@@ -321,14 +321,12 @@ static int handle_play(int fd, const struct message *msg)
     libvlc_media_player_set_media(media_player, media);
     libvlc_media_release(media);
     
-    printf("fuck you\n");
     err = libvlc_media_player_play(media_player);
     if(err < 0) {
         err_msg = libvlc_errmsg();
         log_error(&log, "libvl_media_player_play(): %s\n", err_msg);
         goto out;
     }
-    printf("fuck you\n");
 
     err = ipc_send_message(fd, &msg_out, IPC_MESSAGE_OK, NULL);
     if(err < 0)
