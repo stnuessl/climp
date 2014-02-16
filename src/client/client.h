@@ -16,19 +16,22 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef _CLIMP_PLAYER_H_
-#define _CLIMP_PLAYER_H_
+#ifndef _CLIENT_H_
+#define _CLIENT_H_
 
-int climp_player_init(void);
+#include "../shared/ipc.h"
 
-void climp_player_destroy(void);
+struct client {
+    struct message msg;
+    int fd;
+};
 
-int climp_player_play_title(const char *title);
+struct client *client_new(void);
 
-int climp_player_handle_events(void);
+void client_delete(struct client *__restrict client);
 
-const char *climp_error_message(void);
+int client_request_play(struct client *__restrict client, const char *arg);
 
-int climp_player_send_message(const char *msg);
+int client_request_stop(struct client *__restrict client);
 
-#endif /* _CLIMP_PLAYER_H_ */
+#endif /* _CLIENT_H_ */

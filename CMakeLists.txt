@@ -11,10 +11,20 @@ add_definitions(-g3)
 set(LIBS vci vlc)
 set(CMAKE_LIBRARY_PATH /usr/local/lib)
 set(SOURCE
-    src/main.c
-    src/climp_player.c)
+    src/client/main.c
+    src/client/client.c
+    src/shared/ipc.c
+    )
+    
+set(SOURCE_SERVER
+    src/server/main.c
+    src/shared/ipc.c
+    )
 
 link_directories(${CMAKE_LIBRARY_PATH})
 
 add_executable(climp ${SOURCE})
 target_link_libraries(climp ${LIBS})
+
+add_executable(climpd ${SOURCE_SERVER})
+target_link_libraries(climpd ${LIBS})

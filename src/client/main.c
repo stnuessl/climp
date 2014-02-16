@@ -20,14 +20,15 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>
+#include <errno.h>
 
 #include <libvci/macro.h>
 
-#include "climp_player.h"
+#include "client.h"
 
 #define CLIMP_VERSION_MAJOR "0"
 #define CLIMP_VERSION_MINOR "0"
-#define CLIMP_VERSION_BUILD "1"
+#define CLIMP_VERSION_BUILD "2"
 
 const char *climp_version(void)
 {
@@ -51,42 +52,40 @@ static const char license[] = {
 
 int main(int argc, char *argv[])
 {
+    struct client *client;
     int i, err;
-    const char *title;
     
-    for(i = 0; i < argc; ++i) {
+    client = client_new();
+    if(!client) {
+        fprintf(stderr, "climp: client_new(): %s\n", strerror(errno));
+        exit(EXIT_FAILURE);
+    }
         
+    for(i = 0; i < argc; ++i) {
         if(strcmp("--version", argv[i]) == 0 || strcmp("-v", argv[i]) == 0) {
             fprintf(stdout, "%s\nVersion %s\n\n", license, climp_version());
-        } else if(strcmp("--play", argv[i]) == 0) {
-            if(i + 1 >= argc) {
-                fprintf(stderr, "climp: error: no title specified.\n");
-                exit(EXIT_FAILURE);
+        } else if(strcmp("--help", argv[i]) == 0) {
+            fprintf(stdout, "TODO: help text\n");
+        } else if(strcmp("play", argv[i]) == 0) {
+            i += 1;
+            
+            if(i > argc) {
+                fprintf(stderr, "climp: play: %s", strerror(ENOENT));
+                continue;
             }
             
-            title = argv[i + 1];
+            err = client_request_play(client, argv[i]);
+            if(err < 0)
+                fprintf(stderr, "climp: play: %s\n", strerror(-err));
             
-            err = climp_player_init();
-            if(err  < 0) {
-                fprintf(stderr, "climp: error: initializing player failed.\n");
-                exit(EXIT_FAILURE);
-            }
-            
-            err = climp_player_send_message("Hello climp!");
-            if(err < 0) {
-                fprintf(stderr, "climp: error: sending message failed.\n");
-                exit(EXIT_FAILURE);
-            }
-            
-            err = climp_player_play_title(title);
-            if(err < 0) {
-                fprintf(stderr, "climp: error: playing title failed.\n");
-                exit(EXIT_FAILURE);
-            }
-            
-            climp_player_handle_events();
+        } else if(strcmp("stop", argv[i]) == 0) {
+            err = client_request_stop(client);
+            if(err < 0)
+                fprintf(stderr, "climp: stop: %s\n", strerror(-err));
         }
     }
+    
+    client_delete(client);
     
     return EXIT_SUCCESS;
 }
