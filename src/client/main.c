@@ -22,8 +22,6 @@
 #include <string.h>
 #include <errno.h>
 
-#include <libvci/macro.h>
-
 #include "client.h"
 
 #define CLIMP_VERSION_MAJOR "0"
@@ -50,10 +48,27 @@ static const char license[] = {
     "along with this program.  If not, see <http://www.gnu.org/licenses/>.   \n"
 };
 
+static const char help[] = {
+    "climp - Command Line Interface Music Player                             \n"
+    "Usage: climp [option] [file]...                                         \n"
+    "Options:                                                                \n"
+    "\tplay          Play the file specified by the next argument.           \n"
+    "\tstop          Stop climp from playing any music.                      \n"
+    "\t--version     Prints the version of climp.                            \n"
+    "\t-v            Same as --version.                                      \n"
+};
+
+static const char warning[] = {
+    "warning: project is currently under development.\n"
+    "A lot of features are still buggy or unavailable.\n"
+};
+
 int main(int argc, char *argv[])
 {
     struct client *client;
     int i, err;
+    
+    fprintf(stdout, "%s\n", warning);
     
     client = client_new();
     if(!client) {
@@ -65,7 +80,7 @@ int main(int argc, char *argv[])
         if(strcmp("--version", argv[i]) == 0 || strcmp("-v", argv[i]) == 0) {
             fprintf(stdout, "%s\nVersion %s\n\n", license, climp_version());
         } else if(strcmp("--help", argv[i]) == 0) {
-            fprintf(stdout, "TODO: help text\n");
+            fprintf(stdout, "%s\n", help);
         } else if(strcmp("play", argv[i]) == 0) {
             i += 1;
             

@@ -59,19 +59,15 @@ static int client_connect(struct client *__restrict client)
         goto cleanup1;
     }
     
-    err = climp_ipc_init_message(&client->msg, CLIMP_MESSAGE_HELLO, NULL);
+    err = ipc_send_message(client->fd, &client->msg, IPC_MESSAGE_HELLO, NULL);
     if(err < 0)
         goto cleanup1;
     
-    err = climp_ipc_send_message(client->fd, &client->msg);
+    err = ipc_recv_message(client->fd, &client->msg);
     if(err < 0)
         goto cleanup1;
     
-    err = climp_ipc_recv_message(client->fd, &client->msg);
-    if(err < 0)
-        goto cleanup1;
-    
-    if(client->msg.id != CLIMP_MESSAGE_OK)
+    if(client->msg.id != IPC_MESSAGE_OK)
         return -EIO;
     
     return 0;
@@ -86,19 +82,15 @@ static int client_disconnect(struct client *__restrict client)
 {
     int err;
     
-    err = climp_ipc_init_message(&client->msg, CLIMP_MESSAGE_GOODBYE, NULL);
+    err = ipc_send_message(client->fd, &client->msg, IPC_MESSAGE_GOODBYE, NULL);
     if(err < 0)
         goto out;
     
-    err = climp_ipc_send_message(client->fd, &client->msg);
+    err = ipc_recv_message(client->fd, &client->msg);
     if(err < 0)
         goto out;
     
-    err = climp_ipc_recv_message(client->fd, &client->msg);
-    if(err < 0)
-        goto out;
-    
-    if(client->msg.id != CLIMP_MESSAGE_OK)
+    if(client->msg.id != IPC_MESSAGE_OK)
         err = -EIO;
 out:
     close(client->fd);
@@ -192,20 +184,16 @@ int client_request_play(struct client *__restrict client,
                                 const char *arg)
 {
     int err;
-    
-    err = climp_ipc_init_message(&client->msg, CLIMP_MESSAGE_PLAY, arg);
+
+    err = ipc_send_message(client->fd, &client->msg, IPC_MESSAGE_PLAY, arg);
     if(err < 0)
         goto out;
     
-    err = climp_ipc_send_message(client->fd, &client->msg);
+    err = ipc_recv_message(client->fd, &client->msg);
     if(err < 0)
         goto out;
     
-    err = climp_ipc_recv_message(client->fd, &client->msg);
-    if(err < 0)
-        goto out;
-    
-    if(client->msg.id == CLIMP_MESSAGE_NO) {
+    if(client->msg.id == IPC_MESSAGE_NO) {
         fprintf(stderr, "climp: play: %s\n", client->msg.arg);
         return -EINVAL;
     }
@@ -221,19 +209,15 @@ int client_request_stop(struct client *__restrict client)
 {
     int err;
     
-    err = climp_ipc_init_message(&client->msg, CLIMP_MESSAGE_STOP, NULL);
+    err = ipc_send_message(client->fd, &client->msg, IPC_MESSAGE_STOP, NULL);
     if(err < 0)
         goto out;
     
-    err = climp_ipc_send_message(client->fd, &client->msg);
+    err = ipc_recv_message(client->fd, &client->msg);
     if(err < 0)
         goto out;
     
-    err = climp_ipc_recv_message(client->fd, &client->msg);
-    if(err < 0)
-        goto out;
-    
-    if(client->msg.id == CLIMP_MESSAGE_NO) {
+    if(client->msg.id == IPC_MESSAGE_NO) {
         fprintf(stderr, "climp: stop: %s\n", client->msg.arg);
         return -EINVAL;
     }

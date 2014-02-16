@@ -24,12 +24,14 @@
 #include <errno.h>
 #include <stdbool.h>
 #include <signal.h>
+#include <fcntl.h>
 #include <stdint.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <sys/eventfd.h>
 #include <sys/epoll.h>
 #include <sys/timerfd.h>
+#include <sys/stat.h>
 
 #include <vlc/vlc.h>
 
@@ -215,7 +217,7 @@ void destroy_fds(void)
 static int init(void)
 {
     pid_t sid, pid;
-    int err;
+    int fd, err;
     uint8_t flags;
     
     flags = LOG_PRINT_DATE | 
@@ -238,12 +240,21 @@ static int init(void)
     if(pid > 0)
         _exit(EXIT_SUCCESS);
     
+    /*
+     * We don't want to get closed when our tty is closed.
+     * Creating our own session will prevent this.
+     */
     sid = setsid();
     if(sid < 0) {
         err = -errno;
         goto cleanup1;
     }
     
+    /* 
+     * Exit session leading process:
+     * Only a session leading process is able to acquire
+     * a controlling terminal
+     */
     pid = fork();
     if(pid < 0) {
         err = -errno;
@@ -252,6 +263,19 @@ static int init(void)
     
     if(pid > 0)
         _exit(EXIT_SUCCESS);
+    
+    fd = open("/dev/null", O_RDWR);
+    if(fd < 0) {
+        err = -errno;
+        log_error(&log, "open(): %s\n", strerror(errno));
+        goto cleanup1;
+    }
+    
+//     err = dup2(fd, 0);
+//     err = dup2(fd, 1);
+//     err = dup2(fd, 2);
+
+    setenv("VLC_VERBOSE", "0", 1);
     
     err = init_fds();
     if(err < 0)
@@ -282,43 +306,42 @@ static void destroy(void)
 static int handle_play(int fd, const struct message *msg)
 {
     libvlc_media_t *media;
+    const char *err_msg;
     int err;
     
-    log_info(&log, "%s\n", msg->arg);
+    err_msg = NULL;
     
     media = libvlc_media_new_path(libvlc, msg->arg);
     if(!media) {
-        log_error(&log, "libvlc_media_new_path(): %s\n", libvlc_errmsg());
+        err_msg = libvlc_errmsg();
+        log_error(&log, "libvlc_media_new_path(): %s\n", err_msg);
         goto out;
     }
     
     libvlc_media_player_set_media(media_player, media);
     libvlc_media_release(media);
     
+    printf("fuck you\n");
     err = libvlc_media_player_play(media_player);
     if(err < 0) {
-        log_error(&log, "libvl_media_player_play(): %s\n", libvlc_errmsg());
+        err_msg = libvlc_errmsg();
+        log_error(&log, "libvl_media_player_play(): %s\n", err_msg);
         goto out;
     }
-    
-    err = climp_ipc_init_message(&msg_out, CLIMP_MESSAGE_OK, NULL);
-    if(err < 0)
-        goto out;
-    
-    err = climp_ipc_send_message(fd, &msg_out);
+    printf("fuck you\n");
+
+    err = ipc_send_message(fd, &msg_out, IPC_MESSAGE_OK, NULL);
     if(err < 0)
         goto out;
     
     return 0;
     
 out:
-    log_error(&log, "play: %s\n", (err == -1) ? "vlc error" : strerror(-err));
+    err_msg = (err_msg) ? err_msg : strerror(-err);
     
-    err = climp_ipc_init_message(&msg_out, CLIMP_MESSAGE_NO, libvlc_errmsg());
-    if(err < 0)
-        return err;
+    log_error(&log, "play: %s\n", err_msg);
     
-    err = climp_ipc_send_message(fd, &msg_out);
+    err = ipc_send_message(fd, &msg_out, IPC_MESSAGE_NO, err_msg);
     if(err < 0)
         return err;
     
@@ -332,26 +355,18 @@ static int handle_stop(int fd, const struct message *msg)
     if(libvlc_media_player_is_playing(media_player))
         libvlc_media_player_stop(media_player);
     
-    err = climp_ipc_init_message(&msg_out, CLIMP_MESSAGE_OK, NULL);
+    err = ipc_send_message(fd, &msg_out, IPC_MESSAGE_OK, NULL);
     if(err < 0)
         return err;
-    
-    err = climp_ipc_send_message(fd, &msg_out);
-    if(err < 0)
-        return err;
-    
+
     return 0;
 }
 
 static int handle_hello(int fd, const struct message *msg)
 {
     int err;
-    
-    err = climp_ipc_init_message(&msg_out, CLIMP_MESSAGE_OK, NULL);
-    if(err < 0)
-        return err;
-    
-    err = climp_ipc_send_message(fd, &msg_out);
+
+    err = ipc_send_message(fd, &msg_out, IPC_MESSAGE_OK, NULL);
     if(err < 0)
         return err;
     
@@ -364,11 +379,7 @@ static int handle_goodbye(int fd, const struct message *msg)
 {
     int err;
     
-    err = climp_ipc_init_message(&msg_out, CLIMP_MESSAGE_OK, NULL);
-    if(err < 0)
-        goto out;
-    
-    err = climp_ipc_send_message(fd, &msg_out);
+    err = ipc_send_message(fd, &msg_out, IPC_MESSAGE_OK, NULL);
     if(err < 0)
         goto out;
     
@@ -387,12 +398,12 @@ out:
     return err;
 }
 
-static int (*message_handlers[CLIMP_MESSAGE_MAX_ID])(int, struct message *) = {
-    [CLIMP_MESSAGE_HELLO]   = handle_hello,
-    [CLIMP_MESSAGE_GOODBYE] = handle_goodbye,
-    [CLIMP_MESSAGE_PLAY]    = handle_play,
-    [CLIMP_MESSAGE_STOP]    = handle_stop,
-    [CLIMP_MESSAGE_NEXT]    = NULL
+static int (*msg_handler[IPC_MESSAGE_MAX_ID])(int, const struct message *) = {
+    [IPC_MESSAGE_HELLO]   = handle_hello,
+    [IPC_MESSAGE_GOODBYE] = handle_goodbye,
+    [IPC_MESSAGE_PLAY]    = handle_play,
+    [IPC_MESSAGE_STOP]    = handle_stop,
+    [IPC_MESSAGE_NEXT]    = NULL
 };
 
 int main(int argc, char *argv[])
@@ -430,18 +441,18 @@ int main(int argc, char *argv[])
                 if(err < 0)
                     continue;
             } else {
-                err = climp_ipc_recv_message(events[i].data.fd, &msg_in);
+                err = ipc_recv_message(events[i].data.fd, &msg_in);
                 if(err < 0) {
                     log_error(&log, "climp_ipc_recv_message(): %s\n", strerror(errno));
                     continue;
                 }
                 
-                if(msg_in.id >= CLIMP_MESSAGE_MAX_ID) {
-                    log_warning(&log, "received invalid message %d\n", msg_in.id);
+                if(msg_in.id >= IPC_MESSAGE_MAX_ID) {
+                    log_warning(&log, "Received invalid message - ignoring\n");
                     continue;
                 }
                 
-                err = message_handlers[msg_in.id](events[i].data.fd, &msg_in);
+                err = msg_handler[msg_in.id](events[i].data.fd, &msg_in);
             }
         }
     }

@@ -23,15 +23,15 @@
 #define CLIMP_IPC_MAX_MESSAGE_SIZE      256
 
 enum message_id {
-    CLIMP_MESSAGE_HELLO,
-    CLIMP_MESSAGE_GOODBYE,
-    CLIMP_MESSAGE_OK,
-    CLIMP_MESSAGE_NO,
-    CLIMP_MESSAGE_PLAY,
-    CLIMP_MESSAGE_STOP,
-    CLIMP_MESSAGE_NEXT,
-    CLIMP_MESSAGE_PREVIOUS,
-    CLIMP_MESSAGE_MAX_ID
+    IPC_MESSAGE_HELLO,
+    IPC_MESSAGE_GOODBYE,
+    IPC_MESSAGE_OK,
+    IPC_MESSAGE_NO,
+    IPC_MESSAGE_PLAY,
+    IPC_MESSAGE_STOP,
+    IPC_MESSAGE_NEXT,
+    IPC_MESSAGE_PREVIOUS,
+    IPC_MESSAGE_MAX_ID
 }; 
 
 struct message {
@@ -39,14 +39,13 @@ struct message {
     char arg[CLIMP_IPC_MAX_MESSAGE_SIZE - sizeof(enum message_id)];
 };
 
-const char *climp_ipc_message_id_to_string(enum message_id id);
+const char *ipc_message_id_to_string(enum message_id id);
 
-int climp_ipc_init_message(struct message *__restrict msg, 
-                           enum message_id id, 
-                           const char *s);
+int ipc_send_message(int fd, 
+                     struct message *msg, 
+                     enum message_id id, 
+                     const char *arg);
 
-int climp_ipc_send_message(int fd, const struct message *__restrict msg);
-
-int climp_ipc_recv_message(int fd, struct message *__restrict msg);
+int ipc_recv_message(int fd, struct message *__restrict msg);
 
 #endif /* _IPC_H_ */

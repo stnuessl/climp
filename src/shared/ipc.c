@@ -27,25 +27,25 @@
 
 #include "ipc.h"
 
-const char *climp_ipc_message_id_to_string(enum message_id id)
+const char *ipc_message_id_to_string(enum message_id id)
 {
     static const char *message_names[] = {
-        [CLIMP_MESSAGE_HELLO]    = "CLIMP_MESSAGE_HELLO",
-        [CLIMP_MESSAGE_GOODBYE]  = "CLIMP_MESSAGE_GOODBYE",
-        [CLIMP_MESSAGE_OK]       = "CLIMP_MESSAGE_OK",
-        [CLIMP_MESSAGE_NO]       = "CLIMP_MESSAGE_NO",
-        [CLIMP_MESSAGE_PLAY]     = "CLIMP_MESSAGE_PLAY",
-        [CLIMP_MESSAGE_STOP]     = "CLIMP_MESSAGE_STOP",
-        [CLIMP_MESSAGE_NEXT]     = "CLIMP_MESSAGE_NEXT",
-        [CLIMP_MESSAGE_PREVIOUS] = "CLIMP_MESSAGE_PREVIOUS"
+        [IPC_MESSAGE_HELLO]    = "CLIMP_MESSAGE_HELLO",
+        [IPC_MESSAGE_GOODBYE]  = "CLIMP_MESSAGE_GOODBYE",
+        [IPC_MESSAGE_OK]       = "CLIMP_MESSAGE_OK",
+        [IPC_MESSAGE_NO]       = "CLIMP_MESSAGE_NO",
+        [IPC_MESSAGE_PLAY]     = "CLIMP_MESSAGE_PLAY",
+        [IPC_MESSAGE_STOP]     = "CLIMP_MESSAGE_STOP",
+        [IPC_MESSAGE_NEXT]     = "CLIMP_MESSAGE_NEXT",
+        [IPC_MESSAGE_PREVIOUS] = "CLIMP_MESSAGE_PREVIOUS"
     };
     
     return message_names[id];
 }
 
-int climp_ipc_init_message(struct message *__restrict msg, 
-                           enum message_id id, 
-                           const char *s)
+static int climp_ipc_init_message(struct message *__restrict msg, 
+                                  enum message_id id, 
+                                  const char *s)
 {
     size_t len;
     
@@ -64,11 +64,18 @@ int climp_ipc_init_message(struct message *__restrict msg,
     return 0;
 }
 
-int climp_ipc_send_message(int fd, const struct message *msg)
+int ipc_send_message(int fd, 
+                     struct message *msg, 
+                     enum message_id id, 
+                     const char *arg)
 {
     struct msghdr msghdr;
     struct iovec iovec;
     ssize_t err;
+    
+    err = climp_ipc_init_message(msg, id, arg);
+    if(err < 0)
+        return err;
     
     iovec.iov_base = (void *) msg;
     iovec.iov_len  = sizeof(*msg);
@@ -92,7 +99,7 @@ again:
     return 0;
 }
 
-int climp_ipc_recv_message(int fd, struct message *msg)
+int ipc_recv_message(int fd, struct message *msg)
 {
     struct msghdr msghdr;
     struct iovec iovec;
