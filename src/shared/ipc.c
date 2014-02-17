@@ -27,7 +27,7 @@
 
 #include "ipc.h"
 
-const char *ipc_message_id_to_string(enum message_id id)
+const char *ipc_message_id_string(enum message_id id)
 {
     static const char *message_names[] = {
         [IPC_MESSAGE_HELLO]    = "CLIMP_MESSAGE_HELLO",

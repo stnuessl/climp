@@ -33,11 +33,11 @@
 
 #include "../shared/ipc.h"
 
-#include "client.h"
+#include "climpd_control.h"
 
 extern char **environ;
 
-static int client_connect(struct client *__restrict client)
+static int climpd_control_connect(struct climpd_control *__restrict client)
 {
     struct sockaddr_un addr;
     int err;
@@ -78,26 +78,20 @@ out:
     return err;
 }
 
-static int client_disconnect(struct client *__restrict client)
+static int climpd_control_disconnect(struct climpd_control *__restrict client)
 {
     int err;
     
     err = ipc_send_message(client->fd, &client->msg, IPC_MESSAGE_GOODBYE, NULL);
     if(err < 0)
         goto out;
-    
-    err = ipc_recv_message(client->fd, &client->msg);
-    if(err < 0)
-        goto out;
-    
-    if(client->msg.id != IPC_MESSAGE_OK)
-        err = -EIO;
+
 out:
     close(client->fd);
     return err;
 }
 
-static int client_spawn_server(void)
+static int climpd_control_spawn_server(void)
 {
     char *name = "./climpd";
     char *argv[] = { name, NULL };
@@ -117,16 +111,16 @@ static int client_spawn_server(void)
     exit(EXIT_FAILURE);
 }
 
-struct client *client_new(void)
+struct climpd_control *climpd_control_new(void)
 {
-    struct client *client;
+    struct climpd_control *cc;
     int attempts, err;
     
-    client = malloc(sizeof(*client));
-    if(!client)
+    cc = malloc(sizeof(*cc));
+    if(!cc)
         goto out;
     
-    err = client_connect(client);
+    err = climpd_control_connect(cc);
     if(err < 0) {
         if(err != -ENOENT && err != -ECONNREFUSED)
             goto cleanup1;
@@ -137,14 +131,14 @@ struct client *client_new(void)
             goto cleanup1;
         }
         
-        err = client_spawn_server();
+        err = climpd_control_spawn_server();
         if(err < 0)
             goto cleanup1;
         
         attempts = 10;
         
         while(attempts--) {
-            err = client_connect(client);
+            err = climpd_control_connect(cc);
             if(err < 0) {
                 usleep(1000 * 1000);
                 continue;
@@ -157,44 +151,44 @@ struct client *client_new(void)
             goto cleanup1;
     }
 
-    return client;
+    return cc;
     
 cleanup1:
-    free(client);
+    free(cc);
 out:
     return NULL;
 }
 
-void client_delete(struct client *__restrict client)
+void climpd_control_delete(struct climpd_control *__restrict cc)
 {
     int err;
 
-    err = client_disconnect(client);
+    err = climpd_control_disconnect(cc);
     if(err < 0) {
         fprintf(stderr, 
                 "climp: client_destroy_instance(): %s\n", 
                 strerror(-err));
     }
     
-    free(client);
+    free(cc);
 }
 
 
-int client_request_play(struct client *__restrict client,
-                                const char *arg)
+int climpd_control_play(struct climpd_control *__restrict cc,
+                        const char *arg)
 {
     int err;
 
-    err = ipc_send_message(client->fd, &client->msg, IPC_MESSAGE_PLAY, arg);
+    err = ipc_send_message(cc->fd, &cc->msg, IPC_MESSAGE_PLAY, arg);
     if(err < 0)
         goto out;
     
-    err = ipc_recv_message(client->fd, &client->msg);
+    err = ipc_recv_message(cc->fd, &cc->msg);
     if(err < 0)
         goto out;
     
-    if(client->msg.id == IPC_MESSAGE_NO) {
-        fprintf(stderr, "climp: play: %s\n", client->msg.arg);
+    if(cc->msg.id == IPC_MESSAGE_NO) {
+        fprintf(stderr, "climp: play: %s\n", cc->msg.arg);
         return -EINVAL;
     }
     
@@ -205,20 +199,20 @@ out:
     return err;
 }
 
-int client_request_stop(struct client *__restrict client)
+int climpd_control_stop(struct climpd_control *__restrict cc)
 {
     int err;
     
-    err = ipc_send_message(client->fd, &client->msg, IPC_MESSAGE_STOP, NULL);
+    err = ipc_send_message(cc->fd, &cc->msg, IPC_MESSAGE_STOP, NULL);
     if(err < 0)
         goto out;
     
-    err = ipc_recv_message(client->fd, &client->msg);
+    err = ipc_recv_message(cc->fd, &cc->msg);
     if(err < 0)
         goto out;
     
-    if(client->msg.id == IPC_MESSAGE_NO) {
-        fprintf(stderr, "climp: stop: %s\n", client->msg.arg);
+    if(cc->msg.id == IPC_MESSAGE_NO) {
+        fprintf(stderr, "climp: stop: %s\n", cc->msg.arg);
         return -EINVAL;
     }
     
@@ -227,4 +221,110 @@ int client_request_stop(struct client *__restrict client)
 out:
     fprintf(stderr, "climp: stop: %s\n", strerror(-err));
     return err;
+}
+
+int climpd_control_set_volume(struct climpd_control *__restrict cc,
+                          const char *arg)
+{
+    int err;
+    
+    err = ipc_send_message(cc->fd, &cc->msg, IPC_MESSAGE_VOLUME, arg);
+    if(err < 0)
+        return err;
+    
+    err = ipc_recv_message(cc->fd, &cc->msg);
+    if(err < 0)
+        return err;
+    
+    if(cc->msg.id == IPC_MESSAGE_NO) {
+        fprintf(stderr, "climp: volume: %s\n", cc->msg.arg);
+        return -EINVAL;
+    }
+    
+    return 0;
+}
+
+int climpd_control_toggle_mute(struct climpd_control *__restrict cc)
+{
+    int err;
+    
+    err = ipc_send_message(cc->fd, &cc->msg, IPC_MESSAGE_MUTE, NULL);
+    if(err < 0)
+        return err;
+    
+    err = ipc_recv_message(cc->fd, &cc->msg);
+    if(err < 0)
+        return err;
+    
+    if(cc->msg.id == IPC_MESSAGE_NO) {
+        fprintf(stderr, "climp: volume: %s\n", cc->msg.arg);
+        return -EINVAL;
+    }
+    
+    return 0;
+}
+
+int climpd_control_shutdown(struct climpd_control *__restrict cc)
+{
+    return ipc_send_message(cc->fd, &cc->msg, IPC_MESSAGE_SHUTDOWN, NULL);
+}
+
+int climpd_control_add(struct climpd_control *__restrict cc, const char *arg)
+{
+    int err;
+    
+    err = ipc_send_message(cc->fd, &cc->msg, IPC_MESSAGE_ADD, arg);
+    if(err < 0)
+        return err;
+    
+    err = ipc_recv_message(cc->fd, &cc->msg);
+    if(err < 0)
+        return err;
+    
+    if(cc->msg.id == IPC_MESSAGE_NO) {
+        fprintf(stderr, "climp: add: %s\n", cc->msg.arg);
+        return -EINVAL;
+    }
+    
+    return 0;
+}
+
+int climpd_control_next(struct climpd_control *__restrict cc)
+{
+    int err;
+    
+    err = ipc_send_message(cc->fd, &cc->msg, IPC_MESSAGE_NEXT, NULL);
+    if(err < 0)
+        return err;
+    
+    err = ipc_recv_message(cc->fd, &cc->msg);
+    if(err < 0)
+        return err;
+    
+    if(cc->msg.id == IPC_MESSAGE_NO) {
+        fprintf(stderr, "climp: next: %s\n", cc->msg.arg);
+        return -EINVAL;
+    }
+    
+    return 0;
+}
+
+int climpd_control_previous(struct climpd_control *__restrict cc)
+{
+    int err;
+    
+    err = ipc_send_message(cc->fd, &cc->msg, IPC_MESSAGE_PREVIOUS, NULL);
+    if(err < 0)
+        return err;
+    
+    err = ipc_recv_message(cc->fd, &cc->msg);
+    if(err < 0)
+        return err;
+    
+    if(cc->msg.id == IPC_MESSAGE_NO) {
+        fprintf(stderr, "climp: previous: %s\n", cc->msg.arg);
+        return -EINVAL;
+    }
+    
+    return 0;
 }

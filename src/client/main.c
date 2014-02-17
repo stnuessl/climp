@@ -22,11 +22,12 @@
 #include <string.h>
 #include <errno.h>
 
-#include "client.h"
+#include "climpd_control.h"
 
 #define CLIMP_VERSION_MAJOR "0"
 #define CLIMP_VERSION_MINOR "0"
-#define CLIMP_VERSION_BUILD "2"
+#define CLIMP_VERSION_BUILD "3"
+
 
 const char *climp_version(void)
 {
@@ -49,29 +50,28 @@ static const char license[] = {
 };
 
 static const char help[] = {
-    "climp - Command Line Interface Music Player                             \n"
-    "Usage: climp [option] [file]...                                         \n"
-    "Options:                                                                \n"
-    "\tplay          Play the file specified by the next argument.           \n"
-    "\tstop          Stop climp from playing any music.                      \n"
-    "\t--version     Prints the version of climp.                            \n"
-    "\t-v            Same as --version.                                      \n"
-};
-
-static const char warning[] = {
-    "warning: project is currently under development.\n"
-    "A lot of features are still buggy or unavailable.\n"
+    "climp - Command Line Interface Music Player                           \n\n"
+    "Usage: climp [option] [file] [0..120]                                   \n"
+    "Options:                                                              \n\n"
+    "  add              Add [file] to the playlist.                          \n"
+    "  --help           Print this text.                                     \n"
+    "  mute             Toggle mute / unmute.                                \n"
+    "  next             Play next title.                                     \n"
+    "  play             Play [file].                                         \n"
+    "  previous         Play previous title.                                 \n"
+    "  shutdown         Terminate the musik playing process.                 \n"
+    "  stop             Stop climp from playing any music.                   \n"
+    "  --version, -v    Prints the version of climp.                         \n"
+    "  volume           Set volume to [0..120].                              \n"
 };
 
 int main(int argc, char *argv[])
 {
-    struct client *client;
+    struct climpd_control *cc;
     int i, err;
     
-    fprintf(stdout, "%s\n", warning);
-    
-    client = client_new();
-    if(!client) {
+    cc = climpd_control_new();
+    if(!cc) {
         fprintf(stderr, "climp: client_new(): %s\n", strerror(errno));
         exit(EXIT_FAILURE);
     }
@@ -79,8 +79,10 @@ int main(int argc, char *argv[])
     for(i = 0; i < argc; ++i) {
         if(strcmp("--version", argv[i]) == 0 || strcmp("-v", argv[i]) == 0) {
             fprintf(stdout, "%s\nVersion %s\n\n", license, climp_version());
+            
         } else if(strcmp("--help", argv[i]) == 0) {
             fprintf(stdout, "%s\n", help);
+            
         } else if(strcmp("play", argv[i]) == 0) {
             i += 1;
             
@@ -89,18 +91,62 @@ int main(int argc, char *argv[])
                 continue;
             }
             
-            err = client_request_play(client, argv[i]);
+            err = climpd_control_play(cc, argv[i]);
             if(err < 0)
                 fprintf(stderr, "climp: play: %s\n", strerror(-err));
             
         } else if(strcmp("stop", argv[i]) == 0) {
-            err = client_request_stop(client);
+            err = climpd_control_stop(cc);
             if(err < 0)
                 fprintf(stderr, "climp: stop: %s\n", strerror(-err));
+            
+        } else if(strcmp("volume", argv[i]) == 0) {
+            i += 1;
+            if(i > argc) {
+                fprintf(stderr, "climp: volume: %s\n", strerror(EINVAL));
+                continue;
+            }
+            
+            err = climpd_control_set_volume(cc, argv[i]);
+            if(err < 0)
+                fprintf(stderr, "climp: volume: %s\n", strerror(-err));
+            
+        } else if(strcmp("mute", argv[i]) == 0) {
+            err = climpd_control_toggle_mute(cc);
+            if(err < 0)
+                fprintf(stderr, "climp: mute: %s\n", strerror(-err));
+            
+        } else if(strcmp("shutdown", argv[i]) == 0) {
+            err = climpd_control_shutdown(cc);
+            if(err < 0)
+                fprintf(stderr, "climp: shutdown: %s\n", strerror(-err));
+            
+        } else if(strcmp("add", argv[i]) == 0) {
+            i += 1;
+            
+            if(i >= argc) {
+                fprintf(stderr, "climp: add: %s\n", strerror(ENOENT));
+                continue;
+            }
+            
+            err = climpd_control_add(cc, argv[i]);
+            if(err < 0)
+                fprintf(stderr, "climp: add: %s\n", strerror(-err));
+            
+        } else if(strcmp("next", argv[i]) == 0) {
+            err = climpd_control_next(cc);
+            if(err < 0)
+                fprintf(stderr, "climp: next: %s\n", strerror(-err));
+            
+        } else if(strcmp("previous", argv[i]) == 0) {
+            err = climpd_control_previous(cc);
+            if(err < 0)
+                fprintf(stderr, "climp: previous: %s\n", strerror(-err));
+            
         }
     }
     
-    client_delete(client);
+    climpd_control_delete(cc);
     
     return EXIT_SUCCESS;
 }

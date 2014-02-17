@@ -21,17 +21,31 @@
 
 #include "../shared/ipc.h"
 
-struct client {
+struct climpd_control {
     struct message msg;
     int fd;
 };
 
-struct client *client_new(void);
+struct climpd_control *climpd_control_new(void);
 
-void client_delete(struct client *__restrict client);
+void climpd_control_delete(struct climpd_control *__restrict cc);
 
-int client_request_play(struct client *__restrict client, const char *arg);
+int climpd_control_play(struct climpd_control *__restrict cc, 
+                        const char *arg);
 
-int client_request_stop(struct client *__restrict client);
+int climpd_control_stop(struct climpd_control *__restrict cc);
+
+int climpd_control_set_volume(struct climpd_control *__restrict cc, 
+                              const char *arg);
+
+int climpd_control_toggle_mute(struct climpd_control *__restrict cc);
+
+int climpd_control_shutdown(struct climpd_control *__restrict cc);
+
+int climpd_control_add(struct climpd_control *__restrict cc, const char *arg);
+
+int climpd_control_next(struct climpd_control *__restrict cc);
+
+int climpd_control_previous(struct climpd_control *__restrict cc);
 
 #endif /* _CLIENT_H_ */

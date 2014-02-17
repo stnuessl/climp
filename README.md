@@ -15,11 +15,8 @@ Installation
     TODO
 
 
-
-
-
 USAGE
 -----
 
-    $ climp option [file]
+    $ climp --help
     TODO

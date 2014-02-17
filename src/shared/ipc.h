@@ -31,6 +31,10 @@ enum message_id {
     IPC_MESSAGE_STOP,
     IPC_MESSAGE_NEXT,
     IPC_MESSAGE_PREVIOUS,
+    IPC_MESSAGE_VOLUME,
+    IPC_MESSAGE_MUTE,
+    IPC_MESSAGE_ADD,
+    IPC_MESSAGE_SHUTDOWN,
     IPC_MESSAGE_MAX_ID
 }; 
 
@@ -39,7 +43,7 @@ struct message {
     char arg[CLIMP_IPC_MAX_MESSAGE_SIZE - sizeof(enum message_id)];
 };
 
-const char *ipc_message_id_to_string(enum message_id id);
+const char *ipc_message_id_string(enum message_id id);
 
 int ipc_send_message(int fd, 
                      struct message *msg, 
