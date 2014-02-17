@@ -1,6 +1,8 @@
 /* 
- * climp - Command Line Interface Music Player
  * Copyright (C) 2014  Steffen Nüssle
+ * climp - Command Line Interface Music Player
+ * 
+ * This file is part of climp.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -35,6 +37,7 @@ enum message_id {
     IPC_MESSAGE_MUTE,
     IPC_MESSAGE_ADD,
     IPC_MESSAGE_SHUTDOWN,
+    IPC_MESSAGE_PLAYLIST,
     IPC_MESSAGE_MAX_ID
 }; 
 

@@ -1,6 +1,8 @@
 /* 
- * climp - Command Line Interface Music Player
  * Copyright (C) 2014  Steffen Nüssle
+ * climp - Command Line Interface Music Player
+ * 
+ * This file is part of climp.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -25,12 +27,15 @@
 #include <signal.h>
 #include <fcntl.h>
 #include <stdint.h>
+#include <limits.h>
+#include <dirent.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <sys/eventfd.h>
 #include <sys/epoll.h>
 #include <sys/timerfd.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 
 #include <vlc/vlc.h>
 
@@ -326,29 +331,76 @@ static void destroy(void)
 static int handle_message_play(int fd, const struct message *msg)
 {
     libvlc_media_t *media;
+    struct stat s;
     const char *err_msg;
     int err;
-
-    media = libvlc_media_new_path(libvlc, msg->arg);
-    if(!media) {
-        err_msg = libvlc_errmsg();
-        log_e("libvlc_media_new_path()", err_msg);
-        goto out;
-    }
     
-    libvlc_media_list_lock(media_list);
-    err = libvlc_media_list_add_media(media_list, media);
-    libvlc_media_list_unlock(media_list);
-    
-    libvlc_media_release(media);
-    
+    err = stat(msg->arg, &s);
     if(err < 0) {
-        err_msg = libvlc_errmsg();
-        log_e("libvlc_media_list_add_media()", err_msg);
+        err_msg = strerror(errno);
         goto out;
     }
+    
+    if(S_ISREG(s.st_mode)) {
+        media = libvlc_media_new_path(libvlc, msg->arg);
+        if(!media) {
+            err_msg = libvlc_errmsg();
+            log_e("libvlc_media_new_path()", err_msg);
+            goto out;
+        }
+        
+        libvlc_media_list_lock(media_list);
+        err = libvlc_media_list_add_media(media_list, media);
+        libvlc_media_list_unlock(media_list);
+        
+        libvlc_media_release(media);
+        
+        if(err < 0) {
+            err_msg = libvlc_errmsg();
+            log_e("libvlc_media_list_add_media()", err_msg);
+            goto out;
+        }
 
-    libvlc_media_list_player_play(media_list_player);
+        libvlc_media_list_player_play(media_list_player);
+    } else if(S_ISDIR(s.st_mode)) {
+        DIR *dir;
+        struct dirent *entry;
+        char *path;
+        
+        dir = opendir(msg->arg);
+        if(!dir) {
+            err_msg = strerror(errno);
+            goto out;
+        }
+        
+        path = malloc(sizeof(*path) * PATH_MAX);
+        
+        
+        for(entry = readdir(dir); entry; entry = readdir(dir)) {
+            if(strlen(msg->arg) + strlen(entry->d_name) + 1 > PATH_MAX)
+                continue;
+            
+            sprintf(path, "%s%s", msg->arg, entry->d_name);
+            
+            media = libvlc_media_new_path(libvlc, path);
+            if(!media) {
+                log_e("libvlc_media_new_path", libvlc_errmsg());
+                continue;
+            }
+            
+            libvlc_media_list_lock(media_list);
+            libvlc_media_list_add_media(media_list, media);
+            libvlc_media_list_unlock(media_list);
+            
+            libvlc_media_release(media);
+        }
+        
+        free(path);
+        closedir(dir);
+        
+        libvlc_media_list_player_play(media_list_player);
+        
+    }
 
     return ipc_send_message(fd, &msg_out, IPC_MESSAGE_OK, NULL);
     
@@ -499,6 +551,37 @@ static int handle_message_mute(int fd, const struct message *msg)
     return ipc_send_message(fd, &msg_out, IPC_MESSAGE_OK, NULL);
 }
 
+static int handle_message_playlist(int fd, const struct message *msg)
+{
+    libvlc_media_t *media;
+    int err, i, media_count;
+    const char *title;
+    
+    libvlc_media_list_lock(media_list);
+    media_count = libvlc_media_list_count(media_list);
+
+    for(i = 0; i < media_count; ++i) {
+        media = libvlc_media_list_item_at_index(media_list, i);
+        
+        if(!libvlc_media_is_parsed(media))
+            libvlc_media_parse(media);
+        
+        title = libvlc_media_get_meta(media, libvlc_meta_Title);
+        
+        libvlc_media_release(media);
+        
+        err = ipc_send_message(fd, &msg_out, IPC_MESSAGE_PLAYLIST, title);
+        if(err < 0) {
+            libvlc_media_list_unlock(media_list);
+            return err;
+        }
+    }
+    
+    libvlc_media_list_unlock(media_list);
+    
+    return ipc_send_message(fd, &msg_out, IPC_MESSAGE_OK, NULL);
+}
+
 static int (*msg_handler[IPC_MESSAGE_MAX_ID])(int, const struct message *) = {
     [IPC_MESSAGE_HELLO]    = &handle_message_hello,
     [IPC_MESSAGE_GOODBYE]  = &handle_message_goodbye,
@@ -509,7 +592,8 @@ static int (*msg_handler[IPC_MESSAGE_MAX_ID])(int, const struct message *) = {
     [IPC_MESSAGE_VOLUME]   = &handle_message_volume,
     [IPC_MESSAGE_MUTE]     = &handle_message_mute,
     [IPC_MESSAGE_ADD]      = &handle_message_add,
-    [IPC_MESSAGE_SHUTDOWN] = &handle_message_shutdown
+    [IPC_MESSAGE_SHUTDOWN] = &handle_message_shutdown,
+    [IPC_MESSAGE_PLAYLIST] = &handle_message_playlist
 };
 
 int main(int argc, char *argv[])
@@ -517,6 +601,9 @@ int main(int argc, char *argv[])
     struct epoll_event events[CLIMP_SERVER_MAX_EPOLL_EVENTS];
     eventfd_t val;
     int fd, i, nfds, err;
+    
+    if(getuid() == 0)
+        exit(EXIT_FAILURE);
     
     err = init();
     if(err < 0)
@@ -532,8 +619,6 @@ int main(int argc, char *argv[])
         for(i = 0; i < nfds; ++i) {
             if(events[i].data.fd == event_fd) {
                 eventfd_read(event_fd, &val);
-                
-                run = !(val == 1);
                 
             } else if(events[i].data.fd == server_fd) {
                 fd = accept(server_fd, NULL, NULL);

@@ -1,6 +1,8 @@
 /* 
- * climp - Command Line Interface Music Player
  * Copyright (C) 2014  Steffen Nüssle
+ * climp - Command Line Interface Music Player
+ * 
+ * This file is part of climp.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -47,5 +49,7 @@ int climpd_control_add(struct climpd_control *__restrict cc, const char *arg);
 int climpd_control_next(struct climpd_control *__restrict cc);
 
 int climpd_control_previous(struct climpd_control *__restrict cc);
+
+int climpd_control_playlist(struct climpd_control *__restrict cc);
 
 #endif /* _CLIENT_H_ */

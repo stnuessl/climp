@@ -1,6 +1,8 @@
 /* 
- * climp - Command Line Interface Music Player
  * Copyright (C) 2014  Steffen Nüssle
+ * climp - Command Line Interface Music Player
+ * 
+ * This file is part of climp.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -327,4 +329,30 @@ int climpd_control_previous(struct climpd_control *__restrict cc)
     }
     
     return 0;
+}
+
+int climpd_control_playlist(struct climpd_control *__restrict cc)
+{
+    int err;
+    
+    err = ipc_send_message(cc->fd, &cc->msg, IPC_MESSAGE_PLAYLIST, NULL);
+    if(err < 0)
+        return err;
+    
+    while(1) {
+        err = ipc_recv_message(cc->fd, &cc->msg);
+        if(err < 0)
+            return err;
+        
+        if(cc->msg.id == IPC_MESSAGE_OK) {
+            return 0;
+        } else if(cc->msg.id == IPC_MESSAGE_PLAYLIST) {
+            fprintf(stdout, "%s\n", cc->msg.arg);
+        } else if(cc->msg.id == IPC_MESSAGE_NO) {
+            fprintf(stderr, "climp: playlist: %s\n", cc->msg.arg);
+            return -EINVAL;
+        } else {
+            return -EIO;
+        }
+    }
 }

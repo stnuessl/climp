@@ -1,6 +1,8 @@
 /* 
- * climp - Command Line Interface Music Player
  * Copyright (C) 2014  Steffen Nüssle
+ * climp - Command Line Interface Music Player
+ * 
+ * This file is part of climp.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -58,6 +60,7 @@ static const char help[] = {
     "  mute             Toggle mute / unmute.                                \n"
     "  next             Play next title.                                     \n"
     "  play             Play [file].                                         \n"
+    "  playlist         Prints to current playlist.                          \n"
     "  previous         Play previous title.                                 \n"
     "  shutdown         Terminate the musik playing process.                 \n"
     "  stop             Stop climp from playing any music.                   \n"
@@ -69,6 +72,11 @@ int main(int argc, char *argv[])
 {
     struct climpd_control *cc;
     int i, err;
+    
+    if(getuid() == 0) {
+        fprintf(stderr, "climp: run as root\n");
+        exit(EXIT_FAILURE);
+    }
     
     cc = climpd_control_new();
     if(!cc) {
@@ -142,6 +150,11 @@ int main(int argc, char *argv[])
             err = climpd_control_previous(cc);
             if(err < 0)
                 fprintf(stderr, "climp: previous: %s\n", strerror(-err));
+            
+        } else if(strcmp("playlist", argv[i]) == 0) {
+            err = climpd_control_playlist(cc);
+            if(err < 0)
+                fprintf(stderr, "climp: playlist: %s\n", strerror(-err));
             
         }
     }
