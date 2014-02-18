@@ -24,7 +24,7 @@
 #include <string.h>
 #include <errno.h>
 
-#include "climpd_control.h"
+#include "climpd.h"
 
 #define CLIMP_VERSION_MAJOR "0"
 #define CLIMP_VERSION_MINOR "0"
@@ -70,15 +70,15 @@ static const char help[] = {
 
 int main(int argc, char *argv[])
 {
-    struct climpd_control *cc;
-    int i, err;
+    struct climpd *cc;
+    int i;
     
     if(getuid() == 0) {
         fprintf(stderr, "climp: run as root\n");
         exit(EXIT_FAILURE);
     }
     
-    cc = climpd_control_new();
+    cc = climpd_new();
     if(!cc) {
         fprintf(stderr, "climp: client_new(): %s\n", strerror(errno));
         exit(EXIT_FAILURE);
@@ -99,14 +99,9 @@ int main(int argc, char *argv[])
                 continue;
             }
             
-            err = climpd_control_play(cc, argv[i]);
-            if(err < 0)
-                fprintf(stderr, "climp: play: %s\n", strerror(-err));
-            
+            climpd_play(cc, argv[i]);
         } else if(strcmp("stop", argv[i]) == 0) {
-            err = climpd_control_stop(cc);
-            if(err < 0)
-                fprintf(stderr, "climp: stop: %s\n", strerror(-err));
+            climpd_stop(cc);
             
         } else if(strcmp("volume", argv[i]) == 0) {
             i += 1;
@@ -115,19 +110,13 @@ int main(int argc, char *argv[])
                 continue;
             }
             
-            err = climpd_control_set_volume(cc, argv[i]);
-            if(err < 0)
-                fprintf(stderr, "climp: volume: %s\n", strerror(-err));
-            
+            climpd_set_volume(cc, argv[i]);
         } else if(strcmp("mute", argv[i]) == 0) {
-            err = climpd_control_toggle_mute(cc);
-            if(err < 0)
-                fprintf(stderr, "climp: mute: %s\n", strerror(-err));
+            climpd_toggle_mute(cc);
+     
             
         } else if(strcmp("shutdown", argv[i]) == 0) {
-            err = climpd_control_shutdown(cc);
-            if(err < 0)
-                fprintf(stderr, "climp: shutdown: %s\n", strerror(-err));
+            climpd_shutdown(cc);
             
         } else if(strcmp("add", argv[i]) == 0) {
             i += 1;
@@ -137,29 +126,20 @@ int main(int argc, char *argv[])
                 continue;
             }
             
-            err = climpd_control_add(cc, argv[i]);
-            if(err < 0)
-                fprintf(stderr, "climp: add: %s\n", strerror(-err));
+            climpd_add(cc, argv[i]);
             
         } else if(strcmp("next", argv[i]) == 0) {
-            err = climpd_control_next(cc);
-            if(err < 0)
-                fprintf(stderr, "climp: next: %s\n", strerror(-err));
+            climpd_next(cc);
             
         } else if(strcmp("previous", argv[i]) == 0) {
-            err = climpd_control_previous(cc);
-            if(err < 0)
-                fprintf(stderr, "climp: previous: %s\n", strerror(-err));
+            climpd_previous(cc);
             
         } else if(strcmp("playlist", argv[i]) == 0) {
-            err = climpd_control_playlist(cc);
-            if(err < 0)
-                fprintf(stderr, "climp: playlist: %s\n", strerror(-err));
-            
+            climpd_playlist(cc);
         }
     }
     
-    climpd_control_delete(cc);
+    climpd_delete(cc);
     
     return EXIT_SUCCESS;
 }

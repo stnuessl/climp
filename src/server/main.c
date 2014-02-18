@@ -37,13 +37,14 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#include <vlc/vlc.h>
-
 #include <libvci/macro.h>
-#include <libvci/map.h>
 #include <libvci/log.h>
 
 #include "../shared/ipc.h"
+#include "../shared/util.h"
+
+#include "media_player.h"
+#include "client.h"
 
 #define CLIMP_SERVER_MAX_EPOLL_EVENTS   10
 #define CLIMP_SERVER_LOGFILE_PATH       "/tmp/climpd.log"
@@ -62,10 +63,8 @@
 #define log_e(func, err)                                                       \
     log_error(&log, "%s: %s at %s:%d\n", (func), (err), __FILE__, __LINE__)
 
-static libvlc_instance_t *libvlc;
-static libvlc_media_list_player_t *media_list_player;
-static libvlc_media_player_t *media_player;
-static libvlc_media_list_t *media_list;
+static struct media_player *media_player;
+static struct client client;
 static struct message msg_in;
 static struct message msg_out;
 static struct log log;
@@ -80,69 +79,6 @@ static void media_player_finished(const struct libvlc_event_t *event, void *arg)
         eventfd_write(event_fd, 1);
 }
 
-static int init_vlc(void)
-{
-    libvlc_event_type_t ev;
-    libvlc_event_manager_t *ev_man;
-    int err;
-    
-    libvlc = libvlc_new(0, NULL);
-    if(!libvlc) {
-        log_e("libvlc_new()", libvlc_errmsg());
-        goto out;
-    }
-    
-    media_player = libvlc_media_player_new(libvlc);
-    if(!media_player) {
-        log_e("libvlc_media_player_new()", libvlc_errmsg());
-        goto cleanup1;
-    }
-    
-    media_list_player = libvlc_media_list_player_new(libvlc);
-    if(!media_list_player) {
-        log_e("libvlc_media_list_player_new()", libvlc_errmsg());
-        goto cleanup2;
-    }
-    
-    media_list = libvlc_media_list_new(libvlc);
-    if(!media_list) {
-        log_e("libvlc_media_list_new()", libvlc_errmsg());
-        goto cleanup3;
-    }
-    
-    libvlc_media_list_player_set_media_player(media_list_player, media_player);
-    libvlc_media_list_player_set_media_list(media_list_player, media_list);
-    
-    ev_man = libvlc_media_player_event_manager(media_player);
-    
-    ev = libvlc_MediaPlayerEndReached;
-    
-    err = libvlc_event_attach(ev_man, ev, &media_player_finished, NULL);
-    if(err != 0)
-        goto cleanup4;
-    
-    return 0;
-
-cleanup4:
-    libvlc_media_list_release(media_list);
-cleanup3:
-    libvlc_media_list_player_release(media_list_player);
-cleanup2:
-    libvlc_media_player_release(media_player);
-cleanup1:
-    libvlc_release(libvlc);
-out:
-    return -1;
-}
-
-static void destroy_vlc(void)
-{
-    if(libvlc_media_list_player_is_playing(media_list_player))
-        libvlc_media_list_player_stop(media_list_player);
-    
-    libvlc_media_list_player_release(media_list_player);
-    libvlc_release(libvlc);
-}
 
 static int epoll_add_fd(int fd)
 {
@@ -178,7 +114,7 @@ static int init_fds(void)
     int err;
     
     /* Setup Unix Domain Socket */
-    err = unlink(CLIMP_IPC_SOCKET_PATH);
+    err = unlink(IPC_SOCKET_PATH);
     if(err < 0 && errno != ENOENT) {
         err = -errno;
         goto out;
@@ -193,7 +129,7 @@ static int init_fds(void)
     memset(&addr, 0, sizeof(addr));
     
     addr.sun_family = AF_UNIX;
-    strncpy(addr.sun_path, CLIMP_IPC_SOCKET_PATH, sizeof(addr.sun_path));
+    strncpy(addr.sun_path, IPC_SOCKET_PATH, sizeof(addr.sun_path));
     
     err = bind(server_fd, (struct sockaddr *) &addr, sizeof(addr));
     if(err < 0) {
@@ -237,7 +173,7 @@ cleanup3:
 close(event_fd);
     cleanup1:
 close(server_fd);
-    unlink(CLIMP_IPC_SOCKET_PATH);
+    unlink(IPC_SOCKET_PATH);
 out:
     return err;
 }
@@ -247,7 +183,7 @@ void destroy_fds(void)
     close(epoll_fd);
     close(event_fd);
     close(server_fd);
-    unlink(CLIMP_IPC_SOCKET_PATH);
+    unlink(IPC_SOCKET_PATH);
 }
 
 static int init(void)
@@ -304,10 +240,15 @@ static int init(void)
     if(err < 0)
         goto cleanup1;
     
-    
-    err = init_vlc();
-    if(err < 0)
+
+    media_player = media_player_new();
+    if(!media_player)
         goto cleanup2;
+    
+    memset(&client, 0, sizeof(client));
+    
+    ipc_message_init(&msg_in);
+    ipc_message_init(&msg_out);
     
     run = true;
     
@@ -324,137 +265,86 @@ out:
 static void destroy(void)
 {
     destroy_fds();
-    destroy_vlc();
+    media_player_delete(media_player);
     log_destroy(&log);
 }
 
 static int handle_message_play(int fd, const struct message *msg)
 {
-    libvlc_media_t *media;
+    DIR *dir;
+    struct dirent *entry;
     struct stat s;
-    const char *err_msg;
     int err;
     
     err = stat(msg->arg, &s);
-    if(err < 0) {
-        err_msg = strerror(errno);
-        goto out;
-    }
+    if(err < 0)
+        return -errno;
     
     if(S_ISREG(s.st_mode)) {
-        media = libvlc_media_new_path(libvlc, msg->arg);
-        if(!media) {
-            err_msg = libvlc_errmsg();
-            log_e("libvlc_media_new_path()", err_msg);
-            goto out;
-        }
+        err = media_player_add_title(media_player, msg->arg);
         
-        libvlc_media_list_lock(media_list);
-        err = libvlc_media_list_add_media(media_list, media);
-        libvlc_media_list_unlock(media_list);
-        
-        libvlc_media_release(media);
-        
-        if(err < 0) {
-            err_msg = libvlc_errmsg();
-            log_e("libvlc_media_list_add_media()", err_msg);
-            goto out;
-        }
-
-        libvlc_media_list_player_play(media_list_player);
     } else if(S_ISDIR(s.st_mode)) {
-        DIR *dir;
-        struct dirent *entry;
-        char *path;
-        
-        dir = opendir(msg->arg);
-        if(!dir) {
-            err_msg = strerror(errno);
-            goto out;
-        }
-        
-        path = malloc(sizeof(*path) * PATH_MAX);
-        
-        
-        for(entry = readdir(dir); entry; entry = readdir(dir)) {
-            if(strlen(msg->arg) + strlen(entry->d_name) + 1 > PATH_MAX)
-                continue;
-            
-            sprintf(path, "%s%s", msg->arg, entry->d_name);
-            
-            media = libvlc_media_new_path(libvlc, path);
-            if(!media) {
-                log_e("libvlc_media_new_path", libvlc_errmsg());
-                continue;
-            }
-            
-            libvlc_media_list_lock(media_list);
-            libvlc_media_list_add_media(media_list, media);
-            libvlc_media_list_unlock(media_list);
-            
-            libvlc_media_release(media);
-        }
-        
-        free(path);
-        closedir(dir);
-        
-        libvlc_media_list_player_play(media_list_player);
-        
-    }
 
-    return ipc_send_message(fd, &msg_out, IPC_MESSAGE_OK, NULL);
+        return 0;
+    } else {
+        return -EINVAL;
+    }
     
-out:
-    ipc_send_message(fd, &msg_out, IPC_MESSAGE_NO, err_msg);
-    
-    return -EIO;
+    err = media_player_play(media_player);
+    if(err < 0)
+        return err;
+
+    return 0;
 }
 
 static int handle_message_stop(int fd, const struct message *msg)
 {
-    if(libvlc_media_list_player_is_playing(media_list_player))
-        libvlc_media_list_player_stop(media_list_player);
-
-    return ipc_send_message(fd, &msg_out, IPC_MESSAGE_OK, NULL);
+    media_player_stop(media_player);
+    
+    return 0;
 }
 
 static int handle_message_next(int fd, const struct message *msg)
 {
-    const char *err_msg;
-    int err;
+    media_player_next_title(media_player);
     
-    err = libvlc_media_list_player_next(media_list_player);
-    if(err < 0) {
-        err_msg = libvlc_errmsg();
-        log_e("libvlc_media_list_player_next()", err_msg);
-        ipc_send_message(fd, &msg_out, IPC_MESSAGE_NO, err_msg);
-        return -EIO;
-    }
-    
-    return ipc_send_message(fd, &msg_out, IPC_MESSAGE_OK, NULL);
+    return 0;
 }
 
 static int handle_message_previous(int fd, const struct message *msg)
 {
-    const char *err_msg;
-    int err;
+    media_player_previous_title(media_player);
     
-    err = libvlc_media_list_player_previous(media_list_player);
-    if(err < 0) {
-        err_msg = libvlc_errmsg();
-        log_e("libvlc_media_list_player_previous()", err_msg);
-        ipc_send_message(fd, &msg_out, IPC_MESSAGE_NO, err_msg);
-        return -EIO;
-    }
-    
-    return ipc_send_message(fd, &msg_out, IPC_MESSAGE_OK, NULL);
+    return 0;
 }
 
 static int handle_message_hello(int fd, const struct message *msg)
 {
-    log_i("Registered new client on socket %d\n", fd);
+    client.unix_fd   = fd;
+    client.stdout_fd = ipc_message_fd(msg, IPC_MESSAGE_FD_0);
+    client.stderr_fd = ipc_message_fd(msg, IPC_MESSAGE_FD_1);
     
-    return ipc_send_message(fd, &msg_out, IPC_MESSAGE_OK, NULL);
+    ipc_message_clear(&msg_out);
+    
+    if(client.stdout_fd < 0 || client.stderr_fd < 0) {
+        log_i("bad fds: %d : %d\n", client.stdout_fd, client.stderr_fd);
+        ipc_message_set_id(&msg_out, IPC_MESSAGE_NO);
+        ipc_message_set_arg(&msg_out, errno_string(EINVAL));
+        
+        ipc_send_message(fd, &msg_out);
+        
+        epoll_remove_fd(fd);
+        close(fd);
+        
+        return -EINVAL;
+    }
+    
+    dprintf(client.stdout_fd, "Test stdout\n");
+    dprintf(client.stderr_fd, "Test stderr\n");
+    
+    ipc_message_set_id(&msg_out, IPC_MESSAGE_OK);
+    
+    return ipc_send_message(fd, &msg_out);
 }
 
 static int handle_message_goodbye(int fd, const struct message *msg)
@@ -469,117 +359,74 @@ static int handle_message_goodbye(int fd, const struct message *msg)
 
 static int handle_message_volume(int fd, const struct message *msg)
 {
-    const char *err_msg;
+    const char *err_msg, *arg;
     long val;
     int err;
     
+    arg = ipc_message_arg(msg);
+    
     errno = 0;
-    val = strtol(msg->arg, NULL, 10);
+    val = strtol(arg, NULL, 10);
     if(errno != 0) {
         err_msg = strerror(errno);
         err = -errno;
-        goto out;
+        return err;
     }
     
     val = min(val, CLIMP_MAX_VOLUME);
     val = max(val, CLIMP_MIN_VOLUME);
     
-    err = libvlc_audio_set_volume(media_player, val);
-    if(err < 0) {
-        err_msg = libvlc_errmsg();
-        err = -EINVAL;
-        goto out;
-    }
-    
-    return ipc_send_message(fd, &msg_out, IPC_MESSAGE_OK, NULL);;
-    
-out:
-    ipc_send_message(fd, &msg_out, IPC_MESSAGE_NO, err_msg);
-
-    return -EIO;
+    return media_player_set_volume(media_player, val);
 }
 
-static int handle_message_add(int fd, const struct message *message)
+static int handle_message_add(int fd, const struct message *msg)
 {
-    libvlc_media_t *media;
-    const char *err_msg;
+    struct stat s;
+    const char *path;
     int err;
     
-    media = libvlc_media_new_path(libvlc, message->arg);
-    if(!media) {
-        err_msg = libvlc_errmsg();
-        log_e("libvlc_media_new_path()", err_msg);
-        goto out;
+    path = ipc_message_arg(msg);
+    
+    err = stat(path, &s);
+    if(err < 0)
+        return err;
+    
+    if(S_ISREG(s.st_mode)) {
+        err = media_player_add_title(media_player, path);
+        
+        if(!err) 
+            return err;
+    } else if(S_ISDIR(s.st_mode)) {
+        return 0;
+        
+    } else {
+        return -EINVAL;
     }
     
-    libvlc_media_list_lock(media_list);
-    err = libvlc_media_list_add_media(media_list, media);
-    libvlc_media_list_unlock(media_list);
+    err = media_player_play(media_player);
+    if(err < 0)
+        return err;
     
-    libvlc_media_release(media);
-    
-    if(err < 0) {
-        err_msg = libvlc_errmsg();
-        log_e("libvlc_media_list_add_media()", err_msg);
-        goto out;
-    }
-    
-    if(!libvlc_media_list_player_is_playing(media_list_player))
-        libvlc_media_list_player_play(media_list_player);
-    
-    return ipc_send_message(fd, &msg_out, IPC_MESSAGE_OK, NULL);
-    
-out:
-    ipc_send_message(fd, &msg_out, IPC_MESSAGE_NO, err_msg);
-    
-    return -EIO;
+    return 0;
 }
 
 static int handle_message_shutdown(int fd, const struct message *msg)
 {
-    ipc_send_message(fd, &msg_out, IPC_MESSAGE_OK, NULL);
-    
     run = false;
-    
+
     return 0;
 }
 
 static int handle_message_mute(int fd, const struct message *msg)
 {
-    libvlc_audio_toggle_mute(media_player);
+    media_player_toggle_mute(media_player);
 
-    return ipc_send_message(fd, &msg_out, IPC_MESSAGE_OK, NULL);
+    return 0;
 }
 
 static int handle_message_playlist(int fd, const struct message *msg)
 {
-    libvlc_media_t *media;
-    int err, i, media_count;
-    const char *title;
-    
-    libvlc_media_list_lock(media_list);
-    media_count = libvlc_media_list_count(media_list);
-
-    for(i = 0; i < media_count; ++i) {
-        media = libvlc_media_list_item_at_index(media_list, i);
-        
-        if(!libvlc_media_is_parsed(media))
-            libvlc_media_parse(media);
-        
-        title = libvlc_media_get_meta(media, libvlc_meta_Title);
-        
-        libvlc_media_release(media);
-        
-        err = ipc_send_message(fd, &msg_out, IPC_MESSAGE_PLAYLIST, title);
-        if(err < 0) {
-            libvlc_media_list_unlock(media_list);
-            return err;
-        }
-    }
-    
-    libvlc_media_list_unlock(media_list);
-    
-    return ipc_send_message(fd, &msg_out, IPC_MESSAGE_OK, NULL);
+    return 0;
 }
 
 static int (*msg_handler[IPC_MESSAGE_MAX_ID])(int, const struct message *) = {
@@ -600,6 +447,7 @@ int main(int argc, char *argv[])
 {
     struct epoll_event events[CLIMP_SERVER_MAX_EPOLL_EVENTS];
     eventfd_t val;
+    enum message_id id;
     int fd, i, nfds, err;
     
     if(getuid() == 0)
@@ -633,26 +481,31 @@ int main(int argc, char *argv[])
             } else {
                 fd = events[i].data.fd;
                 
+                ipc_message_clear(&msg_in);
+                
                 err = ipc_recv_message(fd, &msg_in);
                 if(err < 0) {
                     log_w("Receiving message on socket %d failed: %s -> "
                           "closing connection...\n", 
-                          fd, strerror(-err));
+                          fd, errno_string(-err));
 
                     epoll_remove_fd(fd);
                     close(fd);
                     continue; 
                 }
                 
-                if(msg_in.id >= IPC_MESSAGE_MAX_ID) {
+                id = ipc_message_id(&msg_in);
+                
+                if(id >= IPC_MESSAGE_MAX_ID) {
                     log_w("Received invalid message\n");
                     continue;
                 }
                 
-                err = msg_handler[msg_in.id](fd, &msg_in);
+    
+                err = msg_handler[id](fd, &msg_in);
                 if(err < 0) {
                     log_w("Handling message %s failed - %s\n", 
-                          ipc_message_id_string(msg_in.id), strerror(-err));
+                          ipc_message_id_string(id), strerror(-err));
                 }
             }
         }

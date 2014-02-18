@@ -24,73 +24,157 @@
 #include <string.h>
 #include <errno.h>
 #include <stdbool.h>
+#include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <linux/sockios.h>
+
+#include <libvci/macro.h>
 
 #include "ipc.h"
 
 const char *ipc_message_id_string(enum message_id id)
 {
     static const char *message_names[] = {
-        [IPC_MESSAGE_HELLO]    = "CLIMP_MESSAGE_HELLO",
-        [IPC_MESSAGE_GOODBYE]  = "CLIMP_MESSAGE_GOODBYE",
-        [IPC_MESSAGE_OK]       = "CLIMP_MESSAGE_OK",
-        [IPC_MESSAGE_NO]       = "CLIMP_MESSAGE_NO",
-        [IPC_MESSAGE_PLAY]     = "CLIMP_MESSAGE_PLAY",
-        [IPC_MESSAGE_STOP]     = "CLIMP_MESSAGE_STOP",
-        [IPC_MESSAGE_NEXT]     = "CLIMP_MESSAGE_NEXT",
-        [IPC_MESSAGE_PREVIOUS] = "CLIMP_MESSAGE_PREVIOUS"
+        [IPC_MESSAGE_HELLO]    = "IPC_MESSAGE_HELLO",
+        [IPC_MESSAGE_GOODBYE]  = "IPC_MESSAGE_GOODBYE",
+        [IPC_MESSAGE_OK]       = "IPC_MESSAGE_OK",
+        [IPC_MESSAGE_NO]       = "IPC_MESSAGE_NO",
+        [IPC_MESSAGE_PLAY]     = "IPC_MESSAGE_PLAY",
+        [IPC_MESSAGE_STOP]     = "IPC_ESSAGE_STOP",
+        [IPC_MESSAGE_NEXT]     = "IPC_MESSAGE_NEXT",
+        [IPC_MESSAGE_PREVIOUS] = "IPC_MESSAGE_PREVIOUS",
+        [IPC_MESSAGE_VOLUME]   = "IPC_MESSAGE_VOLUME",
+        [IPC_MESSAGE_MUTE]     = "IPC_MESSAGE_MUTE"
     };
     
     return message_names[id];
 }
 
-static int climp_ipc_init_message(struct message *__restrict msg, 
-                                  enum message_id id, 
-                                  const char *s)
+struct message *ipc_message_new(void)
 {
-    size_t len;
+    struct message *msg;
     
+    msg = malloc(sizeof(*msg));
+    if(!msg)
+        return NULL;
+    
+    ipc_message_init(msg);
+    
+    return msg;
+}
+
+void ipc_message_delete(struct message *__restrict msg)
+{
+    ipc_message_destroy(msg);
+    free(msg);
+}
+
+void ipc_message_clear(struct message *__restrict msg)
+{
+    struct cmsghdr *cmsg;
+    
+    msg->msghdr.msg_control    = msg->fd_buf;
+    msg->msghdr.msg_controllen = sizeof(msg->fd_buf);
+    
+    cmsg = CMSG_FIRSTHDR(&msg->msghdr); 
+    
+    cmsg->cmsg_level = 0;
+    cmsg->cmsg_type  = 0;
+    
+    ((int *)CMSG_DATA(cmsg))[IPC_MESSAGE_FD_0] = -1;
+    ((int *)CMSG_DATA(cmsg))[IPC_MESSAGE_FD_1] = -1;
+}
+
+void ipc_message_init(struct message *__restrict msg)
+{
+    struct cmsghdr *cmsg;
+    
+    msg->iovec[0].iov_base = &msg->id;
+    msg->iovec[0].iov_len  = sizeof(msg->id);
+    
+    msg->iovec[1].iov_base = msg->arg;
+    msg->iovec[1].iov_len  = sizeof(msg->arg);
+    
+    msg->msghdr.msg_control    = msg->fd_buf;
+    msg->msghdr.msg_controllen = sizeof(msg->fd_buf);
+    msg->msghdr.msg_iov        = msg->iovec;
+    msg->msghdr.msg_iovlen     = ARRAY_SIZE(msg->iovec);
+    msg->msghdr.msg_name       = NULL;
+    msg->msghdr.msg_namelen    = 0;
+    
+    cmsg = CMSG_FIRSTHDR(&msg->msghdr); 
+
+    cmsg->cmsg_len   = CMSG_LEN(2 * sizeof(int));
+    cmsg->cmsg_level = 0;
+    cmsg->cmsg_type  = 0;
+    
+    ((int *)CMSG_DATA(cmsg))[IPC_MESSAGE_FD_0] = -1;
+    ((int *)CMSG_DATA(cmsg))[IPC_MESSAGE_FD_1] = -1;
+}
+
+void ipc_message_destroy(struct message *__restrict msg)
+{
+    memset(msg, 0, sizeof(*msg));
+}
+
+void ipc_message_set_id(struct message *__restrict msg, enum message_id id)
+{
     msg->id = id;
+}
+
+enum message_id ipc_message_id(const struct message *__restrict msg)
+{
+    return msg->id;
+}
+
+int ipc_message_set_arg(struct message *__restrict msg, const char *arg)
+{
+    size_t size;
     
-    if(!s)
-        return 0;
+    size = strlen(arg) + 1;
     
-    len = strlen(s) + 1;
+    if(size >= sizeof(msg->arg))
+        return -EMSGSIZE;
     
-    if(len >= sizeof(msg->arg))
-        return -EINVAL;
-    
-    memcpy(msg->arg, s, len);
+    memcpy(msg->arg, arg, size);
     
     return 0;
 }
 
-int ipc_send_message(int fd, 
-                     struct message *msg, 
-                     enum message_id id, 
-                     const char *arg)
+const char *ipc_message_arg(const struct message *__restrict msg)
 {
-    struct msghdr msghdr;
-    struct iovec iovec;
-    ssize_t err;
+    return msg->arg;
+}
+
+void ipc_message_set_fds(struct message *__restrict msg, int fd0, int fd1)
+{
+    struct cmsghdr *cmsg;
     
-    err = climp_ipc_init_message(msg, id, arg);
-    if(err < 0)
-        return err;
+    cmsg = CMSG_FIRSTHDR(&msg->msghdr);
     
-    iovec.iov_base = (void *) msg;
-    iovec.iov_len  = sizeof(*msg);
+    cmsg->cmsg_level = SOL_SOCKET;
+    cmsg->cmsg_type  = SCM_RIGHTS;
     
-    msghdr.msg_iov        = &iovec;
-    msghdr.msg_iovlen     = 1;
-    msghdr.msg_name       = NULL;
-    msghdr.msg_namelen    = 0;
-    msghdr.msg_control    = NULL;
-    msghdr.msg_controllen = 0;
+    ((int *)CMSG_DATA(cmsg))[IPC_MESSAGE_FD_0] = fd0;
+    ((int *)CMSG_DATA(cmsg))[IPC_MESSAGE_FD_1] = fd1;
+}
+
+int ipc_message_fd(const struct message *__restrict msg, int i)
+{
+    struct cmsghdr *cmsg;
+    
+    cmsg = CMSG_FIRSTHDR(&msg->msghdr);
+    
+    return ((int *)CMSG_DATA(cmsg))[i];
+}
+
+int ipc_send_message(int fd, struct message *__restrict msg)
+{
+    int err;
     
 again:
-    err = sendmsg(fd, &msghdr, MSG_NOSIGNAL);
+    err = sendmsg(fd, &msg->msghdr, MSG_NOSIGNAL);
     if(err < 0) {
         if(errno == EINTR)
             goto again;
@@ -103,22 +187,10 @@ again:
 
 int ipc_recv_message(int fd, struct message *msg)
 {
-    struct msghdr msghdr;
-    struct iovec iovec;
     ssize_t err;
     
-    iovec.iov_base = msg;
-    iovec.iov_len  = sizeof(*msg);
-    
-    msghdr.msg_iov        = &iovec;
-    msghdr.msg_iovlen     = 1;
-    msghdr.msg_name       = NULL;
-    msghdr.msg_namelen    = 0;
-    msghdr.msg_control    = NULL;
-    msghdr.msg_controllen = 0;
-    
 again:
-    err = recvmsg(fd, &msghdr, MSG_NOSIGNAL);
+    err = recvmsg(fd, &msg->msghdr, MSG_NOSIGNAL);
     if(err < 0) {
         if(errno == EINTR)
             goto again;
@@ -129,8 +201,8 @@ again:
     if(err == 0)
         return -EIO;
     
-    if(err != sizeof(*msg))
-        return -EINVAL;
+//     if(err != IPC_MESSAGE_SIZE)
+//         return -EINVAL;
     
     return 0;
 }

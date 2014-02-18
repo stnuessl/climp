@@ -21,8 +21,13 @@
 #ifndef _IPC_H_
 #define _IPC_H_
 
-#define CLIMP_IPC_SOCKET_PATH           "/tmp/.climp.socket"
-#define CLIMP_IPC_MAX_MESSAGE_SIZE      256
+#include <sys/socket.h>
+#include <sys/un.h>
+
+#define IPC_SOCKET_PATH         "/tmp/.climp.socket"
+#define IPC_MESSAGE_SIZE        256
+#define IPC_MESSAGE_FD_0        0
+#define IPC_MESSAGE_FD_1        1
 
 enum message_id {
     IPC_MESSAGE_HELLO,
@@ -41,17 +46,41 @@ enum message_id {
     IPC_MESSAGE_MAX_ID
 }; 
 
+
+
 struct message {
+    struct msghdr msghdr;
+    struct iovec iovec[2];
     enum message_id id;
-    char arg[CLIMP_IPC_MAX_MESSAGE_SIZE - sizeof(enum message_id)];
+    char arg[IPC_MESSAGE_SIZE - sizeof(enum message_id)];
+    char fd_buf[CMSG_SPACE(2 * sizeof(int))];
 };
 
 const char *ipc_message_id_string(enum message_id id);
 
-int ipc_send_message(int fd, 
-                     struct message *msg, 
-                     enum message_id id, 
-                     const char *arg);
+struct message *ipc_message_new(void);
+
+void ipc_message_delete(struct message *__restrict msg);
+
+void ipc_message_init(struct message *__restrict msg);
+
+void ipc_message_destroy(struct message *__restrict msg);
+
+void ipc_message_clear(struct message *__restrict msg);
+
+void ipc_message_set_id(struct message *__restrict msg, enum message_id id);
+
+enum message_id ipc_message_id(const struct message *__restrict msg);
+
+int ipc_message_set_arg(struct message *__restrict msg, const char *arg);
+
+const char *ipc_message_arg(const struct message *__restrict msg);
+
+void ipc_message_set_fds(struct message *__restrict msg, int fd0, int fd1);
+
+int ipc_message_fd(const struct message *__restrict msg, int i);
+
+int ipc_send_message(int fd, struct message *__restrict msg);
 
 int ipc_recv_message(int fd, struct message *__restrict msg);
 

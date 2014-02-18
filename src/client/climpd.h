@@ -23,33 +23,36 @@
 
 #include "../shared/ipc.h"
 
-struct climpd_control {
+struct climpd {
     struct message msg;
     int fd;
+
+    unsigned int int_err_cnt;
+    unsigned int ext_err_cnt;
 };
 
-struct climpd_control *climpd_control_new(void);
+struct climpd *climpd_new(void);
 
-void climpd_control_delete(struct climpd_control *__restrict cc);
+void climpd_delete(struct climpd *__restrict cc);
 
-int climpd_control_play(struct climpd_control *__restrict cc, 
+void climpd_play(struct climpd *__restrict cc, 
                         const char *arg);
 
-int climpd_control_stop(struct climpd_control *__restrict cc);
+void climpd_stop(struct climpd *__restrict cc);
 
-int climpd_control_set_volume(struct climpd_control *__restrict cc, 
+void climpd_set_volume(struct climpd *__restrict cc, 
                               const char *arg);
 
-int climpd_control_toggle_mute(struct climpd_control *__restrict cc);
+void climpd_toggle_mute(struct climpd *__restrict cc);
 
-int climpd_control_shutdown(struct climpd_control *__restrict cc);
+void climpd_shutdown(struct climpd *__restrict cc);
 
-int climpd_control_add(struct climpd_control *__restrict cc, const char *arg);
+void climpd_add(struct climpd *__restrict cc, const char *arg);
 
-int climpd_control_next(struct climpd_control *__restrict cc);
+void climpd_next(struct climpd *__restrict cc);
 
-int climpd_control_previous(struct climpd_control *__restrict cc);
+void climpd_previous(struct climpd *__restrict cc);
 
-int climpd_control_playlist(struct climpd_control *__restrict cc);
+void climpd_playlist(struct climpd *__restrict cc);
 
 #endif /* _CLIENT_H_ */

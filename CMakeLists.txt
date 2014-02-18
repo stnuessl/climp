@@ -14,13 +14,15 @@ set(LIBS vci vlc)
 set(CMAKE_LIBRARY_PATH /usr/local/lib)
 set(SOURCE
     src/client/main.c
-    src/client/climpd_control.c
+    src/client/climpd.c
     src/shared/ipc.c
     )
     
 set(SOURCE_SERVER
     src/server/main.c
+    src/server/media_player.c
     src/shared/ipc.c
+    src/shared/util.c
     )
 
 link_directories(${CMAKE_LIBRARY_PATH})
