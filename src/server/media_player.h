@@ -52,7 +52,7 @@ int media_player_add_title(struct media_player *__restrict mp,
 void media_player_remove_title(struct media_player *__restrict mp, 
                                const char *title);
 
-int media_player_play(struct media_player *__restrict mp);
+void media_player_play(struct media_player *__restrict mp);
 
 void media_player_stop(struct media_player *__restrict mp);
 

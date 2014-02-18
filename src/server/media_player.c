@@ -167,15 +167,8 @@ int media_player_add_title(struct media_player *__restrict mp,
     int err;
 
     media = map_retrieve(&mp->media_map, title);
-    if(media) {
-        err = libvlc_media_list_player_play_item(mp->list_player, media);
-        if(err < 0) {
-            mp->errmsg = libvlc_errmsg();
-            return -MEDIA_PLAYER_VLC_ERROR;
-        }
-        
+    if(media)
         return 0;
-    }
     
     media = libvlc_media_new_path(mp->libvlc, title);
     if(!media) {
@@ -205,8 +198,6 @@ int media_player_add_title(struct media_player *__restrict mp,
         return -MEDIA_PLAYER_VLC_ERROR;
     }
     
-    libvlc_media_player_play(mp->player);
-    
     return 0;
 }
 
@@ -229,27 +220,19 @@ void media_player_remove_title(struct media_player *__restrict mp,
     libvlc_media_release(media);
 }
 
-int media_player_play(struct media_player *__restrict mp)
+void media_player_play(struct media_player *__restrict mp)
 {
-    int err;
-
-    err = libvlc_media_player_play(mp->player);
-    if(err < 0) {
-        mp->errmsg = libvlc_errmsg();
-        return MEDIA_PLAYER_VLC_ERROR;
-    }
-    
-    return 0;
+    libvlc_media_list_player_play(mp->list_player);    
 }
 
 void media_player_stop(struct media_player *__restrict mp)
 {
-    libvlc_media_player_stop(mp->player);
+    libvlc_media_list_player_stop(mp->list_player);
 }
 
 void media_player_pause(struct media_player *__restrict mp)
 {
-    libvlc_media_player_pause(mp->player);
+    libvlc_media_list_player_pause(mp->list_player);
 }
 
 void media_player_next_title(struct media_player *__restrict mp)
@@ -264,7 +247,7 @@ void media_player_previous_title(struct media_player *__restrict mp)
 
 bool media_player_is_playing(struct media_player *__restrict mp)
 {
-    return libvlc_media_player_is_playing(mp->player);
+    return libvlc_media_list_player_is_playing(mp->list_player);
 }
 
 int media_player_set_volume(struct media_player *__restrict mp, int volume)

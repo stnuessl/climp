@@ -73,11 +73,11 @@ static int event_fd;
 static int epoll_fd;
 static bool run;
 
-static void media_player_finished(const struct libvlc_event_t *event, void *arg)
-{
-    if(event->type == libvlc_MediaPlayerEndReached)
-        eventfd_write(event_fd, 1);
-}
+// static void media_player_finished(const struct libvlc_event_t *event, void *arg)
+// {
+//     if(event->type == libvlc_MediaPlayerEndReached)
+//         eventfd_write(event_fd, 1);
+// }
 
 
 static int epoll_add_fd(int fd)
@@ -290,9 +290,7 @@ static int handle_message_play(int fd, const struct message *msg)
         return -EINVAL;
     }
     
-    err = media_player_play(media_player);
-    if(err < 0)
-        return err;
+    media_player_play(media_player);
 
     return 0;
 }
@@ -327,7 +325,6 @@ static int handle_message_hello(int fd, const struct message *msg)
     ipc_message_clear(&msg_out);
     
     if(client.stdout_fd < 0 || client.stderr_fd < 0) {
-        log_i("bad fds: %d : %d\n", client.stdout_fd, client.stderr_fd);
         ipc_message_set_id(&msg_out, IPC_MESSAGE_NO);
         ipc_message_set_arg(&msg_out, errno_string(EINVAL));
         
@@ -338,9 +335,6 @@ static int handle_message_hello(int fd, const struct message *msg)
         
         return -EINVAL;
     }
-    
-    dprintf(client.stdout_fd, "Test stdout\n");
-    dprintf(client.stderr_fd, "Test stderr\n");
     
     ipc_message_set_id(&msg_out, IPC_MESSAGE_OK);
     
@@ -368,7 +362,7 @@ static int handle_message_volume(int fd, const struct message *msg)
     errno = 0;
     val = strtol(arg, NULL, 10);
     if(errno != 0) {
-        err_msg = strerror(errno);
+        err_msg = errno_string(errno);
         err = -errno;
         return err;
     }
@@ -403,9 +397,7 @@ static int handle_message_add(int fd, const struct message *msg)
         return -EINVAL;
     }
     
-    err = media_player_play(media_player);
-    if(err < 0)
-        return err;
+    media_player_play(media_player);
     
     return 0;
 }
@@ -456,6 +448,7 @@ int main(int argc, char *argv[])
     err = init();
     if(err < 0)
         exit(EXIT_FAILURE);
+    
     
      while(run) {
         nfds = epoll_wait(epoll_fd, events, ARRAY_SIZE(events), -1);
