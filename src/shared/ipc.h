@@ -24,7 +24,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 
-#define IPC_SOCKET_PATH         "/tmp/.climp.socket"
+#define IPC_SOCKET_PATH         "/tmp/.climp-unix"
 #define IPC_MESSAGE_SIZE        256
 #define IPC_MESSAGE_FD_0        0
 #define IPC_MESSAGE_FD_1        1

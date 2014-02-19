@@ -142,7 +142,7 @@ static int init_fds(void)
         err = -errno;
         goto cleanup1;
     }
-    
+
     /* Setup eventfd */
     event_fd = eventfd(0, 0);
     if(event_fd < 0) {
@@ -230,7 +230,7 @@ static int init(void)
     pid = fork();
     if(pid < 0) {
         err = -errno;
-        goto cleanup1;
+       goto cleanup1;
     }
     
     if(pid > 0)
@@ -240,7 +240,6 @@ static int init(void)
     if(err < 0)
         goto cleanup1;
     
-
     media_player = media_player_new();
     if(!media_player)
         goto cleanup2;
@@ -269,23 +268,46 @@ static void destroy(void)
     log_destroy(&log);
 }
 
-static int handle_message_play(int fd, const struct message *msg)
+static int handle_message_play(struct client *__restrict client, 
+                               const struct message *msg)
 {
     DIR *dir;
     struct dirent *entry;
     struct stat s;
+    const char *path;
+    char *pwd;
     int err;
     
-    err = stat(msg->arg, &s);
+    path = ipc_message_arg(msg);
+    
+    err = stat(path, &s);
     if(err < 0)
         return -errno;
     
     if(S_ISREG(s.st_mode)) {
-        err = media_player_add_title(media_player, msg->arg);
+        err = media_player_add_title(media_player, path);
         
     } else if(S_ISDIR(s.st_mode)) {
-
-        return 0;
+        pwd = getcwd(NULL, 0);
+        if(!pwd)
+            return -errno;
+        
+        err = chdir(path);
+        if(err < 0) {
+            free(pwd);
+            return -errno;
+        }
+        
+        dir = opendir(path);
+        
+        for(entry = readdir(dir); entry; entry = readdir(dir)) {
+            err = media_player_add_title(media_player, entry->d_name);
+        }
+        
+        chdir(pwd);
+        free(pwd);
+        
+        
     } else {
         return -EINVAL;
     }
@@ -295,65 +317,76 @@ static int handle_message_play(int fd, const struct message *msg)
     return 0;
 }
 
-static int handle_message_stop(int fd, const struct message *msg)
+static int handle_message_stop(struct client *client, const struct message *msg)
 {
     media_player_stop(media_player);
     
     return 0;
 }
 
-static int handle_message_next(int fd, const struct message *msg)
+static int handle_message_next(struct client *client, const struct message *msg)
 {
     media_player_next_title(media_player);
     
     return 0;
 }
 
-static int handle_message_previous(int fd, const struct message *msg)
+static int handle_message_previous(struct client *client, 
+                                   const struct message *msg)
 {
     media_player_previous_title(media_player);
     
     return 0;
 }
 
-static int handle_message_hello(int fd, const struct message *msg)
+static int handle_message_hello(struct client *client, 
+                                const struct message *msg)
 {
-    client.unix_fd   = fd;
-    client.stdout_fd = ipc_message_fd(msg, IPC_MESSAGE_FD_0);
-    client.stderr_fd = ipc_message_fd(msg, IPC_MESSAGE_FD_1);
+    int fd0, fd1;
+    
+    fd0 = ipc_message_fd(msg, IPC_MESSAGE_FD_0);
+    fd1 = ipc_message_fd(msg, IPC_MESSAGE_FD_1);
     
     ipc_message_clear(&msg_out);
     
-    if(client.stdout_fd < 0 || client.stderr_fd < 0) {
+    if(fd0 < 0 || fd1 < 0) {
         ipc_message_set_id(&msg_out, IPC_MESSAGE_NO);
         ipc_message_set_arg(&msg_out, errno_string(EINVAL));
         
-        ipc_send_message(fd, &msg_out);
+        ipc_send_message(client->unix_fd, &msg_out);
         
-        epoll_remove_fd(fd);
-        close(fd);
+        epoll_remove_fd(client->unix_fd);
+        close(client->unix_fd);
         
         return -EINVAL;
     }
     
+    client->stdout_fd = fd0;
+    client->stdout_fd = fd1;
+    
     ipc_message_set_id(&msg_out, IPC_MESSAGE_OK);
     
-    return ipc_send_message(fd, &msg_out);
+    return ipc_send_message(client->unix_fd, &msg_out);
 }
 
-static int handle_message_goodbye(int fd, const struct message *msg)
+static int handle_message_goodbye(struct client *client, 
+                                  const struct message *msg)
 {
-    epoll_remove_fd(fd);
-    close(fd);
+    epoll_remove_fd(client->unix_fd);
+    close(client->stderr_fd);
+    close(client->stdout_fd);
+    close(client->unix_fd);
     
-    log_i("Unregistered client at socket %d\n", fd);
+    log_i("Unregistered process %d at socket %d\n", 
+          client->pid, client->unix_fd);
     
     return 0;
 }
 
-static int handle_message_volume(int fd, const struct message *msg)
+static int handle_message_volume(struct client *client,
+                                 const struct message *msg)
 {
-    const char *err_msg, *arg;
+    const char *arg;
     long val;
     int err;
     
@@ -362,7 +395,6 @@ static int handle_message_volume(int fd, const struct message *msg)
     errno = 0;
     val = strtol(arg, NULL, 10);
     if(errno != 0) {
-        err_msg = errno_string(errno);
         err = -errno;
         return err;
     }
@@ -373,7 +405,7 @@ static int handle_message_volume(int fd, const struct message *msg)
     return media_player_set_volume(media_player, val);
 }
 
-static int handle_message_add(int fd, const struct message *msg)
+static int handle_message_add(struct client *client, const struct message *msg)
 {
     struct stat s;
     const char *path;
@@ -402,26 +434,27 @@ static int handle_message_add(int fd, const struct message *msg)
     return 0;
 }
 
-static int handle_message_shutdown(int fd, const struct message *msg)
+static int handle_message_shutdown(struct client *client, const struct message *msg)
 {
     run = false;
 
     return 0;
 }
 
-static int handle_message_mute(int fd, const struct message *msg)
+static int handle_message_mute(struct client *client, const struct message *msg)
 {
     media_player_toggle_mute(media_player);
 
     return 0;
 }
 
-static int handle_message_playlist(int fd, const struct message *msg)
+static int handle_message_playlist(struct client *client, 
+                                   const struct message *msg)
 {
     return 0;
 }
 
-static int (*msg_handler[IPC_MESSAGE_MAX_ID])(int, const struct message *) = {
+static int (*msg_handler[])(struct client *, const struct message *) = {
     [IPC_MESSAGE_HELLO]    = &handle_message_hello,
     [IPC_MESSAGE_GOODBYE]  = &handle_message_goodbye,
     [IPC_MESSAGE_PLAY]     = &handle_message_play,
@@ -435,12 +468,89 @@ static int (*msg_handler[IPC_MESSAGE_MAX_ID])(int, const struct message *) = {
     [IPC_MESSAGE_PLAYLIST] = &handle_message_playlist
 };
 
+
+static void handle_client_message(void)
+{
+    enum message_id id;
+    int err;
+    
+    ipc_message_clear(&msg_in);
+    
+    err = ipc_recv_message(client.unix_fd, &msg_in);
+    if(err < 0) {
+        log_w("ipc_recv_message() on socket %d failed: %s -> "
+              "closing connection...\n", 
+              client.unix_fd, errno_string(-err));
+        
+        epoll_remove_fd(client.unix_fd);
+        close(client.stderr_fd);
+        close(client.stdout_fd);
+        close(client.unix_fd);
+        return;
+    }
+    
+    id = ipc_message_id(&msg_in);
+    
+    if(id >= IPC_MESSAGE_MAX_ID) {
+        log_w("Received invalid message with id%d\n", id);
+        return;
+    }
+    
+    err = msg_handler[id](&client, &msg_in);
+    if(err < 0) {
+        log_w("Handling message %s failed - %s\n", 
+              ipc_message_id_string(id), strerror(-err));
+    }
+}
+
+static int register_client(void)
+{
+    struct ucred creds;
+    socklen_t cred_len;
+    int fd, err;
+
+    fd = accept(server_fd, NULL, NULL);
+    if(fd < 0) {
+        err = -errno;
+        goto out;
+    }
+    
+    cred_len = sizeof(creds);
+
+    err = getsockopt(fd, SOL_SOCKET, SO_PEERCRED, &creds, &cred_len);
+    if(err < 0) {
+        err = -errno;
+        goto cleanup1;
+    }
+    
+    if(creds.uid != getuid()) {
+        log_w("Non authorized user %d tried to connect\n", creds.uid);
+        err = -EPERM;
+        goto cleanup1;
+    }
+    
+    err = epoll_add_fd(fd);
+    if(err < 0)
+        goto cleanup1;
+    
+    client.unix_fd = fd;
+    client.pid     = creds.pid;
+    
+    log_i("New connection on socket %d with process %d\n", fd, creds.pid);
+
+    return 0;
+    
+cleanup1:
+    close(fd);
+out:
+    return err;
+}
+
 int main(int argc, char *argv[])
 {
     struct epoll_event events[CLIMP_SERVER_MAX_EPOLL_EVENTS];
     eventfd_t val;
-    enum message_id id;
-    int fd, i, nfds, err;
+    int i, nfds, err;
     
     if(getuid() == 0)
         exit(EXIT_FAILURE);
@@ -462,44 +572,12 @@ int main(int argc, char *argv[])
                 eventfd_read(event_fd, &val);
                 
             } else if(events[i].data.fd == server_fd) {
-                fd = accept(server_fd, NULL, NULL);
-                if(fd < 0)
-                    continue;
+                register_client();
 
-                err = epoll_add_fd(fd);
-                if(err < 0) {
-                    close(fd);
-                    continue;
-                }
+                
             } else {
-                fd = events[i].data.fd;
-                
-                ipc_message_clear(&msg_in);
-                
-                err = ipc_recv_message(fd, &msg_in);
-                if(err < 0) {
-                    log_w("Receiving message on socket %d failed: %s -> "
-                          "closing connection...\n", 
-                          fd, errno_string(-err));
-
-                    epoll_remove_fd(fd);
-                    close(fd);
-                    continue; 
-                }
-                
-                id = ipc_message_id(&msg_in);
-                
-                if(id >= IPC_MESSAGE_MAX_ID) {
-                    log_w("Received invalid message\n");
-                    continue;
-                }
-                
-    
-                err = msg_handler[id](fd, &msg_in);
-                if(err < 0) {
-                    log_w("Handling message %s failed - %s\n", 
-                          ipc_message_id_string(id), strerror(-err));
-                }
+                handle_client_message();
+            
             }
         }
     }

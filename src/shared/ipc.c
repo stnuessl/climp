@@ -201,8 +201,8 @@ again:
     if(err == 0)
         return -EIO;
     
-//     if(err != IPC_MESSAGE_SIZE)
-//         return -EINVAL;
+    if(err != IPC_MESSAGE_SIZE)
+        return -EINVAL;
     
     return 0;
 }

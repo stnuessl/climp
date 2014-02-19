@@ -25,8 +25,7 @@
 #include <sys/un.h>
 
 struct client {
-    struct sockaddr_un addr;
-    struct ucred creds;
+    pid_t pid;
     
     int unix_fd;
     int stdout_fd;
