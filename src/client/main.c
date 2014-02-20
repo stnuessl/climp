@@ -71,6 +71,7 @@ static const char help[] = {
 int main(int argc, char *argv[])
 {
     struct climpd *cc;
+    char *arg;
     int i;
     
     if(getuid() == 0) {
@@ -94,18 +95,18 @@ int main(int argc, char *argv[])
         } else if(strcmp("play", argv[i]) == 0) {
             i += 1;
             
-            if(i > argc) {
-                fprintf(stderr, "climp: play: %s", strerror(ENOENT));
-                continue;
-            }
+            if(i >= argc)
+                arg = NULL;
+            else 
+                arg = argv[i];
             
-            climpd_play(cc, argv[i]);
+            climpd_play(cc, arg);
         } else if(strcmp("stop", argv[i]) == 0) {
             climpd_stop(cc);
             
         } else if(strcmp("volume", argv[i]) == 0) {
             i += 1;
-            if(i > argc) {
+            if(i >= argc) {
                 fprintf(stderr, "climp: volume: %s\n", strerror(EINVAL));
                 continue;
             }
@@ -135,7 +136,14 @@ int main(int argc, char *argv[])
             climpd_previous(cc);
             
         } else if(strcmp("playlist", argv[i]) == 0) {
-            climpd_playlist(cc);
+            i += 1;
+            
+            if(i >= argc)
+                arg = NULL;
+            else
+                arg = argv[i];
+            
+            climpd_playlist(cc, arg);
         }
     }
     

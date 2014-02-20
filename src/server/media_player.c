@@ -166,8 +166,7 @@ int media_player_add_title(struct media_player *__restrict mp,
     libvlc_media_t *media;
     int err;
 
-    media = map_retrieve(&mp->media_map, title);
-    if(media)
+    if(map_contains(&mp->media_map, title))
         return 0;
     
     media = libvlc_media_new_path(mp->libvlc, title);
@@ -225,6 +224,28 @@ void media_player_play(struct media_player *__restrict mp)
     libvlc_media_list_player_play(mp->list_player);    
 }
 
+int media_player_play_title(struct media_player *__restrict mp, 
+                            const char *title)
+{
+    libvlc_media_t *media;
+    int err;
+    
+    media = map_retrieve(&mp->media_map, title);
+    if(media) {
+        libvlc_media_list_player_play_item(mp->list_player, media);
+        return 0;
+    }
+
+    err = media_player_add_title(mp, title);
+    if(err < 0)
+        return err;
+    
+    media = map_retrieve(&mp->media_map, title);
+    libvlc_media_list_player_play_item(mp->list_player, media);
+    
+    return 0;
+}
+
 void media_player_stop(struct media_player *__restrict mp)
 {
     libvlc_media_list_player_stop(mp->list_player);
@@ -257,7 +278,7 @@ int media_player_set_volume(struct media_player *__restrict mp, int volume)
     err = libvlc_audio_set_volume(mp->player, volume);
     if(err < 0) {
         mp->errmsg = libvlc_errmsg();
-        return MEDIA_PLAYER_VLC_ERROR;
+        return -MEDIA_PLAYER_VLC_ERROR;
     }
     
     return 0;
@@ -295,4 +316,29 @@ int media_player_on_track_finished(struct media_player *__restrict mp,
     }
     
     return 0;
+}
+
+const char *
+media_player_current_track(const struct media_player *__restrict mp)
+{
+    const char *ret;
+    libvlc_media_t *media;
+    
+    media = libvlc_media_player_get_media(mp->player);
+    if(!media)
+        return NULL;
+    
+    if(!libvlc_media_is_parsed(media))
+        libvlc_media_parse(media);
+    
+    ret = libvlc_media_get_meta(media, libvlc_meta_Title);
+    
+    libvlc_media_release(media);
+    
+    return ret;
+}
+
+const char *media_player_errmsg(const struct media_player *__restrict mp)
+{
+    return mp->errmsg;
 }

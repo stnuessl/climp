@@ -19,6 +19,7 @@ set(SOURCE
     )
     
 set(SOURCE_SERVER
+    src/server/client.c
     src/server/main.c
     src/server/media_player.c
     src/shared/ipc.c

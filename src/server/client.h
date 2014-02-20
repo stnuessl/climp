@@ -21,15 +21,35 @@
 #ifndef _CLIENT_H_
 #define _CLIENT_H_
 
-#include <sys/socket.h>
-#include <sys/un.h>
+#include <unistd.h>
+
+#include "media_player.h"
 
 struct client {
     pid_t pid;
     
     int unix_fd;
-    int stdout_fd;
-    int stderr_fd;
+    int out_fd;
+    int err_fd;
 };
+
+void client_init(struct client *__restrict client, pid_t pid, int unix_fd);
+
+void client_destroy(struct client *__restrict client);
+
+int client_unix_fd(const struct client *__restrict client);
+
+void client_set_out_fd(struct client *__restrict client, int fd);
+
+void client_set_err_fd(struct client *__restrict client, int fd);
+
+void client_out(struct client *__restrict client, const char *format, ...)
+                                          __attribute__((format(printf, 2, 3)));
+
+void client_err(struct client *__restrict client, const char *format, ...)
+                                          __attribute__((format(printf, 2, 3)));
+
+void client_out_current_track(struct client *__restrict client,
+                              struct media_player *__restrict mp);
 
 #endif /* _CLIENT_H_ */

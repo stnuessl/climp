@@ -54,6 +54,9 @@ void media_player_remove_title(struct media_player *__restrict mp,
 
 void media_player_play(struct media_player *__restrict mp);
 
+int media_player_play_title(struct media_player *__restrict mp, 
+                             const char *title);
+
 void media_player_stop(struct media_player *__restrict mp);
 
 void media_player_pause(struct media_player *__restrict mp);
@@ -75,5 +78,10 @@ bool media_player_empty(struct media_player *__restrict mp);
 int media_player_on_track_finished(struct media_player *__restrict mp,
                     void (*func)(const struct libvlc_event_t *event, void *arg),
                     void *arg);
+
+const char *
+media_player_current_track(const struct media_player *__restrict mp);
+
+const char *media_player_errmsg(const struct media_player *__restrict mp);
 
 #endif /* _MEDIA_PLAYER_H_ */

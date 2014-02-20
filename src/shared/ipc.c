@@ -132,6 +132,9 @@ int ipc_message_set_arg(struct message *__restrict msg, const char *arg)
 {
     size_t size;
     
+    if(!arg)
+        arg = IPC_MESSAGE_EMPTY_ARG;
+    
     size = strlen(arg) + 1;
     
     if(size >= sizeof(msg->arg))

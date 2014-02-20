@@ -96,6 +96,9 @@ static int climpd_disconnect(struct climpd *__restrict cc)
     ipc_message_set_id(&cc->msg, IPC_MESSAGE_GOODBYE);
     
     ipc_send_message(cc->fd, &cc->msg);
+    
+    /* This step is needed for a flawless synchronisation */
+    ipc_recv_message(cc->fd, &cc->msg);
 
     close(cc->fd);
     return 0;
@@ -305,12 +308,18 @@ void climpd_previous(struct climpd *__restrict cc)
         return;
 }
 
-void climpd_playlist(struct climpd *__restrict cc)
+void climpd_playlist(struct climpd *__restrict cc, const char *arg)
 {
     int err;
     
     ipc_message_clear(&cc->msg);
     ipc_message_set_id(&cc->msg, IPC_MESSAGE_PLAYLIST);
+    
+    err = ipc_message_set_arg(&cc->msg, arg);
+    if(err < 0) {
+        fprintf(stdout, "climp: playlist: %s\n", strerror(-err));
+        return;
+    }
     
     err = ipc_send_message(cc->fd, &cc->msg);
     if(err < 0)
