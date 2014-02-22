@@ -21,21 +21,24 @@
 #ifndef _MEDIA_H_
 #define _MEDIA_H_
 
+#include <stdbool.h>
+
 #include <libvci/link.h>
 
 struct media_info {
     const char *title;
     const char *artist;
     const char *album;
-    
-    int track_nr;
 };
 
 struct media {
     struct media_info info;
     struct link link;
     
+    char *uri;
     char *path;
+    
+    bool parsed;
 };
 
 struct media *media_new(const char *path);
@@ -43,5 +46,7 @@ struct media *media_new(const char *path);
 void media_delete(struct media *__restrict media);
 
 const struct media_info *media_info(const struct media *__restrict media);
+
+bool media_is_parsed(const struct media *__restrict media);
 
 #endif /* _MEDIA_H_ */

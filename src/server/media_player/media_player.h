@@ -23,15 +23,23 @@
 
 #include <stdbool.h>
 
+#include <gst/gst.h>
+
 #include "playlist.h"
 #include "media.h"
 
 struct media_player {
     struct playlist *playlist;
     struct media *current_media;
-    
+
     bool muted;
     unsigned int volume;
+    
+    GstState state;
+    
+    GstElement *playbin2;
+    
+    void (*on_media_parsed)(struct media_player *, struct media *);
 };
 
 struct media_player *media_player_new(void);
@@ -42,12 +50,14 @@ int media_player_init(struct media_player *__restrict mp);
 
 void media_player_destroy(struct media_player *__restrict mp);
 
-const struct media *
-media_player_current_media(struct media_player *__restrict mp);
+struct media *media_player_current_media(struct media_player *__restrict mp);
 
 struct playlist *media_player_playlist(struct media_player *__restrict mp);
 
-void media_player_play(struct media_player *__restrict mp);
+int media_player_play(struct media_player *__restrict mp);
+
+int media_player_play_media(struct media_player *__restrict mp,
+                            struct media *m);
 
 void media_player_pause(struct media_player *__restrict mp);
 
@@ -59,5 +69,9 @@ void media_player_set_volume(struct media_player *__restrict mp,
                              unsigned int volume);
 
 unsigned int media_player_volume(const struct media_player *__restrict mp);
+
+void media_player_on_media_parsed(struct media_player *__restrict mp,
+                           void (*func)(struct media_player *, struct media *));
+
 
 #endif /* _MEDIA_PLAYER_H_ */

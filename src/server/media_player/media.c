@@ -19,25 +19,54 @@
  */
 
 #include <stdlib.h>
+#include <string.h>
 #include <errno.h>
+#include <assert.h>
 
 #include "media.h"
+
+#define MEDIA_FILE_PREFIX "file://"
 
 struct media *media_new(const char *path)
 {
     struct media *media;
     
     media = malloc(sizeof(*media));
+    if(!media)
+        return NULL;
+    
+    media->uri = malloc(sizeof(MEDIA_FILE_PREFIX) + strlen(path));
+    if(!media->uri) {
+        free(media);
+        return NULL;
+    }
+    
+    media->uri = strcpy(media->uri, MEDIA_FILE_PREFIX);
+    media->uri = strcat(media->uri, path);
+        
+    media->path = media->uri + sizeof(MEDIA_FILE_PREFIX) - 1;
+    
+    media->parsed = false;
+    
+    media->info.title  = NULL;
+    media->info.artist = NULL;
+    media->info.album  = NULL;
     
     return media;
 }
 
 void media_delete(struct media *__restrict media)
 {
+    free(media->uri);
     free(media);
 }
 
 const struct media_info *media_info(const struct media *__restrict media)
 {
     return &media->info;
+}
+
+bool media_is_parsed(const struct media *__restrict media)
+{
+    return media->parsed;
 }

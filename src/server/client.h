@@ -21,14 +21,12 @@
 #ifndef _CLIENT_H_
 #define _CLIENT_H_
 
-#include <unistd.h>
-
-#include "media_player.h"
+#include <gst/gst.h>
 
 struct client {
     pid_t pid;
     
-    int unix_fd;
+    GIOChannel *io;
     int out_fd;
     int err_fd;
 };
@@ -48,8 +46,5 @@ void client_out(struct client *__restrict client, const char *format, ...)
 
 void client_err(struct client *__restrict client, const char *format, ...)
                                           __attribute__((format(printf, 2, 3)));
-
-void client_out_current_track(struct client *__restrict client,
-                              struct media_player *__restrict mp);
 
 #endif /* _CLIENT_H_ */

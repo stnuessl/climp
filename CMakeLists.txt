@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 2.6)
 # project name
 project(climp C)
 
+add_definitions(`pkg-config --cflags --libs gstreamer-0.10`)
 add_definitions(-D_GNU_SOURCE)
 add_definitions(-Wall)
 #add_definitions(-O2)
@@ -10,7 +11,7 @@ add_definitions(-g3)
 
 set(CMAKE_INSTALL_PREFIX /usr/local)
 set(TARGET_INSTALL_DIR bin)
-set(LIBS vci vlc)
+set(LIBS vci gstreamer-0.10 gobject-2.0 gmodule-2.0 gthread-2.0 glib-2.0 xml2)
 set(CMAKE_LIBRARY_PATH /usr/local/lib)
 set(SOURCE
     src/client/main.c
@@ -18,20 +19,25 @@ set(SOURCE
     src/shared/ipc.c
     )
     
+    
 set(SOURCE_SERVER
     src/server/client.c
     src/server/main.c
-    src/server/media_player.c
+    src/server/media_player/media.c
+    src/server/media_player/playlist.c
+    src/server/media_player/media_player.c
     src/shared/ipc.c
     src/shared/util.c
     )
+
+find_package(Threads)
 
 link_directories(${CMAKE_LIBRARY_PATH})
 
 add_executable(climp ${SOURCE})
 
 add_executable(climpd ${SOURCE_SERVER})
-target_link_libraries(climpd ${LIBS})
+target_link_libraries(climpd ${LIBS} ${CMAKE_THREAD_LIBS_INIT})
 
 install(PROGRAMS
         ${CMAKE_BINARY_DIR}/climp

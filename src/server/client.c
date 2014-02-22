@@ -2,19 +2,21 @@
 #include <unistd.h>
 #include <stdarg.h>
 
+#include <gst/gst.h>
+
 #include "client.h"
 
 void client_init(struct client *__restrict client, pid_t pid, int unix_fd)
 {
     client->pid     = pid;
-    client->unix_fd = unix_fd;
+    client->io      = g_io_channel_unix_new(unix_fd);
     client->out_fd  = -1;
     client->err_fd  = -1;
 }
 
 void client_destroy(struct client *__restrict client)
 {
-    close(client->unix_fd);
+   // g_io_channel_unref(client->io);
     
     if(client->out_fd >= 0)
         close(client->out_fd);
@@ -25,7 +27,7 @@ void client_destroy(struct client *__restrict client)
 
 int client_unix_fd(const struct client *__restrict client)
 {
-    return client->unix_fd;
+    return g_io_channel_unix_get_fd(client->io);
 }
 
 void client_set_out_fd(struct client *__restrict client, int fd)
@@ -66,8 +68,8 @@ void client_err(struct client *__restrict client, const char *format, ...)
     va_end(args);
 }
 
-void client_out_current_track(struct client *__restrict client,
-                              struct media_player *__restrict mp)
-{
-    client_out(client, "Playing\t~~ %s ~~\n", media_player_current_track(mp));
-}
+// void client_out_current_track(struct client *__restrict client,
+//                               struct media_player *__restrict mp)
+// {
+//     client_out(client, "Playing\t~~ %s ~~\n", media_player_current_track(mp));
+// }

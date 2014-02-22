@@ -28,12 +28,12 @@
 
 #define CLIMP_VERSION_MAJOR "0"
 #define CLIMP_VERSION_MINOR "0"
-#define CLIMP_VERSION_BUILD "3"
+#define CLIMP_VERSION_MICRO "3"
 
 
 const char *climp_version(void)
 {
-    return CLIMP_VERSION_MAJOR"."CLIMP_VERSION_MINOR"."CLIMP_VERSION_BUILD;
+    return CLIMP_VERSION_MAJOR"."CLIMP_VERSION_MINOR"."CLIMP_VERSION_MICRO;
 }
 
 static const char license[] = {

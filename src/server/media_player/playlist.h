@@ -48,9 +48,16 @@ void playlist_remove_media(struct playlist *__restrict pl, struct media *m);
 
 void playlist_delete_media(struct playlist *__restrict pl, struct media *m);
 
-int playlist_add_title(struct playlist *__restrict pl, const char *title);
+bool playlist_contains_media(const struct playlist *__restrict pl,
+                             struct media *m);
 
-void playlist_remove_title(struct playlist *__restrict pl, const char *title);
+int playlist_add_file(struct playlist *__restrict pl, const char *title);
+
+void playlist_remove_file(struct playlist *__restrict pl, const char *title);
+
+struct media *playlist_first(struct playlist *__restrict pl);
+
+struct media *playlist_last(struct playlist *__restrict pl);
 
 struct media *playlist_next(struct playlist *__restrict pl, struct media *m);
 
