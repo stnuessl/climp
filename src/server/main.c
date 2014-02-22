@@ -76,6 +76,19 @@ static int server_fd;
 GIOChannel *io_server;
 static GMainLoop *main_loop;
 
+static void print_track(struct media_player *mp, struct media *m)
+{
+    const struct media_info *i;
+    
+    if(media_player_current_media(mp) != m)
+        return;
+    
+    i = media_info(m);
+    
+    client_out(&client, "\t~~ %s: %s - %s ~~\n", 
+               i->artist, i->title, i->album);
+}
+
 static int handle_message_play(struct client *__restrict client, 
                                const struct message *msg)
 {
@@ -122,6 +135,8 @@ static int handle_message_play(struct client *__restrict client,
             return err;
         }
     }
+    
+    print_track(media_player, media_player_current_media(media_player));
     
     return 0;
 }
@@ -497,18 +512,6 @@ static void destroy_server_fd(void)
     unlink(IPC_SOCKET_PATH);
 }
 
-static void print_track(struct media_player *mp, struct media *m)
-{
-    const struct media_info *i;
-    
-    if(media_player_current_media(mp) != m)
-        return;
-    
-    i = media_info(m);
-    
-    client_out(&client, "\t~~ %s: Album %s Track %s ~~\n", 
-               i->artist, i->album, i->title);
-}
 
 static int init(void)
 {

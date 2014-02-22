@@ -26,9 +26,9 @@
 #include <libvci/link.h>
 
 struct media_info {
-    const char *title;
-    const char *artist;
-    const char *album;
+    char *title;
+    char *artist;
+    char *album;
 };
 
 struct media {

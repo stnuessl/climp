@@ -3,22 +3,22 @@ cmake_minimum_required(VERSION 2.6)
 # project name
 project(climp C)
 
-add_definitions(`pkg-config --cflags --libs gstreamer-0.10`)
+add_definitions(`pkg-config --cflags --libs gstreamer-pbutils-0.10 gstreamer-0.10`)
 add_definitions(-D_GNU_SOURCE)
 add_definitions(-Wall)
 #add_definitions(-O2)
 add_definitions(-g3)
 
+
 set(CMAKE_INSTALL_PREFIX /usr/local)
 set(TARGET_INSTALL_DIR bin)
-set(LIBS vci gstreamer-0.10 gobject-2.0 gmodule-2.0 gthread-2.0 glib-2.0 xml2)
+set(LIBS vci gstreamer-0.10 gstpbutils-0.10 gobject-2.0 gmodule-2.0 gthread-2.0 glib-2.0 xml2)
 set(CMAKE_LIBRARY_PATH /usr/local/lib)
 set(SOURCE
     src/client/main.c
     src/client/climpd.c
     src/shared/ipc.c
     )
-    
     
 set(SOURCE_SERVER
     src/server/client.c

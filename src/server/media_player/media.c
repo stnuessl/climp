@@ -23,23 +23,54 @@
 #include <errno.h>
 #include <assert.h>
 
+#include <gst/gst.h>
+#include <gst/pbutils/pbutils.h>
+
+
 #include "media.h"
 
 #define MEDIA_FILE_PREFIX "file://"
 
+
+static void media_parse_tags(const GstTagList *list, 
+                             const gchar *tag, 
+                             gpointer data)
+{
+    struct media *m;
+    const GValue *val;
+    int i, num;
+
+    m  = data;
+    
+    num = gst_tag_list_get_tag_size (list, tag);
+    
+    for (i = 0; i < num; ++i) {
+        val = gst_tag_list_get_value_index(list, tag, i);
+        
+        if(strcmp(GST_TAG_TITLE, tag) == 0)
+            m->info.title = strdup(g_value_get_string(val));
+        else if(strcmp(GST_TAG_ALBUM, tag) == 0)
+            m->info.album = strdup(g_value_get_string(val));
+        else if(strcmp(GST_TAG_ARTIST, tag) == 0)
+            m->info.artist = strdup(g_value_get_string(val));
+    }
+}
+
 static struct media *media_new_abs_path(const char *path)
 {
+    GstDiscoverer *discoverer;
+    GstDiscovererInfo *info;
+    GstDiscovererResult result;
+    const GstTagList *tags;
     struct media *media;
     
     media = malloc(sizeof(*media));
     if(!media)
-        return NULL;
+        goto out;
     
     media->uri = malloc(sizeof(MEDIA_FILE_PREFIX) + strlen(path));
-    if(!media->uri) {
-        free(media);
-        return NULL;
-    }
+    if(!media->uri)
+        goto cleanup1;
     
     media->uri = strcpy(media->uri, MEDIA_FILE_PREFIX);
     media->uri = strcat(media->uri, path);
@@ -47,12 +78,41 @@ static struct media *media_new_abs_path(const char *path)
     media->path = media->uri + sizeof(MEDIA_FILE_PREFIX) - 1;
     
     media->parsed = false;
+
+    discoverer = gst_discoverer_new(GST_SECOND, NULL);
+    if(!discoverer) {
+        errno = ENOMEM;
+        goto cleanup2;
+    }
     
-    media->info.title  = NULL;
-    media->info.artist = NULL;
-    media->info.album  = NULL;
+    info = gst_discoverer_discover_uri(discoverer, media->uri, NULL);
+    
+    result = gst_discoverer_info_get_result(info);
+    if(result != GST_DISCOVERER_OK) {
+        errno = EINVAL;
+    }
+    tags = gst_discoverer_info_get_tags(info);
+    if(!tags) {
+        media->info.title  = strdup("Unknown");
+        media->info.artist = strdup("Unknown");
+        media->info.album  = strdup("Unknown");
+        
+        return media;
+    }
+    
+    gst_tag_list_foreach(tags, media_parse_tags, media);
+    
+    gst_discoverer_info_unref(info);
+    g_object_unref(discoverer);
     
     return media;
+    
+cleanup2:
+    free(media->uri);
+cleanup1:
+    free(media);
+out:
+    return NULL;
 }
 
 struct media *media_new(const char *path)
@@ -73,6 +133,9 @@ struct media *media_new(const char *path)
 
 void media_delete(struct media *__restrict media)
 {
+    free(media->info.title);
+    free(media->info.artist);
+    free(media->info.album);
     free(media->uri);
     free(media);
 }

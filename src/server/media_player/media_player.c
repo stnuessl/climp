@@ -48,55 +48,6 @@ static void media_player_on_end_of_stream(struct media_player *__restrict mp)
     media_player_play_media(mp, m);
 }
 
-static void media_player_parse_tags(const GstTagList *list,
-                                    const gchar *tag,
-                                    gpointer data)
-{
-    struct media *m;
-    const GValue *val;
-    int i, num;
-    
-    if(!data)
-        return;
-    
-    m  = data;
-    
-    num = gst_tag_list_get_tag_size (list, tag);
-    
-    for (i = 0; i < num; ++i) {
-        val = gst_tag_list_get_value_index(list, tag, i);
-        
-        if(strcmp(GST_TAG_TITLE, tag) == 0)
-            m->info.title = strdup(g_value_get_string(val));
-        else if(strcmp(GST_TAG_ALBUM, tag) == 0)
-            m->info.album = strdup(g_value_get_string(val));
-        else if(strcmp(GST_TAG_ARTIST, tag) == 0)
-            m->info.artist = strdup(g_value_get_string(val));
-    }
-}
-
-static void media_player_on_tag_message(struct media_player *__restrict mp, 
-                                        GstMessage *msg)
-{
-    GstTagList *tags;
-    
-    tags = NULL;
-    
-    gst_message_parse_tag(msg, &tags);
-    
-    gst_tag_list_foreach(tags, &media_player_parse_tags, mp->current_media);
-    
-    gst_tag_list_free(tags);
-    
-    if(!mp->current_media)
-        return; 
-    
-    mp->current_media->parsed = true;
-    
-    if(mp->on_media_parsed)
-        mp->on_media_parsed(mp, mp->current_media);
-}
-
 static void media_player_on_state_change(struct media_player *__restrict mp,
                                          GstMessage *msg)
 {
@@ -127,12 +78,10 @@ static gboolean bus_watcher(GstBus *bus, GstMessage *msg, gpointer data)
     case GST_MESSAGE_EOS:
         media_player_on_end_of_stream(mp);
         break;
-    case GST_MESSAGE_TAG:
-        media_player_on_tag_message(mp, msg);
-        break;
     case GST_MESSAGE_STATE_CHANGED:
         media_player_on_state_change(mp, msg);
         break;
+    case GST_MESSAGE_TAG:
     case GST_MESSAGE_WARNING:
     case GST_MESSAGE_INFO:
     case GST_MESSAGE_BUFFERING:
