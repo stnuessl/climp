@@ -280,51 +280,69 @@ static int handle_message_mute(struct client *client, const struct message *msg)
     return 0;
 }
 
+static void print_playlist(void)
+{
+    struct playlist *pl;
+    struct link *link;
+    struct media *media;
+    
+    pl = media_player_playlist(media_player);
+    
+    playlist_for_each(pl, link) {
+        media = container_of(link, struct media, link);
+        
+        if(!media)
+            abort();
+    }
+}
+
 static int handle_message_playlist(struct client *client, 
                                    const struct message *msg)
 {
-    //     FILE *playlist_file;
-    //     const char *arg;
-    //     char *buf;
-    //     size_t size;
-    //     ssize_t n;
-    //     int err;
-    //     
-    //     arg = ipc_message_arg(msg);
-    //     
-    //     if(strlen(arg) == 0) {
-    //         
-    //         /* print playlist */
-    //         
-    //         return 0;
-    //     }
-    //     
-    //     playlist_file = fopen(arg, "r");
-    //     if(!playlist_file) {
-    //         err = -errno;
-    //         client_err(client, "climpd: %s: %s\n", arg, errno_string(errno));
-    //         return err;
-    //     }
-    // 
-    //     size = 0;
-    //     buf = NULL;
-    // 
-    //     while(1) {
-    //         n = getline(&buf, &size, playlist_file);
-    //         if(n < 0)
-    //             break;
-    //         
-    //         buf[n - 1] = '\0';
-    //         
-    //         err = media_player_add_title(media_player, buf);
-    //         if(err < 0) {
-    //             client_err(client, "climpd: unable to add %s: %s\n",
-    //                        buf, media_player_errmsg(media_player));
-    //         }
-    //     }
-    //     
-    //     free(buf);
-    // 
+    struct playlist *pl;
+    FILE *file;
+    const char *arg;
+    char *buf;
+    size_t size;
+    ssize_t n;
+    int err;
+    
+    arg = ipc_message_arg(msg);
+        
+    if(strlen(arg) == 0) {
+        print_playlist();
+        
+        return 0;
+    }
+    
+    file = fopen(arg, "r");
+    if(!file) {
+        err = -errno;
+        client_err(client, "climpd: %s: %s\n", arg, errno_string(errno));
+        return err;
+    }
+
+    pl = media_player_playlist(media_player);
+    
+    size = 0;
+    buf = NULL;
+
+    while(1) {
+        n = getline(&buf, &size, file);
+        if(n < 0)
+            break;
+        
+        buf[n - 1] = '\0';
+        
+        err = playlist_add_file(pl, buf);
+        if(err < 0) {
+            client_err(client, "climpd: unable to add %s: %s\n",
+                       buf, errno_string(-err));
+        }
+    }
+    
+    free(buf);
+    
     return 0;
 }
 

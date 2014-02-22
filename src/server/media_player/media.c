@@ -27,7 +27,7 @@
 
 #define MEDIA_FILE_PREFIX "file://"
 
-struct media *media_new(const char *path)
+static struct media *media_new_abs_path(const char *path)
 {
     struct media *media;
     
@@ -43,7 +43,7 @@ struct media *media_new(const char *path)
     
     media->uri = strcpy(media->uri, MEDIA_FILE_PREFIX);
     media->uri = strcat(media->uri, path);
-        
+    
     media->path = media->uri + sizeof(MEDIA_FILE_PREFIX) - 1;
     
     media->parsed = false;
@@ -52,6 +52,22 @@ struct media *media_new(const char *path)
     media->info.artist = NULL;
     media->info.album  = NULL;
     
+    return media;
+}
+
+struct media *media_new(const char *path)
+{
+    struct media *media;
+    char *abs_path;
+    
+    if(path[0] == '/') 
+        return media_new_abs_path(path);
+    
+    abs_path = realpath(path, NULL);
+
+    media = media_new_abs_path(abs_path);
+    
+    free(abs_path);
     return media;
 }
 
