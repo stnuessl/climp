@@ -16,7 +16,7 @@ void client_init(struct client *__restrict client, pid_t pid, int unix_fd)
 
 void client_destroy(struct client *__restrict client)
 {
-   // g_io_channel_unref(client->io);
+    g_io_channel_unref(client->io);
     
     if(client->out_fd >= 0)
         close(client->out_fd);

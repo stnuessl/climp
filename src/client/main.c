@@ -28,7 +28,7 @@
 
 #define CLIMP_VERSION_MAJOR "0"
 #define CLIMP_VERSION_MINOR "0"
-#define CLIMP_VERSION_MICRO "3"
+#define CLIMP_VERSION_MICRO "4"
 
 
 const char *climp_version(void)

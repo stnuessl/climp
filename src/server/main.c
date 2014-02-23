@@ -300,7 +300,7 @@ static void print_playlist(void)
     struct playlist *pl;
     struct link *link;
     struct media *media;
-    struct media_info *i;
+    const struct media_info *i;
     
     pl = media_player_playlist(media_player);
     
@@ -416,6 +416,9 @@ static gboolean handle_unix_fd(GIOChannel *src, GIOCondition cond, void *data)
         return false;
     }
     
+    if(id == IPC_MESSAGE_GOODBYE)
+        return false;
+    
     return true;
 }
 
@@ -453,6 +456,7 @@ static gboolean handle_server_fd(GIOChannel *src, GIOCondition cond, void *data)
     client_init(&client, creds.pid, fd);
  
     g_io_add_watch(client.io, G_IO_IN, &handle_unix_fd, NULL);
+    g_io_channel_set_close_on_unref(client.io, true);
     
     log_i("New connection on socket %d with process %d\n", fd, creds.pid);
     
@@ -461,6 +465,27 @@ static gboolean handle_server_fd(GIOChannel *src, GIOCondition cond, void *data)
 out:
     close(fd);
     return false;
+}
+
+static int close_std_streams(void)
+{
+    int streams[] = { STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO };
+    int err, i, fd;
+    
+    fd = open("/dev/null", O_RDWR);
+    if(fd < 0)
+        return -errno;
+    
+    for(i = 0; i < ARRAY_SIZE(streams); ++i) {
+        err = dup2(fd, streams[i]);
+        if(err < 0) {
+            close(fd);
+            return -errno;
+        }
+    }
+    
+    close(fd);
+    return 0;
 }
 
 static int init_server_fd(void)
@@ -570,6 +595,10 @@ static int init(void)
     
 #endif
     
+    err = close_std_streams();
+    if(err < 0)
+        goto cleanup1;
+    
     main_loop = g_main_loop_new(NULL, false);
     if(!main_loop)
         goto cleanup1;
@@ -581,9 +610,7 @@ static int init(void)
     media_player = media_player_new();
     if(!media_player)
         goto cleanup3;
-    
-    media_player_on_media_parsed(media_player, &print_track);
-    
+
     memset(&client, 0, sizeof(client));
     
     ipc_message_init(&msg_in);
