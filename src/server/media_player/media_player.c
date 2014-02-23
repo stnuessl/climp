@@ -60,20 +60,13 @@ static void media_player_on_state_change(struct media_player *__restrict mp,
 static gboolean bus_watcher(GstBus *bus, GstMessage *msg, gpointer data)
 {
     struct media_player *mp;
-    GError *err;
-    gchar *debug_info;
     
     mp = data;
     
     switch (GST_MESSAGE_TYPE(msg)) {
     case GST_MESSAGE_ERROR:
-        gst_message_parse_error (msg, &err, &debug_info);
-        
-        g_printerr ("Error received from element %s: %s\n", GST_OBJECT_NAME (msg->src), err->message);
-        
-        g_printerr ("Debugging information: %s\n", debug_info ? debug_info : "none");
-        g_clear_error (&err);
-        g_free (debug_info);
+        if(mp->on_bus_error)
+            mp->on_bus_error(mp, msg);
         break;
     case GST_MESSAGE_EOS:
         media_player_on_end_of_stream(mp);
@@ -210,7 +203,7 @@ int media_player_play_media(struct media_player *__restrict mp,
     
     gst_element_set_state(mp->playbin2, GST_STATE_PLAYING);
     
-    mp->current_media   = m;
+    mp->current_media = m;
     
     return 0;
 }
@@ -252,4 +245,10 @@ void media_player_set_volume(struct media_player *__restrict mp,
 unsigned int media_player_volume(const struct media_player *__restrict mp)
 {
     return mp->volume;
+}
+
+void media_player_on_bus_error(struct media_player *__restrict mp,
+                               void (*func)(struct media_player *, GstMessage *))
+{
+    mp->on_bus_error = func;
 }

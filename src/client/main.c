@@ -106,12 +106,12 @@ int main(int argc, char *argv[])
             
         } else if(strcmp("volume", argv[i]) == 0) {
             i += 1;
-            if(i >= argc) {
-                fprintf(stderr, "climp: volume: %s\n", strerror(EINVAL));
-                continue;
-            }
+            if(i >= argc)
+                arg = NULL;
+            else
+                arg = argv[i];
             
-            climpd_set_volume(cc, argv[i]);
+            climpd_set_volume(cc, arg);
         } else if(strcmp("mute", argv[i]) == 0) {
             climpd_toggle_mute(cc);
      

@@ -63,8 +63,11 @@
     
 #define log_w(format, ...)                                                     \
     log_warning(&log, format, ##__VA_ARGS__)
-    
-#define log_e(func, err)                                                       \
+
+#define log_e(format, ...)                                                     \
+    log_error(&log, format, ##__VA_ARGS__)
+
+#define log_func_e(func, err)                                                  \
     log_error(&log, "%s: %s at %s:%d\n", (func), (err), __FILE__, __LINE__)
 
 static struct media_player *media_player;
@@ -76,17 +79,25 @@ static int server_fd;
 GIOChannel *io_server;
 static GMainLoop *main_loop;
 
-static void print_track(struct media_player *mp, struct media *m)
+static void media_player_handle_bus_error(struct media_player *mp,
+                                          GstMessage *msg)
 {
-    const struct media_info *i;
+    GError *err;
+    gchar *debug_info;
+    const char *name;
     
-    if(media_player_current_media(mp) != m)
-        return;
+    gst_message_parse_error(msg, &err, &debug_info);
     
-    i = media_info(m);
+    name = GST_OBJECT_NAME(msg->src);
     
-    client_out(&client, "\t~~ %s: %s - %s ~~\n", 
-               i->artist, i->title, i->album);
+    log_e("Error received from element %s: %s\n", name, err->message);
+    
+    if(debug_info) {
+        log_i("Debugging information: %s\n", debug_info);
+        g_free(debug_info);
+    }
+
+    g_clear_error(&err);
 }
 
 static int handle_message_play(struct client *__restrict client, 
@@ -136,7 +147,9 @@ static int handle_message_play(struct client *__restrict client,
         }
     }
     
-    print_track(media_player, media_player_current_media(media_player));
+    media = media_player_current_media(media_player);
+    
+    client_print_current_track(client, media);
     
     return 0;
 }
@@ -241,6 +254,11 @@ static int handle_message_volume(struct client *client,
     
     arg = ipc_message_arg(msg);
     
+    if(strlen(arg) == 0) {
+        client_print_volume(client, media_player_volume(media_player));
+        return 0;
+    }
+    
     errno = 0;
     val = strtol(arg, NULL, 10);
     if(errno != 0) {
@@ -281,7 +299,8 @@ static int handle_message_add(struct client *client, const struct message *msg)
     return 0;
 }
 
-static int handle_message_shutdown(struct client *client, const struct message *msg)
+static int handle_message_shutdown(struct client *client, 
+                                   const struct message *msg)
 {
     g_main_loop_quit(main_loop);
     
@@ -300,19 +319,16 @@ static void print_playlist(void)
     struct playlist *pl;
     struct link *link;
     struct media *media;
-    const struct media_info *i;
     
     pl = media_player_playlist(media_player);
     
     playlist_for_each(pl, link) {
         media = container_of(link, struct media, link);
         
-        i = media_info(media);
-        
         if(media == media_player_current_media(media_player))
-            client_out(&client, "\t %s: %s - %s  <--\n", i->artist, i->title, i->album);
+            client_print_current_track(&client, media);
         else
-            client_out(&client, "\t %s: %s - %s\n", i->artist, i->title, i->album);
+            client_print_track(&client, media);
     }
 }
 
@@ -331,7 +347,6 @@ static int handle_message_playlist(struct client *client,
         
     if(strlen(arg) == 0) {
         print_playlist();
-        
         return 0;
     }
     
@@ -443,7 +458,7 @@ static gboolean handle_server_fd(GIOChannel *src, GIOCondition cond, void *data)
     err = getsockopt(fd, SOL_SOCKET, SO_PEERCRED, &creds, &cred_len);
     if(err < 0) {
         err = -errno;
-        log_e("getsockopt()", errno_string(errno));
+        log_func_e("getsockopt()", errno_string(errno));
         goto out;
     }
     
@@ -491,7 +506,6 @@ static int close_std_streams(void)
 static int init_server_fd(void)
 {
     struct sockaddr_un addr;
-    struct epoll_event ev;
     int err;
     
     /* Setup Unix Domain Socket */
@@ -610,6 +624,8 @@ static int init(void)
     media_player = media_player_new();
     if(!media_player)
         goto cleanup3;
+    
+    media_player_on_bus_error(media_player, &media_player_handle_bus_error);
 
     memset(&client, 0, sizeof(client));
     

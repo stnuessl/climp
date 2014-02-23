@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <stdarg.h>
+#include <assert.h>
 
 #include <gst/gst.h>
 
@@ -68,8 +69,31 @@ void client_err(struct client *__restrict client, const char *format, ...)
     va_end(args);
 }
 
-// void client_out_current_track(struct client *__restrict client,
-//                               struct media_player *__restrict mp)
-// {
-//     client_out(client, "Playing\t~~ %s ~~\n", media_player_current_track(mp));
-// }
+void client_print_volume(struct client *__restrict client, unsigned int vol)
+{
+    client_out(client, "\tVolume: %u\n", vol);
+}
+
+void client_print_current_track(struct client *__restrict client, 
+                                const struct media *m)
+{
+    const struct media_info *i;
+
+    assert(m && "No track to print");
+    
+    i = media_info(m);
+    
+    client_out(client, "\t~~ %s: %s - %s ~~\n", i->artist, i->title, i->album);
+}
+
+void client_print_track(struct client *__restrict client, 
+                        const struct media *m)
+{
+    const struct media_info *i;
+    
+    assert(m && "No track to print");
+    
+    i = media_info(m);
+    
+    client_out(client, "\t   %s: %s - %s\n", i->artist, i->title, i->album);
+}

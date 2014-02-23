@@ -94,7 +94,9 @@ static struct media *media_new_abs_path(const char *path)
     result = gst_discoverer_info_get_result(info);
     if(result != GST_DISCOVERER_OK) {
         errno = EINVAL;
+        goto cleanup3;
     }
+    
     tags = gst_discoverer_info_get_tags(info);
     if(!tags) {
         strncpy(media->info.title, "Unknown", MEDIA_META_ELEMENT_SIZE);
@@ -110,7 +112,9 @@ static struct media *media_new_abs_path(const char *path)
     g_object_unref(discoverer);
     
     return media;
-    
+
+cleanup3:
+    g_object_unref(discoverer);
 cleanup2:
     free(media->uri);
 cleanup1:

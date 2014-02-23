@@ -23,6 +23,8 @@
 
 #include <gst/gst.h>
 
+#include "media_player/media.h"
+
 struct client {
     pid_t pid;
     
@@ -46,5 +48,13 @@ void client_out(struct client *__restrict client, const char *format, ...)
 
 void client_err(struct client *__restrict client, const char *format, ...)
                                           __attribute__((format(printf, 2, 3)));
+                                          
+void client_print_volume(struct client *__restrict client, unsigned int vol);
+
+void client_print_current_track(struct client *__restrict client, 
+                                const struct media *m);
+
+void client_print_track(struct client *__restrict client, 
+                        const struct media *m);
 
 #endif /* _CLIENT_H_ */

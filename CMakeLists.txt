@@ -5,6 +5,7 @@ project(climp C)
 
 add_definitions(`pkg-config --cflags --libs gstreamer-pbutils-0.10 gstreamer-0.10`)
 add_definitions(-D_GNU_SOURCE)
+#add_definitions(-DNDEBUG)
 add_definitions(-Wall)
 #add_definitions(-O2)
 add_definitions(-g3)
