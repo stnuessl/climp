@@ -254,7 +254,6 @@ unsigned int media_player_volume(const struct media_player *__restrict mp)
     return mp->volume;
 }
 
-
 void media_player_on_media_parsed(struct media_player *__restrict mp,
                            void (*func)(struct media_player *, struct media *))
 {
