@@ -161,6 +161,8 @@ int media_player_init(struct media_player *__restrict mp)
 
 void media_player_destroy(struct media_player *__restrict mp)
 {
+    media_player_stop(mp);
+    
     gst_object_unref(mp->playbin2);
     playlist_delete(mp->playlist);
 }

@@ -29,7 +29,8 @@
 
 #include "media.h"
 
-#define MEDIA_FILE_PREFIX "file://"
+#define MEDIA_FILE_PREFIX        "file://"
+#define MEDIA_META_ELEMENT_SIZE  64
 
 
 static void media_parse_tags(const GstTagList *list, 
@@ -39,6 +40,7 @@ static void media_parse_tags(const GstTagList *list,
     struct media *m;
     const GValue *val;
     int i, num;
+    const char *s;
 
     m  = data;
     
@@ -46,13 +48,17 @@ static void media_parse_tags(const GstTagList *list,
     
     for (i = 0; i < num; ++i) {
         val = gst_tag_list_get_value_index(list, tag, i);
-        
-        if(strcmp(GST_TAG_TITLE, tag) == 0)
-            m->info.title = strdup(g_value_get_string(val));
-        else if(strcmp(GST_TAG_ALBUM, tag) == 0)
-            m->info.album = strdup(g_value_get_string(val));
-        else if(strcmp(GST_TAG_ARTIST, tag) == 0)
-            m->info.artist = strdup(g_value_get_string(val));
+
+        if(strcmp(GST_TAG_TITLE, tag) == 0) {
+            s = g_value_get_string(val);
+            strncpy(m->info.title, s, MEDIA_META_ELEMENT_SIZE);
+        } else if(strcmp(GST_TAG_ALBUM, tag) == 0) {
+            s = g_value_get_string(val);
+            strncpy(m->info.album, s, MEDIA_META_ELEMENT_SIZE);
+        } else if(strcmp(GST_TAG_ARTIST, tag) == 0) {
+            s = g_value_get_string(val);
+            strncpy(m->info.artist, s, MEDIA_META_ELEMENT_SIZE);
+        }
     }
 }
 
@@ -76,8 +82,6 @@ static struct media *media_new_abs_path(const char *path)
     media->uri = strcat(media->uri, path);
     
     media->path = media->uri + sizeof(MEDIA_FILE_PREFIX) - 1;
-    
-    media->parsed = false;
 
     discoverer = gst_discoverer_new(GST_SECOND, NULL);
     if(!discoverer) {
@@ -93,9 +97,9 @@ static struct media *media_new_abs_path(const char *path)
     }
     tags = gst_discoverer_info_get_tags(info);
     if(!tags) {
-        media->info.title  = strdup("Unknown");
-        media->info.artist = strdup("Unknown");
-        media->info.album  = strdup("Unknown");
+        strncpy(media->info.title, "Unknown", MEDIA_META_ELEMENT_SIZE);
+        strncpy(media->info.artist, "Unknown", MEDIA_META_ELEMENT_SIZE);
+        strncpy(media->info.album, "Unknown", MEDIA_META_ELEMENT_SIZE);
         
         return media;
     }
@@ -133,9 +137,6 @@ struct media *media_new(const char *path)
 
 void media_delete(struct media *__restrict media)
 {
-    free(media->info.title);
-    free(media->info.artist);
-    free(media->info.album);
     free(media->uri);
     free(media);
 }
@@ -143,9 +144,4 @@ void media_delete(struct media *__restrict media)
 const struct media_info *media_info(const struct media *__restrict media)
 {
     return &media->info;
-}
-
-bool media_is_parsed(const struct media *__restrict media)
-{
-    return media->parsed;
 }

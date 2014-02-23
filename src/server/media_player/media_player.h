@@ -38,8 +38,6 @@ struct media_player {
     GstState state;
     
     GstElement *playbin2;
-    
-    void (*on_media_parsed)(struct media_player *, struct media *);
 };
 
 struct media_player *media_player_new(void);
@@ -69,9 +67,5 @@ void media_player_set_volume(struct media_player *__restrict mp,
                              unsigned int volume);
 
 unsigned int media_player_volume(const struct media_player *__restrict mp);
-
-void media_player_on_media_parsed(struct media_player *__restrict mp,
-                           void (*func)(struct media_player *, struct media *));
-
 
 #endif /* _MEDIA_PLAYER_H_ */

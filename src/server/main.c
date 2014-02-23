@@ -300,14 +300,19 @@ static void print_playlist(void)
     struct playlist *pl;
     struct link *link;
     struct media *media;
+    struct media_info *i;
     
     pl = media_player_playlist(media_player);
     
     playlist_for_each(pl, link) {
         media = container_of(link, struct media, link);
         
-        if(!media)
-            abort();
+        i = media_info(media);
+        
+        if(media == media_player_current_media(media_player))
+            client_out(&client, "\t %s: %s - %s  <--\n", i->artist, i->title, i->album);
+        else
+            client_out(&client, "\t %s: %s - %s\n", i->artist, i->title, i->album);
     }
 }
 
