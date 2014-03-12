@@ -293,6 +293,8 @@ static int handle_message_add(struct client *client, const struct message *msg)
     
     err = playlist_add_file(playlist, path);
     if(err < 0) {
+        client_err(client, "climpd: unable to add %s - %s\n", 
+                   path, errno_string(-err));
         return err;
     }
     
