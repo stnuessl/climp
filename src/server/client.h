@@ -1,7 +1,7 @@
-/* 
+/*
  * Copyright (C) 2014  Steffen Nüssle
  * climp - Command Line Interface Music Player
- * 
+ *
  * This file is part of climp.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -13,7 +13,7 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
@@ -52,9 +52,14 @@ void client_err(struct client *__restrict client, const char *format, ...)
 void client_print_volume(struct client *__restrict client, unsigned int vol);
 
 void client_print_current_track(struct client *__restrict client, 
-                                const struct media *m);
+                                const struct media *m,
+                                int index);
 
 void client_print_track(struct client *__restrict client, 
-                        const struct media *m);
+                        const struct media *m,
+                        int index);
+
+void client_print_media_player_playlist(struct client *__restrict client, 
+                                        struct media_player *mp);
 
 #endif /* _CLIENT_H_ */

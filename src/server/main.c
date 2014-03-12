@@ -1,7 +1,7 @@
-/* 
+/*
  * Copyright (C) 2014  Steffen Nüssle
  * climp - Command Line Interface Music Player
- * 
+ *
  * This file is part of climp.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -13,7 +13,7 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
@@ -149,7 +149,7 @@ static int handle_message_play(struct client *__restrict client,
     
     media = media_player_current_media(media_player);
     
-    client_print_current_track(client, media);
+    client_print_current_track(client, media, 0);
     
     return 0;
 }
@@ -316,24 +316,6 @@ static int handle_message_mute(struct client *client, const struct message *msg)
     return 0;
 }
 
-static void print_playlist(void)
-{
-    struct playlist *pl;
-    struct link *link;
-    struct media *media;
-    
-    pl = media_player_playlist(media_player);
-    
-    playlist_for_each(pl, link) {
-        media = container_of(link, struct media, link);
-        
-        if(media == media_player_current_media(media_player))
-            client_print_current_track(&client, media);
-        else
-            client_print_track(&client, media);
-    }
-}
-
 static int handle_message_playlist(struct client *client, 
                                    const struct message *msg)
 {
@@ -348,7 +330,7 @@ static int handle_message_playlist(struct client *client,
     arg = ipc_message_arg(msg);
         
     if(strlen(arg) == 0) {
-        print_playlist();
+        client_print_media_player_playlist(client, media_player);
         return 0;
     }
     

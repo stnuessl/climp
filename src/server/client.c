@@ -1,3 +1,23 @@
+/*
+ * Copyright (C) 2014  Steffen Nüssle
+ * climp - Command Line Interface Music Player
+ *
+ * This file is part of climp.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 #include <stdio.h>
 #include <unistd.h>
 #include <stdarg.h>
@@ -5,6 +25,11 @@
 
 #include <gst/gst.h>
 
+#include <libvci/macro.h>
+
+#include "media_player/media_player.h"
+#include "media_player/playlist.h"
+#include "media_player/media.h"
 #include "client.h"
 
 void client_init(struct client *__restrict client, pid_t pid, int unix_fd)
@@ -75,7 +100,8 @@ void client_print_volume(struct client *__restrict client, unsigned int vol)
 }
 
 void client_print_current_track(struct client *__restrict client, 
-                                const struct media *m)
+                                const struct media *m,
+                                int index)
 {
     const struct media_info *i;
 
@@ -83,11 +109,13 @@ void client_print_current_track(struct client *__restrict client,
     
     i = media_info(m);
     
-    client_out(client, "\t~~ %s: %s - %s ~~\n", i->artist, i->title, i->album);
+    client_out(client, "    ( %3d )    ~~ %s: %s - %s ~~\n", 
+               index, i->artist, i->title, i->album);
 }
 
 void client_print_track(struct client *__restrict client, 
-                        const struct media *m)
+                        const struct media *m,
+                        int index)
 {
     const struct media_info *i;
     
@@ -95,5 +123,29 @@ void client_print_track(struct client *__restrict client,
     
     i = media_info(m);
     
-    client_out(client, "\t   %s: %s - %s\n", i->artist, i->title, i->album);
+    client_out(client, "    ( %3d )       %s: %s - %s\n",
+               index, i->artist, i->title, i->album);
+}
+
+void client_print_media_player_playlist(struct client *__restrict client, 
+                                        struct media_player *mp)
+{
+    struct playlist *pl;
+    struct link *link;
+    struct media *m;
+    int i;
+    
+    pl = media_player_playlist(mp);
+    i = 0;
+
+    playlist_for_each(pl, link) {
+        i += 1;
+        
+        m = container_of(link, struct media, link);
+        
+        if(m == media_player_current_media(mp))
+            client_print_current_track(client, m, i);
+        else
+            client_print_track(client, m, i);
+    }
 }
