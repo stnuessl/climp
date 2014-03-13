@@ -55,4 +55,6 @@ void climpd_previous(struct climpd *__restrict cc);
 
 void climpd_playlist(struct climpd *__restrict cc, const char *arg);
 
+void climpd_goto(struct climpd *__restrict cc, const char *arg);
+
 #endif /* _CLIENT_H_ */

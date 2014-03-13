@@ -92,11 +92,11 @@ int playlist_init(struct playlist *__restrict pl)
 {
     int err;
     
-    err = map_init(&pl->map, 0, &media_compare, &media_hash);
+    err = map_init(&pl->map_path, 0, &media_compare, &media_hash);
     if(err < 0)
         return 0;
     
-    map_set_data_delete(&pl->map, (void(*)(void*)) &media_delete);
+    map_set_data_delete(&pl->map_path, (void(*)(void*)) &media_delete);
     
     list_init(&pl->list);
     
@@ -106,20 +106,20 @@ int playlist_init(struct playlist *__restrict pl)
 void playlist_destroy(struct playlist *__restrict pl)
 {
     list_destroy(&pl->list, NULL);
-    map_destroy(&pl->map);
+    map_destroy(&pl->map_path);
 }
 
 void playlist_clear(struct playlist *__restrict pl)
 {
     list_clear(&pl->list, NULL);
-    map_clear(&pl->map);
+    map_clear(&pl->map_path);
 }
 
 int playlist_add_media(struct playlist *__restrict pl, struct media *m)
 {
     int err;
         
-    err = map_insert(&pl->map, m->path, m);
+    err = map_insert(&pl->map_path, m->path, m);
     if(err < 0)
         return err;
     
@@ -130,15 +130,15 @@ int playlist_add_media(struct playlist *__restrict pl, struct media *m)
 
 void playlist_remove_media(struct playlist* pl, struct media* m)
 {
-    assert(map_contains(&pl->map, m->path) && MEDIA_NOT_IN_PLAYLIST);
+    assert(map_contains(&pl->map_path, m->path) && MEDIA_NOT_IN_PLAYLIST);
     
-    if(map_take(&pl->map, m->path))
+    if(map_take(&pl->map_path, m->path))
         list_take(&m->link);
 }
 
 void playlist_delete_media(struct playlist *__restrict pl, struct media *m)
 {
-    m = map_take(&pl->map, m->path);
+    m = map_take(&pl->map_path, m->path);
     
     assert(m && MEDIA_NOT_IN_PLAYLIST);
     
@@ -149,7 +149,7 @@ void playlist_delete_media(struct playlist *__restrict pl, struct media *m)
 bool playlist_contains_media(const struct playlist *__restrict pl,
                              struct media *m)
 {
-    return map_contains(&pl->map, m->path);
+    return map_contains(&pl->map_path, m->path);
 }
 
 int playlist_add_file(struct playlist *__restrict pl, const char *path)
@@ -167,7 +167,7 @@ void playlist_remove_file(struct playlist *__restrict pl, const char* path)
 {
     struct media *m;
     
-    m = map_take(&pl->map, path);
+    m = map_take(&pl->map_path, path);
     if(!m)
         return;
     
@@ -186,7 +186,7 @@ struct media *playlist_last(struct playlist *__restrict pl)
 
 struct media *playlist_next(struct playlist *__restrict pl, struct media *m)
 {
-    assert(map_contains(&pl->map, m->path) && MEDIA_NOT_IN_PLAYLIST);
+    assert(map_contains(&pl->map_path, m->path) && MEDIA_NOT_IN_PLAYLIST);
     
     if(unlikely(&m->link == list_back(&pl->list)))
         return NULL;
@@ -197,12 +197,26 @@ struct media *playlist_next(struct playlist *__restrict pl, struct media *m)
 struct media *playlist_previous(struct playlist *__restrict pl, 
                                 struct media *m)
 {
-    assert(map_contains(&pl->map, m->path) && MEDIA_NOT_IN_PLAYLIST);
+    assert(map_contains(&pl->map_path, m->path) && MEDIA_NOT_IN_PLAYLIST);
     
     if(unlikely(&m->link == list_front(&pl->list)))
         return NULL;
     
     return container_of(m->link.prev, struct media, link);
+}
+
+struct media *playlist_at(struct playlist *__restrict pl, unsigned int index)
+{
+    struct link *link;
+    
+    playlist_for_each(pl, link) {
+        index -= 1;
+        
+        if(index == 0)
+            return container_of(link, struct media, link);
+    }
+    
+    return NULL;
 }
 
 int playlist_merge(struct playlist *__restrict pl1, struct playlist *pl2)
@@ -214,7 +228,7 @@ int playlist_merge(struct playlist *__restrict pl1, struct playlist *pl2)
     list_for_each(&pl2->list, link) {
         m = container_of(link, struct media, link);
         
-        err = map_insert(&pl1->map, m->path, m);
+        err = map_insert(&pl1->map_path, m->path, m);
         if(err < 0)
             goto out;
     }
@@ -227,7 +241,7 @@ out:
     list_for_each(&pl2->list, link) {
         m = container_of(link, struct media, link);
         
-        if(!map_take(&pl1->map, m->path))
+        if(!map_take(&pl1->map_path, m->path))
             break;
     }
     

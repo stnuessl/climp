@@ -144,6 +144,15 @@ int main(int argc, char *argv[])
                 arg = argv[i];
             
             climpd_playlist(cc, arg);
+        } else if(strcmp("goto", argv[i]) == 0) {
+            i += 1;
+            
+            if(i >= argc) {
+                fprintf(stderr, "climp: goto: %s\n", strerror(EINVAL));
+                continue;
+            }
+            
+            climpd_goto(cc, argv[i]);
         }
     }
     

@@ -365,6 +365,29 @@ static int handle_message_playlist(struct client *client,
     return 0;
 }
 
+static int handle_message_goto(struct client *client, const struct message *msg)
+{
+    struct playlist *pl;
+    struct media *m;
+    long index;
+    const char *arg;
+    
+    arg = ipc_message_arg(msg);
+    
+    errno = 0;
+    index = strtol(arg, NULL, 10);
+    if(errno != 0)
+        return -errno;
+    
+    pl = media_player_playlist(media_player);
+    
+    m = playlist_at(pl, index);
+    if(!m)
+        return -EINVAL;
+    
+    return media_player_play_media(media_player, m);
+}
+
 static int (*msg_handler[])(struct client *, const struct message *) = {
     [IPC_MESSAGE_HELLO]    = &handle_message_hello,
     [IPC_MESSAGE_GOODBYE]  = &handle_message_goodbye,
@@ -376,7 +399,8 @@ static int (*msg_handler[])(struct client *, const struct message *) = {
     [IPC_MESSAGE_MUTE]     = &handle_message_mute,
     [IPC_MESSAGE_ADD]      = &handle_message_add,
     [IPC_MESSAGE_SHUTDOWN] = &handle_message_shutdown,
-    [IPC_MESSAGE_PLAYLIST] = &handle_message_playlist
+    [IPC_MESSAGE_PLAYLIST] = &handle_message_playlist,
+    [IPC_MESSAGE_GOTO]     = &handle_message_goto
 };
 
 static gboolean handle_unix_fd(GIOChannel *src, GIOCondition cond, void *data)

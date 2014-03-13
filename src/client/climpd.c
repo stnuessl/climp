@@ -325,3 +325,21 @@ void climpd_playlist(struct climpd *__restrict cc, const char *arg)
     if(err < 0)
         return;
 }
+
+void climpd_goto(struct climpd *__restrict cc, const char *arg)
+{
+    int err;
+    
+    ipc_message_clear(&cc->msg);
+    ipc_message_set_id(&cc->msg, IPC_MESSAGE_GOTO);
+    
+    err = ipc_message_set_arg(&cc->msg, arg);
+    if(err < 0) {
+        fprintf(stdout, "climp: goto: %s\n", strerror(-err));
+        return;
+    }
+    
+    err = ipc_send_message(cc->fd, &cc->msg);
+    if(err < 0)
+        return;
+}

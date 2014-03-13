@@ -28,7 +28,7 @@
 #include "media.h"
 
 struct playlist {
-    struct map map;
+    struct map map_path;
     struct link list;
 };
 
@@ -57,12 +57,14 @@ void playlist_remove_file(struct playlist *__restrict pl, const char *path);
 
 struct media *playlist_first(struct playlist *__restrict pl);
 
-struct media *playlist_last__Eac(struct playlist *__restrict pl);
+struct media *playlist_last(struct playlist *__restrict pl);
 
 struct media *playlist_next(struct playlist *__restrict pl, struct media *m);
 
 struct media *playlist_previous(struct playlist *__restrict pl, 
                                 struct media *m);
+
+struct media *playlist_at(struct playlist *__restrict pl, unsigned int index);
 
 int playlist_merge(struct playlist *__restrict pl1, struct playlist *pl2);
 
