@@ -51,13 +51,9 @@ void client_err(struct client *__restrict client, const char *format, ...)
                                           
 void client_print_volume(struct client *__restrict client, unsigned int vol);
 
-void client_print_current_track(struct client *__restrict client, 
-                                const struct media *m,
-                                int index);
 
-void client_print_track(struct client *__restrict client, 
-                        const struct media *m,
-                        int index);
+void client_print_current_media(struct client *__restrict client,
+                                struct media_player *mp);
 
 void client_print_media_player_playlist(struct client *__restrict client, 
                                         struct media_player *mp);

@@ -30,6 +30,8 @@
 #include "media_player/media_player.h"
 #include "media_player/playlist.h"
 #include "media_player/media.h"
+
+#include "color.h"
 #include "client.h"
 
 void client_init(struct client *__restrict client, pid_t pid, int unix_fd)
@@ -99,32 +101,46 @@ void client_print_volume(struct client *__restrict client, unsigned int vol)
     client_out(client, "\tVolume: %u\n", vol);
 }
 
-void client_print_current_track(struct client *__restrict client, 
-                                const struct media *m,
-                                int index)
+static void client_print_media(struct client *__restrict client, 
+                               const struct media *m,
+                               int index,
+                               const char *color)
 {
     const struct media_info *i;
-
+    
     assert(m && "No track to print");
     
     i = media_info(m);
     
-    client_out(client, "    ( %3d )    ~~ %s: %s - %s ~~\n", 
-               index, i->artist, i->title, i->album);
+    client_out(client, 
+               "%s    ( %3d ) %*s: %*s %*s\n" COLOR_DEFAULT,
+               color, index,
+               MEDIA_META_ELEMENT_SIZE >> 1, i->artist, 
+               MEDIA_META_ELEMENT_SIZE >> 1, i->title,
+               MEDIA_META_ELEMENT_SIZE >> 1, i->album);
 }
 
-void client_print_track(struct client *__restrict client, 
-                        const struct media *m,
-                        int index)
+void client_print_current_media(struct client *__restrict client,
+                                struct media_player *mp)
 {
-    const struct media_info *i;
+    struct playlist *pl;
+    struct link *link;
+    struct media *m;
+    int i;
     
-    assert(m && "No track to print");
+    pl = media_player_playlist(mp);
+    i = 0;
     
-    i = media_info(m);
-    
-    client_out(client, "    ( %3d )       %s: %s - %s\n",
-               index, i->artist, i->title, i->album);
+    playlist_for_each(pl, link) {
+        i += 1;
+        
+        m = container_of(link, struct media, link);
+        
+        if(m == media_player_current_media(mp)) {
+            client_print_media(client, m, i, COLOR_GREEN);
+            break;
+        }
+    }
 }
 
 void client_print_media_player_playlist(struct client *__restrict client, 
@@ -144,8 +160,8 @@ void client_print_media_player_playlist(struct client *__restrict client,
         m = container_of(link, struct media, link);
         
         if(m == media_player_current_media(mp))
-            client_print_current_track(client, m, i);
+            client_print_media(client, m, i, COLOR_GREEN);
         else
-            client_print_track(client, m, i);
+            client_print_media(client, m, i, COLOR_YELLOW);
     }
 }

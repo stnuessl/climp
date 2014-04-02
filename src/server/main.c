@@ -149,7 +149,7 @@ static int handle_message_play(struct client *__restrict client,
     
     media = media_player_current_media(media_player);
     
-    client_print_current_track(client, media, 0);
+    client_print_current_media(client, media_player);
     
     return 0;
 }
