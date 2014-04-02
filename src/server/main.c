@@ -48,6 +48,8 @@
 #include "media_player/media_player.h"
 #include "media_player/playlist.h"
 #include "media_player/media.h"
+
+#include "color.h"
 #include "client.h"
 
 #define CLIMP_SERVER_MAX_EPOLL_EVENTS   10
@@ -69,6 +71,11 @@
 
 #define log_func_e(func, err)                                                  \
     log_error(&log, "%s: %s at %s:%d\n", (func), (err), __FILE__, __LINE__)
+
+unsigned int media_meta_length = 24;
+const char *current_media_meta_color = COLOR_GREEN;
+const char *media_meta_color = COLOR_DEFAULT;
+
 
 static struct media_player *media_player;
 static struct client client;
@@ -165,6 +172,7 @@ static int handle_message_next(struct client *client, const struct message *msg)
 {
     struct playlist *pl;
     struct media *m;
+    int err;
     
     pl = media_player_playlist(media_player);
     
@@ -174,7 +182,13 @@ static int handle_message_next(struct client *client, const struct message *msg)
         return -EINVAL;
     }
     
-    return media_player_play_media(media_player, m);
+    err = media_player_play_media(media_player, m);
+    if(err < 0)
+        return err;
+    
+    client_print_current_media(client, media_player);
+    
+    return 0;
 }
 
 static int handle_message_previous(struct client *client, 
@@ -182,6 +196,7 @@ static int handle_message_previous(struct client *client,
 {
     struct playlist *pl;
     struct media *m;
+    int err;
     
     pl = media_player_playlist(media_player);
     
@@ -191,7 +206,13 @@ static int handle_message_previous(struct client *client,
         return -EINVAL;
     }
     
-    return media_player_play_media(media_player, m);
+    err = media_player_play_media(media_player, m);
+    if(err < 0)
+        return err;
+    
+    client_print_current_media(client, media_player);
+    
+    return 0;
 }
 
 static int handle_message_hello(struct client *client, 
@@ -371,6 +392,7 @@ static int handle_message_goto(struct client *client, const struct message *msg)
     struct media *m;
     long index;
     const char *arg;
+    int err;
     
     arg = ipc_message_arg(msg);
     
@@ -385,7 +407,13 @@ static int handle_message_goto(struct client *client, const struct message *msg)
     if(!m)
         return -EINVAL;
     
-    return media_player_play_media(media_player, m);
+    err = media_player_play_media(media_player, m);
+    if(err < 0)
+        return err;
+    
+    client_print_current_media(client, media_player);
+    
+    return 0;
 }
 
 static int (*msg_handler[])(struct client *, const struct message *) = {

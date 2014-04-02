@@ -34,6 +34,29 @@
 #include "color.h"
 #include "client.h"
 
+extern int media_meta_length;
+extern const char *current_media_meta_color;
+extern const char *media_meta_color;
+
+static void client_print_media(struct client *__restrict client, 
+                               const struct media *m,
+                               int index,
+                               const char *color)
+{
+    const struct media_info *i;
+    
+    assert(m && "No track to print");
+    
+    i = media_info(m);
+
+    client_out(client, 
+               "%s    ( %3d )\t%-*.*s %-*.*s %-*.*s\n" COLOR_DEFAULT,
+               color, index,
+               media_meta_length, media_meta_length, i->title, 
+               media_meta_length, media_meta_length, i->artist, 
+               media_meta_length, media_meta_length, i->album);
+}
+
 void client_init(struct client *__restrict client, pid_t pid, int unix_fd)
 {
     client->pid     = pid;
@@ -101,25 +124,6 @@ void client_print_volume(struct client *__restrict client, unsigned int vol)
     client_out(client, "\tVolume: %u\n", vol);
 }
 
-static void client_print_media(struct client *__restrict client, 
-                               const struct media *m,
-                               int index,
-                               const char *color)
-{
-    const struct media_info *i;
-    
-    assert(m && "No track to print");
-    
-    i = media_info(m);
-    
-    client_out(client, 
-               "%s    ( %3d ) %*s: %*s %*s\n" COLOR_DEFAULT,
-               color, index,
-               MEDIA_META_ELEMENT_SIZE >> 1, i->artist, 
-               MEDIA_META_ELEMENT_SIZE >> 1, i->title,
-               MEDIA_META_ELEMENT_SIZE >> 1, i->album);
-}
-
 void client_print_current_media(struct client *__restrict client,
                                 struct media_player *mp)
 {
@@ -137,7 +141,7 @@ void client_print_current_media(struct client *__restrict client,
         m = container_of(link, struct media, link);
         
         if(m == media_player_current_media(mp)) {
-            client_print_media(client, m, i, COLOR_GREEN);
+            client_print_media(client, m, i, current_media_meta_color);
             break;
         }
     }
@@ -160,8 +164,8 @@ void client_print_media_player_playlist(struct client *__restrict client,
         m = container_of(link, struct media, link);
         
         if(m == media_player_current_media(mp))
-            client_print_media(client, m, i, COLOR_GREEN);
+            client_print_media(client, m, i, current_media_meta_color);
         else
-            client_print_media(client, m, i, COLOR_YELLOW);
+            client_print_media(client, m, i, media_meta_color);
     }
 }
