@@ -170,6 +170,8 @@ void playlist_remove_file(struct playlist *__restrict pl, const char *path)
     if(!m)
         return;
     
+    list_take(&m->link);
+    
     media_delete(m);
 }
 

@@ -451,7 +451,7 @@ static int remove_media_realpath(struct client *client, const char *path)
     
     err = media_player_play_media(media_player, m);
     
-    playlist_delete_media(pl, m);
+    playlist_remove_file(pl, path);
     
     client_print_current_media(client, media_player);
     
