@@ -36,16 +36,21 @@
 const char *ipc_message_id_string(enum message_id id)
 {
     static const char *message_names[] = {
-        [IPC_MESSAGE_HELLO]    = "IPC_MESSAGE_HELLO",
-        [IPC_MESSAGE_GOODBYE]  = "IPC_MESSAGE_GOODBYE",
-        [IPC_MESSAGE_OK]       = "IPC_MESSAGE_OK",
-        [IPC_MESSAGE_NO]       = "IPC_MESSAGE_NO",
-        [IPC_MESSAGE_PLAY]     = "IPC_MESSAGE_PLAY",
-        [IPC_MESSAGE_STOP]     = "IPC_ESSAGE_STOP",
-        [IPC_MESSAGE_NEXT]     = "IPC_MESSAGE_NEXT",
-        [IPC_MESSAGE_PREVIOUS] = "IPC_MESSAGE_PREVIOUS",
-        [IPC_MESSAGE_VOLUME]   = "IPC_MESSAGE_VOLUME",
-        [IPC_MESSAGE_MUTE]     = "IPC_MESSAGE_MUTE"
+        [IPC_MESSAGE_HELLO]             = "IPC_MESSAGE_HELLO",
+        [IPC_MESSAGE_GOODBYE]           = "IPC_MESSAGE_GOODBYE",
+        [IPC_MESSAGE_OK]                = "IPC_MESSAGE_OK",
+        [IPC_MESSAGE_NO]                = "IPC_MESSAGE_NO",
+        [IPC_MESSAGE_GET_PLAYLIST]      = "IPC_MESSAGE_GET_PLAYLIST",
+        [IPC_MESSAGE_GET_FILES]         = "IPC_MESSAGE_GET_FILES",
+        [IPC_MESSAGE_GET_VOLUME]        = "IPC_MESSAGE_GET_VOLUME",
+        [IPC_MESSAGE_GET_STATUS]        = "IPC_MESSAGE_GET_STATUS",
+        [IPC_MESSAGE_SET_STATUS]        = "IPC_MESSAGE_SET_STATUS",
+        [IPC_MESSAGE_SET_PLAYLIST]      = "IPC_MESSAGE_SET_PLAYLIST",
+        [IPC_MESSAGE_SET_VOLUME]        = "IPC_MESSAGE_SET_VOLUME",
+        [IPC_MESSAGE_PLAY_NEXT]         = "IPC_MESSAGE_PLAY_NEXT",
+        [IPC_MESSAGE_PLAY_PREVIOUS]     = "IPC_MESSAGE_PLAY_PREVIOUS",
+        [IPC_MESSAGE_PLAY_FILE]         = "IPC_MESSAGE_PLAY_FILE",
+        [IPC_MESSAGE_PLAY_TRACK]        = "IPC_MESSAGE_PLAY_TRACK"
     };
     
     return message_names[id];

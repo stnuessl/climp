@@ -62,7 +62,7 @@ static void media_parse_tags(const GstTagList *list,
     }
 }
 
-static struct media *media_new_abs_path(const char *path)
+struct media *media_new(const char *path)
 {
     GstDiscoverer *discoverer;
     GstDiscovererInfo *info;
@@ -70,6 +70,11 @@ static struct media *media_new_abs_path(const char *path)
     const GstTagList *tags;
     struct media *media;
     
+    if(path[0] != '/') {
+        errno = EINVAL;
+        return NULL;
+    }
+
     media = malloc(sizeof(*media));
     if(!media)
         goto out;
@@ -82,7 +87,7 @@ static struct media *media_new_abs_path(const char *path)
     media->uri = strcat(media->uri, path);
     
     media->path = media->uri + sizeof(MEDIA_FILE_PREFIX) - 1;
-
+    
     discoverer = gst_discoverer_new(GST_SECOND, NULL);
     if(!discoverer) {
         errno = ENOMEM;
@@ -112,7 +117,7 @@ static struct media *media_new_abs_path(const char *path)
     g_object_unref(discoverer);
     
     return media;
-
+    
 cleanup3:
     g_object_unref(discoverer);
 cleanup2:
@@ -121,22 +126,6 @@ cleanup1:
     free(media);
 out:
     return NULL;
-}
-
-struct media *media_new(const char *path)
-{
-    struct media *media;
-    char *abs_path;
-    
-    if(path[0] == '/') 
-        return media_new_abs_path(path);
-    
-    abs_path = realpath(path, NULL);
-
-    media = media_new_abs_path(abs_path);
-    
-    free(abs_path);
-    return media;
 }
 
 void media_delete(struct media *__restrict media)
@@ -148,4 +137,24 @@ void media_delete(struct media *__restrict media)
 const struct media_info *media_info(const struct media *__restrict media)
 {
     return &media->info;
+}
+
+bool media_is_from_file(const struct media *__restrict media, 
+                        const char *__restrict path)
+{
+    char *abs_path;
+    bool ret;
+    
+    if(path[0] == '/')
+        return strcmp(media->path, path) == 0;
+    
+    abs_path = realpath(path, NULL);
+    if(!abs_path)
+        return false;
+    
+    ret = strcmp(media->path, abs_path) == 0;
+    
+    free(abs_path);
+    
+    return ret;
 }

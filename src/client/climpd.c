@@ -39,13 +39,13 @@
 
 extern char **environ;
 
-static int climpd_connect(struct climpd *__restrict cc)
+static int climpd_connect(struct climpd *__restrict c)
 {
     struct sockaddr_un addr;
     int err;
     
-    cc->fd = socket(AF_UNIX, SOCK_STREAM, 0);
-    if(cc->fd < 0) {
+    c->fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if(c->fd < 0) {
         err = -errno;
         goto out;
     }
@@ -55,29 +55,29 @@ static int climpd_connect(struct climpd *__restrict cc)
     addr.sun_family = AF_UNIX;
     strncpy(addr.sun_path, IPC_SOCKET_PATH, sizeof(addr.sun_path));
     
-    err = connect(cc->fd, (struct sockaddr *) &addr, sizeof(addr));
+    err = connect(c->fd, (struct sockaddr *) &addr, sizeof(addr));
     if(err < 0) {
         err = -errno;
         goto cleanup1;
     }
     
-    ipc_message_clear(&cc->msg);
-    ipc_message_set_id(&cc->msg, IPC_MESSAGE_HELLO);
-    ipc_message_set_fds(&cc->msg, STDOUT_FILENO, STDERR_FILENO);
+    ipc_message_clear(&c->msg);
+    ipc_message_set_id(&c->msg, IPC_MESSAGE_HELLO);
+    ipc_message_set_fds(&c->msg, STDOUT_FILENO, STDERR_FILENO);
     
-    err = ipc_send_message(cc->fd, &cc->msg);
+    err = ipc_send_message(c->fd, &c->msg);
     if(err < 0) {
         fprintf(stderr, "climp: ipc_send_message(): %s\n", strerror(-err));
         goto cleanup1;
     }
     
-    err = ipc_recv_message(cc->fd, &cc->msg);
+    err = ipc_recv_message(c->fd, &c->msg);
     if(err < 0) {
         fprintf(stderr, "climp: ipc_recv_message(): %s\n", strerror(-err));
         goto cleanup1;
     }
     
-    if(ipc_message_id(&cc->msg) != IPC_MESSAGE_OK) {
+    if(ipc_message_id(&c->msg) != IPC_MESSAGE_OK) {
         err = -EIO;
         goto cleanup1;
     }
@@ -85,22 +85,22 @@ static int climpd_connect(struct climpd *__restrict cc)
     return 0;
     
 cleanup1:
-    close(cc->fd);
+    close(c->fd);
 out:
     return err;
 }
 
-static int climpd_disconnect(struct climpd *__restrict cc)
+static int climpd_disconnect(struct climpd *__restrict c)
 {
-    ipc_message_clear(&cc->msg);
-    ipc_message_set_id(&cc->msg, IPC_MESSAGE_GOODBYE);
+    ipc_message_clear(&c->msg);
+    ipc_message_set_id(&c->msg, IPC_MESSAGE_GOODBYE);
     
-    ipc_send_message(cc->fd, &cc->msg);
+    ipc_send_message(c->fd, &c->msg);
     
     /* This step is needed for a flawless synchronisation */
-    ipc_recv_message(cc->fd, &cc->msg);
+    ipc_recv_message(c->fd, &c->msg);
 
-    close(cc->fd);
+    close(c->fd);
     return 0;
 }
 
@@ -126,19 +126,19 @@ static int spawn_climpd(void)
 
 struct climpd *climpd_new(void)
 {
-    struct climpd *cc;
+    struct climpd *c;
     int attempts, err;
     
-    cc = malloc(sizeof(*cc));
-    if(!cc)
+    c = malloc(sizeof(*c));
+    if(!c)
         goto out;
     
-    ipc_message_init(&cc->msg);
+    ipc_message_init(&c->msg);
     
-    cc->int_err_cnt = 0;
-    cc->ext_err_cnt = 0;
+    c->int_err_cnt = 0;
+    c->ext_err_cnt = 0;
     
-    err = climpd_connect(cc);
+    err = climpd_connect(c);
     if(err < 0) {
         if(err != -ENOENT && err != -ECONNREFUSED)
             goto cleanup1;
@@ -156,7 +156,7 @@ struct climpd *climpd_new(void)
         attempts = 10;
         
         while(attempts--) {
-            err = climpd_connect(cc);
+            err = climpd_connect(c);
             if(err < 0) {
                 usleep(1000 * 1000);
                 continue;
@@ -169,177 +169,222 @@ struct climpd *climpd_new(void)
             goto cleanup1;
     }
 
-    return cc;
+    return c;
     
 cleanup1:
-    free(cc);
+    free(c);
 out:
     return NULL;
 }
 
-void climpd_delete(struct climpd *__restrict cc)
+void climpd_delete(struct climpd *__restrict c)
 {
     int err;
 
-    err = climpd_disconnect(cc);
+    err = climpd_disconnect(c);
     if(err < 0) {
         fprintf(stderr, 
                 "climp: client_destroy_instance(): %s\n", 
                 strerror(-err));
     }
     
-    free(cc);
+    free(c);
 }
 
-
-void climpd_play(struct climpd *__restrict cc,
-                        const char *arg)
+void climpd_get_playlist(struct climpd *__restrict c)
 {
     int err;
-    
-    ipc_message_clear(&cc->msg);
-    ipc_message_set_id(&cc->msg, IPC_MESSAGE_PLAY);
-    
-    err = ipc_message_set_arg(&cc->msg, arg);
-    if(err < 0)
-        return;
 
-    err = ipc_send_message(cc->fd, &cc->msg);
+    ipc_message_clear(&c->msg);
+    ipc_message_set_id(&c->msg, IPC_MESSAGE_GET_PLAYLIST);
+    
+    err = ipc_send_message(c->fd, &c->msg);
     if(err < 0)
         return;
 }
 
-void climpd_stop(struct climpd *__restrict cc)
+void climpd_get_files(struct climpd *__restrict c)
 {
     int err;
+
+    ipc_message_clear(&c->msg);
+    ipc_message_set_id(&c->msg, IPC_MESSAGE_GET_FILES);
     
-    ipc_message_clear(&cc->msg);
-    ipc_message_set_id(&cc->msg, IPC_MESSAGE_STOP);
-    
-    err = ipc_send_message(cc->fd, &cc->msg);
+    err = ipc_send_message(c->fd, &c->msg);
     if(err < 0)
         return;
 }
 
-void climpd_set_volume(struct climpd *__restrict cc,
-                       const char *arg)
+void climpd_get_volume(struct climpd *__restrict c)
 {
     int err;
     
-    ipc_message_clear(&cc->msg);
-    ipc_message_set_id(&cc->msg, IPC_MESSAGE_VOLUME);
+    ipc_message_clear(&c->msg);
+    ipc_message_set_id(&c->msg, IPC_MESSAGE_GET_VOLUME);
     
-    err = ipc_message_set_arg(&cc->msg, arg);
-    if(err < 0)
-        return;
-    
-    err = ipc_message_set_arg(&cc->msg, arg);
-    if(err < 0)
-        return;
-    
-    err = ipc_send_message(cc->fd, &cc->msg);
+    err = ipc_send_message(c->fd, &c->msg);
     if(err < 0)
         return;
 }
 
-void climpd_toggle_mute(struct climpd *__restrict cc)
+void climpd_get_status(struct climpd *__restrict c)
 {
     int err;
     
-    ipc_message_clear(&cc->msg);
-    ipc_message_set_id(&cc->msg, IPC_MESSAGE_MUTE);
+    ipc_message_clear(&c->msg);
+    ipc_message_set_id(&c->msg, IPC_MESSAGE_GET_STATUS);
     
-    err = ipc_send_message(cc->fd, &cc->msg);
+    err = ipc_send_message(c->fd, &c->msg);
     if(err < 0)
         return;
 }
 
-void climpd_shutdown(struct climpd *__restrict cc)
+void climpd_set_status(struct climpd *__restrict c, const char *arg)
 {
     int err;
     
-    ipc_message_clear(&cc->msg);
-    ipc_message_set_id(&cc->msg, IPC_MESSAGE_SHUTDOWN);
+    ipc_message_clear(&c->msg);
+    ipc_message_set_id(&c->msg, IPC_MESSAGE_SET_STATUS);
     
-    err = ipc_send_message(cc->fd, &cc->msg);
-    if(err < 0)
-        return;
-    
-    ipc_recv_message(cc->fd, &cc->msg);
-}
-
-void climpd_add(struct climpd *__restrict cc, const char *arg)
-{
-    int err;
-    
-    ipc_message_clear(&cc->msg);
-    ipc_message_set_id(&cc->msg, IPC_MESSAGE_ADD);
-    
-    err = ipc_message_set_arg(&cc->msg, arg);
-    if(err < 0)
-        return;
-    
-    err = ipc_send_message(cc->fd, &cc->msg);
-    if(err < 0)
-        return;
-}
-
-void climpd_next(struct climpd *__restrict cc)
-{
-    int err;
-    
-    ipc_message_clear(&cc->msg);
-    ipc_message_set_id(&cc->msg, IPC_MESSAGE_NEXT);
-    
-    err = ipc_send_message(cc->fd, &cc->msg);
-    if(err < 0)
-        return;
-}
-
-void climpd_previous(struct climpd *__restrict cc)
-{
-    int err;
-    
-    ipc_message_clear(&cc->msg);
-    ipc_message_set_id(&cc->msg, IPC_MESSAGE_PREVIOUS);
-    
-    err = ipc_send_message(cc->fd, &cc->msg);
-    if(err < 0)
-        return;
-}
-
-void climpd_playlist(struct climpd *__restrict cc, const char *arg)
-{
-    int err;
-    
-    ipc_message_clear(&cc->msg);
-    ipc_message_set_id(&cc->msg, IPC_MESSAGE_PLAYLIST);
-    
-    err = ipc_message_set_arg(&cc->msg, arg);
+    err = ipc_message_set_arg(&c->msg, arg);
     if(err < 0) {
-        fprintf(stdout, "climp: playlist: %s\n", strerror(-err));
+        fprintf(stderr, "climp: set-status: %s\n", strerror(-err));
         return;
     }
     
-    err = ipc_send_message(cc->fd, &cc->msg);
+    err = ipc_send_message(c->fd, &c->msg);
     if(err < 0)
         return;
 }
 
-void climpd_goto(struct climpd *__restrict cc, const char *arg)
+void climpd_set_playlist(struct climpd *__restrict c, const char *arg)
 {
     int err;
     
-    ipc_message_clear(&cc->msg);
-    ipc_message_set_id(&cc->msg, IPC_MESSAGE_GOTO);
+    ipc_message_clear(&c->msg);
+    ipc_message_set_id(&c->msg, IPC_MESSAGE_SET_PLAYLIST);
     
-    err = ipc_message_set_arg(&cc->msg, arg);
+    err = ipc_message_set_arg(&c->msg, arg);
     if(err < 0) {
-        fprintf(stdout, "climp: goto: %s\n", strerror(-err));
+        fprintf(stderr, "climp: set-playlist: %s\n", strerror(-err));
         return;
     }
     
-    err = ipc_send_message(cc->fd, &cc->msg);
+    err = ipc_send_message(c->fd, &c->msg);
+    if(err < 0)
+        return;
+}
+
+void climpd_set_volume(struct climpd *__restrict c, const char *arg)
+{
+    int err;
+    
+    ipc_message_clear(&c->msg);
+    ipc_message_set_id(&c->msg, IPC_MESSAGE_SET_VOLUME);
+    
+    err = ipc_message_set_arg(&c->msg, arg);
+    if(err < 0) {
+        fprintf(stderr, "climp: set-volume: %s\n", strerror(-err));
+        return;
+    }
+    
+    err = ipc_send_message(c->fd, &c->msg);
+    if(err < 0)
+        return;
+}
+
+void climpd_play_next(struct climpd *__restrict c)
+{
+    int err;
+    
+    ipc_message_clear(&c->msg);
+    ipc_message_set_id(&c->msg, IPC_MESSAGE_PLAY_NEXT);
+    
+    err = ipc_send_message(c->fd, &c->msg);
+    if(err < 0)
+        return;
+}
+
+void climpd_play_previous(struct climpd *__restrict c)
+{
+    int err;
+    
+    ipc_message_clear(&c->msg);
+    ipc_message_set_id(&c->msg, IPC_MESSAGE_PLAY_PREVIOUS);
+    
+    err = ipc_send_message(c->fd, &c->msg);
+    if(err < 0)
+        return;
+}
+
+void climpd_play_file(struct climpd *__restrict c, const char *arg)
+{
+    int err;
+    
+    ipc_message_clear(&c->msg);
+    ipc_message_set_id(&c->msg, IPC_MESSAGE_PLAY_FILE);
+    
+    err = ipc_message_set_arg(&c->msg, arg);
+    if(err < 0) {
+        fprintf(stderr, "climp: play-file: %s\n", strerror(-err));
+        return;
+    }
+    
+    err = ipc_send_message(c->fd, &c->msg);
+    if(err < 0)
+        return;
+}
+
+void climpd_play_track(struct climpd *__restrict c, const char *arg)
+{
+    int err;
+    
+    ipc_message_clear(&c->msg);
+    ipc_message_set_id(&c->msg, IPC_MESSAGE_PLAY_TRACK);
+    
+    err = ipc_message_set_arg(&c->msg, arg);
+    if(err < 0) {
+        fprintf(stderr, "climp: play-track: %s\n", strerror(-err));
+        return;
+    }
+    
+    err = ipc_send_message(c->fd, &c->msg);
+    if(err < 0)
+        return;
+}
+
+void climpd_add_media(struct climpd *__restrict c, const char *arg)
+{
+    int err;
+    
+    ipc_message_clear(&c->msg);
+    ipc_message_set_id(&c->msg, IPC_MESSAGE_ADD_MEDIA);
+    
+    err = ipc_message_set_arg(&c->msg, arg);
+    if(err < 0) {
+        fprintf(stderr, "climp: add-file: %s\n", strerror(-err));
+        return;
+    }
+    
+    err = ipc_send_message(c->fd, &c->msg);
+    if(err < 0)
+        return;
+}
+
+void climpd_remove_media(struct climpd *__restrict c, const char *arg)
+{
+    int err;
+    
+    ipc_message_clear(&c->msg);
+    ipc_message_set_id(&c->msg, IPC_MESSAGE_REMOVE_MEDIA);
+    
+    err = ipc_message_set_arg(&c->msg, arg);
+    if(err < 0) {
+        fprintf(stderr, "climp: remove-file: %s\n", strerror(-err));
+        return;
+    }
+    
+    err = ipc_send_message(c->fd, &c->msg);
     if(err < 0)
         return;
 }

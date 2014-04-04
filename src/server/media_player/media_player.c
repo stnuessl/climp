@@ -224,9 +224,16 @@ void media_player_stop(struct media_player *__restrict mp)
     gst_element_set_state(mp->playbin2, GST_STATE_NULL);
 }
 
-void media_player_toggle_mute(struct media_player *__restrict mp)
+void media_player_mute(struct media_player *__restrict mp)
 {
-    mp->muted = !mp->muted;
+    mp->muted = true;
+    
+    g_object_set(mp->playbin2, "mute", mp->muted, NULL);
+}
+
+void media_player_unmute(struct media_player *__restrict mp)
+{
+    mp->muted = false;
     
     g_object_set(mp->playbin2, "mute", mp->muted, NULL);
 }

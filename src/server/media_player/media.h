@@ -47,4 +47,7 @@ void media_delete(struct media *__restrict media);
 
 const struct media_info *media_info(const struct media *__restrict media);
 
+bool media_is_from_file(const struct media *__restrict media, 
+                        const char *__restrict path);
+
 #endif /* _MEDIA_H_ */

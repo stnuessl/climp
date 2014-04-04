@@ -23,6 +23,10 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
+#include <stdbool.h>
+
+#include <libvci/map.h>
+#include <libvci/macro.h>
 
 #include "climpd.h"
 
@@ -68,10 +72,112 @@ static const char help[] = {
     "  volume           Set volume to [0..120].                              \n"
 };
 
+static int string_compare(const void *a, const void *b)
+{
+    return strcmp(a, b);
+}
+
+static unsigned int string_hash(const void *key)
+{
+    const char *s;
+    unsigned int hval;
+    size_t len;
+    
+    s = key;
+    hval = 1;
+    len  = strlen(s);
+    
+    while(len--) {
+        hval += *s++;
+        hval += (hval << 10);
+        hval ^= (hval >> 6);
+        hval &= 0x0fffffff;
+    }
+    
+    hval += (hval << 3);
+    hval ^= (hval >> 11);
+    hval += (hval << 15);
+    
+    return hval;
+}
+
+struct command_handle {
+    const char *command;
+    
+    void (*arg_func)(struct climpd *, const char *);
+    void (*func)(struct climpd *);
+};
+
+/*
+ * get-playlist
+ * get-files
+ * get-volume
+ * get-status
+ * 
+ * set-status [play / stop / pause / mute / unmute]
+ * set-playlist [file1 file2 file3]
+ * set-volume [0..120]
+ * 
+ * play-next
+ * play-previous
+ * play-title [file1 file2 file3]
+ * play-number [number]
+ * 
+ * add-file
+ * remove-file
+ */
+
+
+static struct command_handle command_handles[] = {
+    { "get-playlist",   NULL,                   climpd_get_playlist     },
+    { "get-files",      NULL,                   climpd_get_files        },
+    { "get-volume",     NULL,                   climpd_get_volume       },
+    { "set-status",     climpd_set_status,      NULL                    },
+    { "set-playlist",   climpd_set_playlist,    NULL                    },
+    { "set-volume",     climpd_set_volume,      NULL                    },
+    { "play-next",      NULL,                   climpd_play_next        },
+    { "play-previous",  NULL,                   climpd_play_previous    },
+    { "play-title",     climpd_play_file,       NULL                    },
+    { "play-track",     climpd_play_track,      NULL                    },
+    { "add-media",       climpd_add_media,        NULL                  },
+    { "remove-media",    climpd_remove_media,     NULL                  }
+};
+
+static struct map *command_map;
+
+void command_map_init(void)
+{
+    struct command_handle *handle;
+    int i, err;
+    
+    command_map = map_new(0, &string_compare, &string_hash);
+    if(!command_map) {
+        fprintf(stderr, "climp: %s\n", strerror(ENOMEM));
+        exit(EXIT_FAILURE);
+    }
+    
+    for(i = 0; i < ARRAY_SIZE(command_handles); ++i) {
+        handle = command_handles + i;
+        
+        err = map_insert(command_map, handle->command, handle);
+        if(err < 0) {
+            map_delete(command_map);
+            fprintf(stderr, "climp: %s\n", strerror(-err));
+            exit(EXIT_FAILURE);
+        }
+    }
+}
+
+void command_map_destroy(void)
+{
+    map_delete(command_map);
+}
+
 int main(int argc, char *argv[])
 {
-    struct climpd *cc;
-    char *arg;
+    struct climpd *climpd;
+    struct command_handle *h, *tmp;
+    const char *err_msg;
     int i;
     
     if(getuid() == 0) {
@@ -79,84 +185,59 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
     
-    cc = climpd_new();
-    if(!cc) {
+    command_map_init();
+    
+    climpd = climpd_new();
+    if(!climpd) {
         fprintf(stderr, "climp: client_new(): %s\n", strerror(errno));
         exit(EXIT_FAILURE);
     }
         
-    for(i = 0; i < argc; ++i) {
+    for(i = 1; i < argc; ++i) {
         if(strcmp("--version", argv[i]) == 0 || strcmp("-v", argv[i]) == 0) {
             fprintf(stdout, "%s\nVersion %s\n\n", license, climp_version());
             
         } else if(strcmp("--help", argv[i]) == 0) {
             fprintf(stdout, "%s\n", help);
             
-        } else if(strcmp("play", argv[i]) == 0) {
-            i += 1;
-            
-            if(i >= argc)
-                arg = NULL;
-            else 
-                arg = argv[i];
-            
-            climpd_play(cc, arg);
-        } else if(strcmp("stop", argv[i]) == 0) {
-            climpd_stop(cc);
-            
-        } else if(strcmp("volume", argv[i]) == 0) {
-            i += 1;
-            if(i >= argc)
-                arg = NULL;
-            else
-                arg = argv[i];
-            
-            climpd_set_volume(cc, arg);
-        } else if(strcmp("mute", argv[i]) == 0) {
-            climpd_toggle_mute(cc);
-     
-            
-        } else if(strcmp("shutdown", argv[i]) == 0) {
-            climpd_shutdown(cc);
-            
-        } else if(strcmp("add", argv[i]) == 0) {
-            i += 1;
-            
-            if(i >= argc) {
-                fprintf(stderr, "climp: add: %s\n", strerror(ENOENT));
+        } else {
+            h = map_retrieve(command_map, argv[i]);
+            if(!h) {
+                err_msg = strerror(EINVAL);
+                fprintf(stderr, "climp: %s - %s\n", argv[i], err_msg);
                 continue;
             }
             
-            climpd_add(cc, argv[i]);
-            
-        } else if(strcmp("next", argv[i]) == 0) {
-            climpd_next(cc);
-            
-        } else if(strcmp("previous", argv[i]) == 0) {
-            climpd_previous(cc);
-            
-        } else if(strcmp("playlist", argv[i]) == 0) {
-            i += 1;
-            
-            if(i >= argc)
-                arg = NULL;
-            else
-                arg = argv[i];
-            
-            climpd_playlist(cc, arg);
-        } else if(strcmp("goto", argv[i]) == 0) {
+            if(h->func) {
+                h->func(climpd);
+                continue;
+            }
+
             i += 1;
             
             if(i >= argc) {
-                fprintf(stderr, "climp: goto: %s\n", strerror(EINVAL));
+                err_msg = strerror(EINVAL);
+                fprintf(stderr, "climp: %s: %s\n", h->command, err_msg);
                 continue;
             }
             
-            climpd_goto(cc, argv[i]);
+            while(i < argc) {
+                /* check for command arguments until a new one is found */
+                tmp = map_retrieve(command_map, argv[i]);
+                if(tmp) {
+                    i -= 1;
+                    break;
+                }
+                
+                h->arg_func(climpd, argv[i]);
+                
+                i += 1;
+            }
         }
     }
     
-    climpd_delete(cc);
+    climpd_delete(climpd);
+    command_map_destroy();
     
     return EXIT_SUCCESS;
 }

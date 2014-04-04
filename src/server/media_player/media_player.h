@@ -63,7 +63,9 @@ void media_player_pause(struct media_player *__restrict mp);
 
 void media_player_stop(struct media_player *__restrict mp);
 
-void media_player_toggle_mute(struct media_player *__restrict mp);
+void media_player_mute(struct media_player *__restrict mp);
+
+void media_player_unmute(struct media_player *__restrict mp);
 
 void media_player_set_volume(struct media_player *__restrict mp,
                              unsigned int volume);

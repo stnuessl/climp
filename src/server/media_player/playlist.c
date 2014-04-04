@@ -34,8 +34,7 @@
 
 #define MEDIA_NOT_IN_PLAYLIST "Media not in playlist"
 
-static int media_compare(const void *__restrict s1, 
-                         const void *__restrict s2)
+static int media_compare(const void *__restrict s1, const void *__restrict s2)
 {
     return strcmp(s1, s2);
 }
@@ -163,7 +162,7 @@ int playlist_add_file(struct playlist *__restrict pl, const char *path)
     return playlist_add_media(pl, m);
 }
 
-void playlist_remove_file(struct playlist *__restrict pl, const char* path)
+void playlist_remove_file(struct playlist *__restrict pl, const char *path)
 {
     struct media *m;
     

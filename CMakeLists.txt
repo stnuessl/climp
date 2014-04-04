@@ -13,7 +13,19 @@ add_definitions(-g3)
 
 set(CMAKE_INSTALL_PREFIX /usr/local)
 set(TARGET_INSTALL_DIR bin)
-set(LIBS vci gstreamer-0.10 gstpbutils-0.10 gobject-2.0 gmodule-2.0 gthread-2.0 glib-2.0 xml2)
+
+set(CLIMPD_LIBS 
+    vci 
+    gstreamer-0.10 
+    gstpbutils-0.10 
+    gobject-2.0 
+    gmodule-2.0 
+    gthread-2.0 
+    glib-2.0 
+    xml2
+    )
+    
+set(CLIMP_LIBS vci)
 set(CMAKE_LIBRARY_PATH /usr/local/lib)
 set(SOURCE
     src/client/main.c
@@ -36,9 +48,10 @@ find_package(Threads)
 link_directories(${CMAKE_LIBRARY_PATH})
 
 add_executable(climp ${SOURCE})
+target_link_libraries(climp ${CLIMP_LIBS})
 
 add_executable(climpd ${SOURCE_SERVER})
-target_link_libraries(climpd ${LIBS} ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(climpd ${CLIMPD_LIBS} ${CMAKE_THREAD_LIBS_INIT})
 
 install(PROGRAMS
         ${CMAKE_BINARY_DIR}/climp
