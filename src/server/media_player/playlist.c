@@ -151,7 +151,7 @@ bool playlist_contains_media(const struct playlist *__restrict pl,
     return map_contains(&pl->map_path, m->path);
 }
 
-int playlist_add_file(struct playlist *__restrict pl, const char *path)
+int playlist_add_media_path(struct playlist *__restrict pl, const char *path)
 {
     struct media *m;
     
@@ -162,7 +162,7 @@ int playlist_add_file(struct playlist *__restrict pl, const char *path)
     return playlist_add_media(pl, m);
 }
 
-void playlist_remove_file(struct playlist *__restrict pl, const char *path)
+void playlist_delete_media_path(struct playlist *__restrict pl, const char *path)
 {
     struct media *m;
     

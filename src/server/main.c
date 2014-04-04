@@ -215,7 +215,7 @@ static int set_playlist(struct client *client, const struct message *msg)
             continue;
         }
             
-        err = playlist_add_file(pl, buf);
+        err = playlist_add_media_path(pl, buf);
         if(err < 0) {
             client_err(client, "climpd: unable to add %s: %s\n",
                        buf, errno_string(-err));
@@ -402,7 +402,7 @@ static int add_media_realpath(struct client *client, const char *path)
     
     pl = media_player_playlist(media_player);
     
-    err = playlist_add_file(pl, path);
+    err = playlist_add_media_path(pl, path);
     if(err < 0) {
         client_err(client, "climpd: add-file: %s\n", errno_string(-err));
         return err;
@@ -443,7 +443,7 @@ static int remove_media_realpath(struct client *client, const char *path)
     pl = media_player_playlist(media_player);
     
     if(!media_is_from_file(current, path)) {
-        playlist_remove_file(pl, path);
+        playlist_delete_media_path(pl, path);
         return 0;
     }
     
@@ -451,7 +451,7 @@ static int remove_media_realpath(struct client *client, const char *path)
     
     err = media_player_play_media(media_player, m);
     
-    playlist_remove_file(pl, path);
+    playlist_delete_media_path(pl, path);
     
     client_print_current_media(client, media_player);
     

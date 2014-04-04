@@ -51,9 +51,9 @@ void playlist_delete_media(struct playlist *__restrict pl, struct media *m);
 bool playlist_contains_media(const struct playlist *__restrict pl,
                              struct media *m);
 
-int playlist_add_file(struct playlist *__restrict pl, const char *path);
+int playlist_add_media_path(struct playlist *__restrict pl, const char *path);
 
-void playlist_remove_file(struct playlist *__restrict pl, const char *path);
+void playlist_delete_media_path(struct playlist *__restrict pl, const char *path);
 
 struct media *playlist_first(struct playlist *__restrict pl);
 
