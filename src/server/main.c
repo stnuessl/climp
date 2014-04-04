@@ -149,15 +149,23 @@ static int get_status(struct client *client, const struct message *msg)
 
 static int set_status(struct client *client, const struct message *msg)
 {
-    const char *arg;
+    const char *arg, *err_msg;
     int err;
     
     arg = ipc_message_arg(msg);
     
     if(strcmp("play", arg) == 0) {
+        if(media_player_empty(media_player)) {
+            client_err(client, "climpd: no track(s) available\n");
+            return -EINVAL;
+        }
+        
         err = media_player_play(media_player);
-        if(err < 0)
+        if(err < 0) {
+            err_msg = errno_string(-err);
+            client_err(client, "climpd: set-status play: %s\n", err_msg);
             return err;
+        }
         
     } else if(strcmp("pause", arg) == 0) {
         media_player_pause(media_player);
@@ -197,6 +205,8 @@ static int set_playlist(struct client *client, const struct message *msg)
     
     pl = media_player_playlist(media_player);
     
+    playlist_clear(pl);
+    
     size = 0;
     buf = NULL;
     
@@ -209,7 +219,7 @@ static int set_playlist(struct client *client, const struct message *msg)
         
         if(buf[0] != '/') {
             client_err(client, 
-                       "climpd: unable to add %s - absolute file path needed\n",
+                       "climpd: unable to add %s: absolute file path needed\n",
                        buf);
             
             continue;
@@ -249,46 +259,36 @@ static int set_volume(struct client *client, const struct message *msg)
 
 static int play_next(struct client *client, const struct message *msg)
 {
-    struct playlist *pl;
-    struct media *m;
     int err;
-    
-    pl = media_player_playlist(media_player);
-    
-    m = playlist_next(pl, media_player_current_media(media_player));
-    if(!m) {
-        client_err(client, "climpd: no next track available\n");
-        return -EINVAL;
+
+    err = media_player_next(media_player);
+    if(err < 0) {
+        client_err(client, "climpd: play-next: %s\n", errno_string(-err));
+        return err;
     }
     
-    err = media_player_play_media(media_player, m);
-    if(err < 0)
-        return err;
-    
-    client_print_current_media(client, media_player);
+    if(media_player_stopped(media_player))
+        client_out(client, "climpd: play-next: no track available\n");
+    else
+        client_print_current_media(client, media_player);
     
     return 0;
 }
 
 static int play_previous(struct client *client, const struct message *msg)
 {
-    struct playlist *pl;
-    struct media *m;
     int err;
     
-    pl = media_player_playlist(media_player);
-    
-    m = playlist_previous(pl, media_player_current_media(media_player));
-    if(!m) {
-        client_err(client, "climpd: no previous track available\n");
-        return -EINVAL;
+    err = media_player_previous(media_player);
+    if(err < 0) {
+        client_err(client, "climpd: play-previous: %s\n", errno_string(-err));
+        return err;
     }
     
-    err = media_player_play_media(media_player, m);
-    if(err < 0)
-        return err;
-    
-    client_print_current_media(client, media_player);
+    if(media_player_stopped(media_player))
+        client_out(client, "climpd: play-previous: no track available\n");
+    else
+        client_print_current_media(client, media_player);
     
     return 0;
 }
@@ -433,6 +433,11 @@ static int add_media(struct client *client, const struct message *msg)
     return err;
 }
 
+static int add_playlist(struct client *client, const struct message *msg)
+{
+    return 0;
+}
+
 static int remove_media_realpath(struct client *client, const char *path)
 {
     struct playlist *pl;
@@ -478,6 +483,11 @@ static int remove_media(struct client *client, const struct message *msg)
     free(path);
     
     return err;
+}
+
+static int remove_playlist(struct client *client, const struct message *msg)
+{
+    return 0;
 }
 
 static int handle_message_hello(struct client *client, 
@@ -570,21 +580,23 @@ static int handle_message_goodbye(struct client *client,
 // }
 
 static int (*msg_handler[])(struct client *, const struct message *) = {
-    [IPC_MESSAGE_HELLO]         = &handle_message_hello,
-    [IPC_MESSAGE_GOODBYE]       = &handle_message_goodbye,
-    [IPC_MESSAGE_GET_PLAYLIST]  = &get_playlist,
-    [IPC_MESSAGE_GET_FILES]     = &get_files,
-    [IPC_MESSAGE_GET_VOLUME]    = &get_volume,
-    [IPC_MESSAGE_GET_STATUS]    = &get_status,
-    [IPC_MESSAGE_SET_STATUS]    = &set_status,
-    [IPC_MESSAGE_SET_PLAYLIST]  = &set_playlist,
-    [IPC_MESSAGE_SET_VOLUME]    = &set_volume,
-    [IPC_MESSAGE_PLAY_NEXT]     = &play_next,
-    [IPC_MESSAGE_PLAY_PREVIOUS] = &play_previous,
-    [IPC_MESSAGE_PLAY_FILE]     = &play_file,
-    [IPC_MESSAGE_PLAY_TRACK]    = &play_track,
-    [IPC_MESSAGE_ADD_MEDIA]     = &add_media,
-    [IPC_MESSAGE_REMOVE_MEDIA]  = &remove_media
+    [IPC_MESSAGE_HELLO]                 = &handle_message_hello,
+    [IPC_MESSAGE_GOODBYE]               = &handle_message_goodbye,
+    [IPC_MESSAGE_GET_PLAYLIST]          = &get_playlist,
+    [IPC_MESSAGE_GET_FILES]             = &get_files,
+    [IPC_MESSAGE_GET_VOLUME]            = &get_volume,
+    [IPC_MESSAGE_GET_STATUS]            = &get_status,
+    [IPC_MESSAGE_SET_STATUS]            = &set_status,
+    [IPC_MESSAGE_SET_PLAYLIST]          = &set_playlist,
+    [IPC_MESSAGE_SET_VOLUME]            = &set_volume,
+    [IPC_MESSAGE_PLAY_NEXT]             = &play_next,
+    [IPC_MESSAGE_PLAY_PREVIOUS]         = &play_previous,
+    [IPC_MESSAGE_PLAY_FILE]             = &play_file,
+    [IPC_MESSAGE_PLAY_TRACK]            = &play_track,
+    [IPC_MESSAGE_ADD_MEDIA]             = &add_media,
+    [IPC_MESSAGE_ADD_PLAYLIST]          = &add_playlist,
+    [IPC_MESSAGE_REMOVE_MEDIA]          = &remove_media,
+    [IPC_MESSAGE_REMOVE_PLAYLIST]       = &remove_playlist
 };
 
 static gboolean handle_unix_fd(GIOChannel *src, GIOCondition cond, void *data)

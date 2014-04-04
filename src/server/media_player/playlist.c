@@ -127,7 +127,7 @@ int playlist_add_media(struct playlist *__restrict pl, struct media *m)
     return 0;
 }
 
-void playlist_remove_media(struct playlist* pl, struct media* m)
+void playlist_take_media(struct playlist* pl, struct media* m)
 {
     assert(map_contains(&pl->map_path, m->path) && MEDIA_NOT_IN_PLAYLIST);
     
@@ -187,7 +187,8 @@ struct media *playlist_last(struct playlist *__restrict pl)
 
 struct media *playlist_next(struct playlist *__restrict pl, struct media *m)
 {
-    assert(map_contains(&pl->map_path, m->path) && MEDIA_NOT_IN_PLAYLIST);
+    if(!map_contains(pl->map_path, m->path))
+        return NULL;
     
     if(unlikely(&m->link == list_back(&pl->list)))
         return NULL;
@@ -198,7 +199,8 @@ struct media *playlist_next(struct playlist *__restrict pl, struct media *m)
 struct media *playlist_previous(struct playlist *__restrict pl, 
                                 struct media *m)
 {
-    assert(map_contains(&pl->map_path, m->path) && MEDIA_NOT_IN_PLAYLIST);
+    if(!map_contains(pl->map_path, m->path))
+        return NULL;
     
     if(unlikely(&m->link == list_front(&pl->list)))
         return NULL;
@@ -247,4 +249,14 @@ out:
     }
     
     return err;
+}
+
+bool playlist_empty(const struct playlist *__restrict pl)
+{
+    return map_empty(pl->map_path);
+}
+
+unsigned int playlist_size(const struct playlist *__restrict pl)
+{
+    return map_size(pl->map_path);
 }

@@ -129,18 +129,20 @@ struct command_handle {
 
 
 static struct command_handle command_handles[] = {
-    { "get-playlist",   NULL,                   climpd_get_playlist     },
-    { "get-files",      NULL,                   climpd_get_files        },
-    { "get-volume",     NULL,                   climpd_get_volume       },
-    { "set-status",     climpd_set_status,      NULL                    },
-    { "set-playlist",   climpd_set_playlist,    NULL                    },
-    { "set-volume",     climpd_set_volume,      NULL                    },
-    { "play-next",      NULL,                   climpd_play_next        },
-    { "play-previous",  NULL,                   climpd_play_previous    },
-    { "play-title",     climpd_play_file,       NULL                    },
-    { "play-track",     climpd_play_track,      NULL                    },
-    { "add-media",       climpd_add_media,        NULL                  },
-    { "remove-media",    climpd_remove_media,     NULL                  }
+    { "get-playlist",    NULL,                   climpd_get_playlist     },
+    { "get-files",       NULL,                   climpd_get_files        },
+    { "get-volume",      NULL,                   climpd_get_volume       },
+    { "set-status",      climpd_set_status,      NULL                    },
+    { "set-playlist",    climpd_set_playlist,    NULL                    },
+    { "set-volume",      climpd_set_volume,      NULL                    },
+    { "play-next",       NULL,                   climpd_play_next        },
+    { "play-previous",   NULL,                   climpd_play_previous    },
+    { "play-file",       climpd_play_file,       NULL                    },
+    { "play-track",      climpd_play_track,      NULL                    },
+    { "add-media",       climpd_add_media,       NULL                    },
+    { "add-playlist",    climpd_add_playlist,    NULL                    },
+    { "remove-media",    climpd_remove_media,    NULL                    },
+    { "remove-playlist", climpd_remove_playlist, NULL                    }
 };
 
 static struct map *command_map;

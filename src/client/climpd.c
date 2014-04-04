@@ -371,6 +371,24 @@ void climpd_add_media(struct climpd *__restrict c, const char *arg)
         return;
 }
 
+void climpd_add_playlist(struct climpd *__restrict c, const char *arg)
+{
+    int err;
+    
+    ipc_message_clear(&c->msg);
+    ipc_message_set_id(&c->msg, IPC_MESSAGE_ADD_PLAYLIST);
+    
+    err = ipc_message_set_arg(&c->msg, arg);
+    if(err < 0) {
+        fprintf(stderr, "climp: add-playlist: %s\n", strerror(-err));
+        return;
+    }
+    
+    err = ipc_send_message(c->fd, &c->msg);
+    if(err < 0)
+        return;
+}
+
 void climpd_remove_media(struct climpd *__restrict c, const char *arg)
 {
     int err;
@@ -381,6 +399,24 @@ void climpd_remove_media(struct climpd *__restrict c, const char *arg)
     err = ipc_message_set_arg(&c->msg, arg);
     if(err < 0) {
         fprintf(stderr, "climp: remove-file: %s\n", strerror(-err));
+        return;
+    }
+    
+    err = ipc_send_message(c->fd, &c->msg);
+    if(err < 0)
+        return;
+}
+
+void climpd_remove_playlist(struct climpd *__restrict c, const char *arg)
+{
+    int err;
+    
+    ipc_message_clear(&c->msg);
+    ipc_message_set_id(&c->msg, IPC_MESSAGE_REMOVE_PLAYLIST);
+    
+    err = ipc_message_set_arg(&c->msg, arg);
+    if(err < 0) {
+        fprintf(stderr, "climp: remove-playlist: %s\n", strerror(-err));
         return;
     }
     

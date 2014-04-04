@@ -29,17 +29,20 @@
 #include "media.h"
 
 struct media_player {
-    struct playlist *playlist;
+    struct playlist *current_playlist;
+    struct playlist *deprecated_playlist;
     struct media *current_media;
 
-    bool muted;
-    unsigned int volume;
-    
-    GstState state;
-    
     GstElement *playbin2;
     
+    GstState state;
+
     void (*on_bus_error)(struct media_player *, GstMessage *);
+
+    unsigned int volume;
+    bool muted;
+    bool repeat;
+    bool shuffle;
 };
 
 struct media_player *media_player_new(void);
@@ -50,9 +53,8 @@ int media_player_init(struct media_player *__restrict mp);
 
 void media_player_destroy(struct media_player *__restrict mp);
 
-struct media *media_player_current_media(struct media_player *__restrict mp);
-
-struct playlist *media_player_playlist(struct media_player *__restrict mp);
+const struct media *
+media_player_current_media(const struct media_player *__restrict mp);
 
 int media_player_play(struct media_player *__restrict mp);
 
@@ -71,6 +73,34 @@ void media_player_set_volume(struct media_player *__restrict mp,
                              unsigned int volume);
 
 unsigned int media_player_volume(const struct media_player *__restrict mp);
+
+void media_player_set_repeat(struct media_player *__restrict mp, bool repeat);
+
+void media_player_set_shuffle(struct media_player *__restrict mp, bool shuffle);
+
+int media_player_next(struct media_player *__restrict mp);
+
+int media_player_previous(struct media_player *__restrict mp);
+
+int media_player_add_track(struct media_player *__restrict mp, 
+                           const char *__restrict path);
+
+void media_player_remove_track(struct media_player *__restrict mp,
+                               const char *__restrict path);
+
+int media_player_add_playlist(struct media_player *__restrict mp,
+                              struct playlist *pl);
+
+int media_player_set_playlist(struct media_player *__restrict mp,
+                               struct playlist *pl);
+
+bool media_player_empty(const struct media_player *__restrict mp);
+
+bool media_player_playing(const struct media_player *__restrict mp);
+
+bool media_player_paused(const struct media_player *__restrict mp);
+
+bool media_player_stopped(const struct media_player *__restrict mp);
 
 void media_player_on_bus_error(struct media_player *__restrict mp,
                              void (*func)(struct media_player *, GstMessage *));

@@ -37,15 +37,7 @@
 
 static void media_player_on_end_of_stream(struct media_player *__restrict mp)
 {
-    struct media *m;
-    
-    media_player_stop(mp);
-    
-    m = playlist_next(mp->playlist, mp->current_media);
-    if(!m)
-        return;
-    
-    media_player_play_media(mp, m);
+    media_player_next(mp);
 }
 
 static void media_player_on_state_change(struct media_player *__restrict mp,
@@ -129,27 +121,45 @@ void media_player_delete(struct media_player *__restrict mp)
 int media_player_init(struct media_player *__restrict mp)
 {
     GstBus *bus;
+    int err;
     
-    mp->playlist = playlist_new();
-    if(!mp->playlist)
-        return -errno;
+    mp->current_playlist = playlist_new();
+    if(!mp->current_playlist) {
+        err = -errno;
+        goto out;
+    }
+    
+    mp->deprecated_playlist = playlist_new();
+    if(!mp->deprecated_playlist) {
+        err = -errno;
+        goto cleanup1;
+    }
     
     mp->playbin2 = gst_element_factory_make("playbin2", NULL);
     if(!mp->playbin2) {
-        playlist_delete(mp->playlist);
-        return -MEDIA_PLAYER_GST_ERROR;
+        err = -MEDIA_PLAYER_GST_ERROR;
+        goto cleanup2;
     }
     
     bus = gst_element_get_bus(mp->playbin2);
     
     gst_bus_add_watch(bus, &bus_watcher, mp);
     
-    mp->muted           = false;
-    mp->volume          = 100;
-    mp->state           = GST_STATE_NULL;
     mp->current_media   = NULL;
+    mp->state           = GST_STATE_NULL;
+    mp->volume          = 100;
+    mp->muted           = false;
+    mp->repeat          = false;
+    mp->shuffle         = false;
     
     return 0;
+    
+cleanup2:
+    playlist_delete(mp->deprecated_playlist);
+cleanup1:
+    playlist_delete(mp->current_playlist);
+out:
+    return err;
 }
 
 void media_player_destroy(struct media_player *__restrict mp)
@@ -157,17 +167,13 @@ void media_player_destroy(struct media_player *__restrict mp)
     media_player_stop(mp);
     
     gst_object_unref(mp->playbin2);
-    playlist_delete(mp->playlist);
+    playlist_delete(mp->current_playlist);
 }
 
-struct media *media_player_current_media(struct media_player *__restrict mp)
+const struct media *
+media_player_current_media(const struct media_player *__restrict mp)
 {
     return mp->current_media;
-}
-
-struct playlist *media_player_playlist(struct media_player *__restrict mp)
-{
-    return mp->playlist;
 }
 
 int media_player_play(struct media_player *__restrict mp)
@@ -176,7 +182,7 @@ int media_player_play(struct media_player *__restrict mp)
         return 0;
     
     if(!mp->current_media)
-        mp->current_media = playlist_first(mp->playlist);
+        mp->current_media = playlist_first(mp->current_playlist);
     
     if(!mp->current_media)
         return -EINVAL;
@@ -191,8 +197,8 @@ int media_player_play_media(struct media_player *__restrict mp,
     
     assert(m && "No media passed");
         
-    if(!playlist_contains_media(mp->playlist, m)) {
-        err = playlist_add_media(mp->playlist, m);
+    if(!playlist_contains_media(mp->current_playlist, m)) {
+        err = playlist_add_media(mp->current_playlist, m);
         if(err < 0)
             return err;
     }
@@ -252,6 +258,127 @@ void media_player_set_volume(struct media_player *__restrict mp,
 unsigned int media_player_volume(const struct media_player *__restrict mp)
 {
     return mp->volume;
+}
+
+void media_player_set_repeat(struct media_player *__restrict mp, bool repeat)
+{
+    mp->repeat = repeat;
+}
+
+void media_player_set_shuffle(struct media_player *__restrict mp, bool shuffle)
+{
+    mp->shuffle = shuffle;
+}
+
+int media_player_next(struct media_player *__restrict mp)
+{
+    struct media *m;
+    bool b;
+    
+    m = playlist_next(mp->current_playlist, mp->current_media);
+    if(!m) {
+        b = playlist_contains_media(mp->deprecated_playlist, mp->current_media);
+        if(b || mp->repeat)
+            m = playlist_first(mp->current_playlist);
+    }
+    
+    playlist_clear(mp->deprecated_playlist);
+    
+    if(!m) {
+        media_player_stop(mp);
+        return 0;
+    }
+    
+    return media_player_play_media(mp, m);
+}
+
+int media_player_previous(struct media_player *__restrict mp)
+{
+    struct media *m;
+    bool b;
+    
+    m = playlist_previous(mp->current_playlist, mp->current_media);
+    if(!m) {
+        b = playlist_contains_media(mp->deprecated_playlist, mp->current_media);
+        if(b || mp->repeat)
+            m = playlist_last(mp->current_playlist);
+    }
+    
+    playlist_clear(mp->deprecated_playlist);
+    
+    if(!m) {
+        media_player_stop(mp);
+        return 0;
+    }
+    
+    return media_player_play_media(mp, m);
+}
+
+int media_player_add_track(struct media_player *__restrict mp, 
+                           const char *__restrict path)
+{
+    return playlist_add_media_path(mp->current_playlist, path);
+}
+
+void media_player_remove_track(struct media_player *__restrict mp,
+                               const char *__restrict path)
+{
+    if(!media_is_from_file(mp->current_media, path)) {
+        playlist_delete_media_path(mp->current_media, path);
+        return;
+    }
+
+    playlist_take_media(mp->current_playlist, mp->current_media);
+    playlist_add_media(mp->deprecated_playlist, mp->current_media);
+}
+
+int media_player_add_playlist(struct media_player *__restrict mp,
+                              struct playlist *pl)
+{
+    return playlist_merge(mp->current_playlist, pl);
+}
+
+int media_player_set_playlist(struct media_player *__restrict mp,
+                              struct playlist *pl)
+{
+    int err;
+    
+    if(playlist_contains_media(mp->deprecated_playlist, mp->current_media)) {
+        err = playlist_merge(mp->deprecated_playlist, mp->current_playlist);
+        if(err < 0)
+            return err;
+        
+        mp->current_playlist = pl;
+        
+        return 0;
+    }
+    
+    playlist_delete(mp->deprecated_playlist);
+    
+    mp->deprecated_playlist = mp->current_playlist;
+    mp->current_playlist    = pl;
+    
+    return 0;
+}
+
+bool media_player_empty(const struct media_player *__restrict mp)
+{
+    return playlist_empty(mp->current_playlist);
+}
+
+bool media_player_playing(const struct media_player *__restrict mp)
+{
+    return mp->state == GST_STATE_PLAYING;
+}
+
+bool media_player_paused(const struct media_player *__restrict mp)
+{
+    return mp->state == GST_STATE_PAUSED;
+}
+
+bool media_player_stopped(const struct media_player *__restrict mp)
+{
+    return mp->state == GST_STATE_NULL;
 }
 
 void media_player_on_bus_error(struct media_player *__restrict mp,

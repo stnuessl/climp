@@ -59,6 +59,10 @@ void climpd_play_track(struct climpd *__restrict c, const char *arg);
 
 void climpd_add_media(struct climpd *__restrict c, const char *arg);
 
+void climpd_add_playlist(struct climpd *__restrict c, const char *arg);
+
 void climpd_remove_media(struct climpd *__restrict c, const char *arg);
+
+void climpd_remove_playlist(struct climpd *__restrict c, const char *arg);
 
 #endif /* _CLIENT_H_ */

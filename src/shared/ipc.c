@@ -50,7 +50,11 @@ const char *ipc_message_id_string(enum message_id id)
         [IPC_MESSAGE_PLAY_NEXT]         = "IPC_MESSAGE_PLAY_NEXT",
         [IPC_MESSAGE_PLAY_PREVIOUS]     = "IPC_MESSAGE_PLAY_PREVIOUS",
         [IPC_MESSAGE_PLAY_FILE]         = "IPC_MESSAGE_PLAY_FILE",
-        [IPC_MESSAGE_PLAY_TRACK]        = "IPC_MESSAGE_PLAY_TRACK"
+        [IPC_MESSAGE_PLAY_TRACK]        = "IPC_MESSAGE_PLAY_TRACK",
+        [IPC_MESSAGE_ADD_MEDIA]         = "IPC_MESSAGE_ADD_MEDIA",
+        [IPC_MESSAGE_ADD_PLAYLIST]      = "IPC_MESSAGE_ADD_PLAYLIST",
+        [IPC_MESSAGE_REMOVE_MEDIA]      = "IPC_MESSAGE_REMOVE_MEDIA",
+        [IPC_MESSAGE_REMOVE_PLAYLIST]   = "IPC_MESSAGE_REMOVE_PLAYLIST"
     };
     
     return message_names[id];

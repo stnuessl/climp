@@ -44,7 +44,7 @@ void playlist_clear(struct playlist *__restrict pl);
 
 int playlist_add_media(struct playlist *__restrict pl, struct media *m);
 
-void playlist_remove_media(struct playlist *__restrict pl, struct media *m);
+void playlist_take_media(struct playlist *__restrict pl, struct media *m);
 
 void playlist_delete_media(struct playlist *__restrict pl, struct media *m);
 
@@ -67,6 +67,10 @@ struct media *playlist_previous(struct playlist *__restrict pl,
 struct media *playlist_at(struct playlist *__restrict pl, unsigned int index);
 
 int playlist_merge(struct playlist *__restrict pl1, struct playlist *pl2);
+
+bool playlist_empty(const struct playlist *__restrict pl);
+
+unsigned int playlist_size(const struct playlist *__restrict pl);
 
 
 #define playlist_for_each(playlist, link)                                      \
