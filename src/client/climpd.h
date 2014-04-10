@@ -35,34 +35,8 @@ struct climpd *climpd_new(void);
 
 void climpd_delete(struct climpd *__restrict cc);
 
-void climpd_get_playlist(struct climpd *__restrict c);
-
-void climpd_get_files(struct climpd *__restrict c);
-
-void climpd_get_volume(struct climpd *__restrict c);
-
-void climpd_get_status(struct climpd *__restrict c);
-
-void climpd_set_status(struct climpd *__restrict c, const char *arg);
-
-void climpd_set_playlist(struct climpd *__restrict c, const char *arg);
-
-void climpd_set_volume(struct climpd *__restrict c, const char *arg);
-
-void climpd_play_next(struct climpd *__restrict c);
-
-void climpd_play_previous(struct climpd *__restrict c);
-
-void climpd_play_file(struct climpd *__restrict c, const char *arg);
-
-void climpd_play_track(struct climpd *__restrict c, const char *arg);
-
-void climpd_add_media(struct climpd *__restrict c, const char *arg);
-
-void climpd_add_playlist(struct climpd *__restrict c, const char *arg);
-
-void climpd_remove_media(struct climpd *__restrict c, const char *arg);
-
-void climpd_remove_playlist(struct climpd *__restrict c, const char *arg);
+int climpd_send_message(struct climpd *__restrict c,
+                        enum message_id id, 
+                        const char *__restrict arg);
 
 #endif /* _CLIENT_H_ */

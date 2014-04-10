@@ -28,6 +28,7 @@
 #include <libvci/map.h>
 #include <libvci/macro.h>
 
+#include "../shared/ipc.h"
 #include "climpd.h"
 
 #define CLIMP_VERSION_MAJOR "0"
@@ -103,9 +104,8 @@ static unsigned int string_hash(const void *key)
 
 struct command_handle {
     const char *command;
-    
-    void (*arg_func)(struct climpd *, const char *);
-    void (*func)(struct climpd *);
+    enum message_id message_id;
+    bool arg;
 };
 
 /*
@@ -129,20 +129,20 @@ struct command_handle {
 
 
 static struct command_handle command_handles[] = {
-    { "get-playlist",    NULL,                   climpd_get_playlist     },
-    { "get-files",       NULL,                   climpd_get_files        },
-    { "get-volume",      NULL,                   climpd_get_volume       },
-    { "set-status",      climpd_set_status,      NULL                    },
-    { "set-playlist",    climpd_set_playlist,    NULL                    },
-    { "set-volume",      climpd_set_volume,      NULL                    },
-    { "play-next",       NULL,                   climpd_play_next        },
-    { "play-previous",   NULL,                   climpd_play_previous    },
-    { "play-file",       climpd_play_file,       NULL                    },
-    { "play-track",      climpd_play_track,      NULL                    },
-    { "add-media",       climpd_add_media,       NULL                    },
-    { "add-playlist",    climpd_add_playlist,    NULL                    },
-    { "remove-media",    climpd_remove_media,    NULL                    },
-    { "remove-playlist", climpd_remove_playlist, NULL                    }
+    { "get-playlist",    IPC_MESSAGE_GET_PLAYLIST,      false   },
+    { "get-files",       IPC_MESSAGE_GET_FILES,         false   },
+    { "get-volume",      IPC_MESSAGE_GET_VOLUME,        false   },
+    { "set-status",      IPC_MESSAGE_SET_STATUS,        true    },
+    { "set-playlist",    IPC_MESSAGE_SET_PLAYLIST,      true    },
+    { "set-volume",      IPC_MESSAGE_SET_VOLUME,        true    },
+    { "play-next",       IPC_MESSAGE_PLAY_NEXT,         false   },
+    { "play-previous",   IPC_MESSAGE_PLAY_PREVIOUS,     false   },
+    { "play-file",       IPC_MESSAGE_PLAY_FILE,         true    },
+    { "play-track",      IPC_MESSAGE_PLAY_TRACK,        true    },
+    { "add-media",       IPC_MESSAGE_ADD_MEDIA,         true    },
+    { "add-playlist",    IPC_MESSAGE_ADD_PLAYLIST,      true    },
+    { "remove-media",    IPC_MESSAGE_REMOVE_MEDIA,      true    },
+    { "remove-playlist", IPC_MESSAGE_REMOVE_PLAYLIST,   true    }
 };
 
 static struct map *command_map;
@@ -180,7 +180,7 @@ int main(int argc, char *argv[])
     struct climpd *climpd;
     struct command_handle *h, *tmp;
     const char *err_msg;
-    int i;
+    int i, err;
     
     if(getuid() == 0) {
         fprintf(stderr, "climp: run as root\n");
@@ -210,8 +210,12 @@ int main(int argc, char *argv[])
                 continue;
             }
             
-            if(h->func) {
-                h->func(climpd);
+            if(!h->arg) {
+                err = climpd_send_message(climpd, h->message_id, NULL);
+                if(err < 0) {
+                    err_msg = strerror(-err);
+                    fprintf(stderr, "climp: %s: %s\n", h->command, err_msg);
+                }
                 continue;
             }
 
@@ -231,7 +235,11 @@ int main(int argc, char *argv[])
                     break;
                 }
                 
-                h->arg_func(climpd, argv[i]);
+                err = climpd_send_message(climpd, h->message_id, argv[i]);
+                if(err < 0) {
+                    err_msg = strerror(-err);
+                    fprintf(stderr, "climp: %s: %s\n", h->command, err_msg);
+                }
                 
                 i += 1;
             }
