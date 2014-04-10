@@ -102,6 +102,9 @@ bool media_player_paused(const struct media_player *__restrict mp);
 
 bool media_player_stopped(const struct media_player *__restrict mp);
 
+const struct playlist *
+media_player_playlist(const struct media_player *__restrict mp);
+
 void media_player_on_bus_error(struct media_player *__restrict mp,
                              void (*func)(struct media_player *, GstMessage *));
 

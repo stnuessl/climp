@@ -38,10 +38,10 @@ extern int media_meta_length;
 extern const char *current_media_meta_color;
 extern const char *media_meta_color;
 
-static void client_print_media(struct client *__restrict client, 
-                               const struct media *m,
-                               int index,
-                               const char *color)
+static void media_player_print_media(const struct client *__restrict client, 
+                                     const struct media *m,
+                                     int index,
+                                     const char *color)
 {
     const struct media_info *i;
     
@@ -124,12 +124,12 @@ void client_print_volume(struct client *__restrict client, unsigned int vol)
     client_out(client, "\tVolume: %u\n", vol);
 }
 
-void client_print_current_media(struct client *__restrict client,
-                                struct media_player *mp)
+void client_print_current_media(const struct client *__restrict client,
+                                const struct media_player *mp)
 {
-    struct playlist *pl;
-    struct link *link;
-    struct media *m;
+    const struct playlist *pl;
+    const struct link *link;
+    const struct media *m;
     int i;
     
     pl = media_player_playlist(mp);
@@ -138,21 +138,21 @@ void client_print_current_media(struct client *__restrict client,
     playlist_for_each(pl, link) {
         i += 1;
         
-        m = container_of(link, struct media, link);
+        m = container_of(link, const struct media, link);
         
         if(m == media_player_current_media(mp)) {
-            client_print_media(client, m, i, current_media_meta_color);
+            media_player_print_media(client, m, i, current_media_meta_color);
             break;
         }
     }
 }
 
-void client_print_media_player_playlist(struct client *__restrict client, 
-                                        struct media_player *mp)
+void client_print_media_player_playlist(const struct client *__restrict client, 
+                                        const struct media_player *mp)
 {
-    struct playlist *pl;
-    struct link *link;
-    struct media *m;
+    const struct playlist *pl;
+    const struct link *link;
+    const struct media *m;
     int i;
     
     pl = media_player_playlist(mp);
@@ -161,11 +161,11 @@ void client_print_media_player_playlist(struct client *__restrict client,
     playlist_for_each(pl, link) {
         i += 1;
         
-        m = container_of(link, struct media, link);
+        m = container_of(link, const struct media, link);
         
         if(m == media_player_current_media(mp))
-            client_print_media(client, m, i, current_media_meta_color);
+            media_player_print_media(client, m, i, current_media_meta_color);
         else
-            client_print_media(client, m, i, media_meta_color);
+            media_player_print_media(client, m, i, media_meta_color);
     }
 }

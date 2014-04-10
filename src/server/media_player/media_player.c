@@ -197,7 +197,7 @@ int media_player_play_media(struct media_player *__restrict mp,
     
     assert(m && "No media passed");
         
-    if(!playlist_contains_media(mp->current_playlist, m)) {
+    if(!playlist_contains(mp->current_playlist, m->path)) {
         err = playlist_add_media(mp->current_playlist, m);
         if(err < 0)
             return err;
@@ -212,6 +212,18 @@ int media_player_play_media(struct media_player *__restrict mp,
     mp->current_media = m;
     
     return 0;
+}
+
+int media_player_play_file(struct media_player *__restrict mp,
+                           const char *__restrict path)
+{
+    struct media *m;
+    
+    m = media_new(path);
+    if(!m)
+        return -errno;
+    
+    return media_player_play_media(mp, m);
 }
 
 void media_player_pause(struct media_player *__restrict mp)
@@ -277,7 +289,7 @@ int media_player_next(struct media_player *__restrict mp)
     
     m = playlist_next(mp->current_playlist, mp->current_media);
     if(!m) {
-        b = playlist_contains_media(mp->deprecated_playlist, mp->current_media);
+        b = playlist_contains(mp->deprecated_playlist, mp->current_media->path);
         if(b || mp->repeat)
             m = playlist_first(mp->current_playlist);
     }
@@ -299,7 +311,7 @@ int media_player_previous(struct media_player *__restrict mp)
     
     m = playlist_previous(mp->current_playlist, mp->current_media);
     if(!m) {
-        b = playlist_contains_media(mp->deprecated_playlist, mp->current_media);
+        b = playlist_contains(mp->deprecated_playlist, mp->current_media->path);
         if(b || mp->repeat)
             m = playlist_last(mp->current_playlist);
     }
@@ -324,7 +336,7 @@ void media_player_remove_track(struct media_player *__restrict mp,
                                const char *__restrict path)
 {
     if(!media_is_from_file(mp->current_media, path)) {
-        playlist_delete_media_path(mp->current_media, path);
+        playlist_delete_media_path(mp->current_playlist, path);
         return;
     }
 
@@ -379,6 +391,12 @@ bool media_player_paused(const struct media_player *__restrict mp)
 bool media_player_stopped(const struct media_player *__restrict mp)
 {
     return mp->state == GST_STATE_NULL;
+}
+
+const struct playlist *
+media_player_playlist(const struct media_player *__restrict mp)
+{
+    return mp->current_playlist;
 }
 
 void media_player_on_bus_error(struct media_player *__restrict mp,

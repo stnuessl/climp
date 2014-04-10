@@ -116,14 +116,14 @@ static int get_playlist(struct client *client, const struct message *msg)
 
 static int get_files(struct client *client, const struct message *msg)
 {
-    struct playlist *pl;
-    struct media *m;
-    struct link *link;
+    const struct playlist *pl;
+    const struct media *m;
+    const struct link *link;
     
     pl = media_player_playlist(media_player);
     
     playlist_for_each(pl, link) {
-        m = container_of(link, struct media, link);
+        m = container_of(link, const struct media, link);
         
         client_out(client, "%s\n", m->path);
     }
@@ -186,55 +186,55 @@ static int set_status(struct client *client, const struct message *msg)
 
 static int set_playlist(struct client *client, const struct message *msg)
 {
-    struct playlist *pl;
-    FILE *file;
-    const char *arg;
-    char *buf;
-    size_t size;
-    ssize_t n;
-    int err;
-    
-    arg = ipc_message_arg(msg);
-    
-    file = fopen(arg, "r");
-    if(!file) {
-        err = -errno;
-        client_err(client, "climpd: %s: %s\n", arg, errno_string(errno));
-        return err;
-    }
-    
-    pl = media_player_playlist(media_player);
-    
-    playlist_clear(pl);
-    
-    size = 0;
-    buf = NULL;
-    
-    while(1) {
-        n = getline(&buf, &size, file);
-        if(n < 0)
-            break;
-        
-        buf[n - 1] = '\0';
-        
-        if(buf[0] != '/') {
-            client_err(client, 
-                       "climpd: unable to add %s: absolute file path needed\n",
-                       buf);
-            
-            continue;
-        }
-            
-        err = playlist_add_media_path(pl, buf);
-        if(err < 0) {
-            client_err(client, "climpd: unable to add %s: %s\n",
-                       buf, errno_string(-err));
-        }
-    }
-    
-    free(buf);
-    
-    return 0;
+//     struct playlist *pl;
+//     FILE *file;
+//     const char *arg;
+//     char *buf;
+//     size_t size;
+//     ssize_t n;
+//     int err;
+//     
+//     arg = ipc_message_arg(msg);
+//     
+//     file = fopen(arg, "r");
+//     if(!file) {
+//         err = -errno;
+//         client_err(client, "climpd: %s: %s\n", arg, errno_string(errno));
+//         return err;
+//     }
+//     
+//     pl = media_player_playlist(media_player);
+//     
+//     playlist_clear(pl);
+//     
+//     size = 0;
+//     buf = NULL;
+//     
+//     while(1) {
+//         n = getline(&buf, &size, file);
+//         if(n < 0)
+//             break;
+//         
+//         buf[n - 1] = '\0';
+//         
+//         if(buf[0] != '/') {
+//             client_err(client, 
+//                        "climpd: unable to add %s: absolute file path needed\n",
+//                        buf);
+//             
+//             continue;
+//         }
+//             
+//         err = playlist_add_media_path(pl, buf);
+//         if(err < 0) {
+//             client_err(client, "climpd: unable to add %s: %s\n",
+//                        buf, errno_string(-err));
+//         }
+//     }
+//     
+//     free(buf);
+//     
+//     return 0;
 }
 
 static int set_volume(struct client *client, const struct message *msg)
@@ -302,32 +302,28 @@ static int play_file_realpath(struct client *client, const char *path)
     err = stat(path, &s);
     if(err < 0) {
         err = -errno;
-        client_err(client, "climpd: %s - %s\n", path, errno_string(errno));
+        client_err(client, "climpd: play-file: %s - %s\n", 
+                   path, errno_string(errno));
         return err;
     }
     
     if(!S_ISREG(s.st_mode)) {
-        client_err(client, "climpd: %s is not a file\n", path);
+        client_err(client, "climpd: play-file: %s is not a file\n", path);
         return -EINVAL;
     }
     
     media = media_new(path);
-    if(!media)
-        return- errno;
-    
-    err = media_player_play_media(media_player, media);
-    if(err < 0) {
-        client_err(client, "climpd: Unable to play %s: %s",
-                   path, errno_string(-err));
-        
+    if(!media) {
+        err = -errno;
+        client_err(client, "climpd: play-file: %s\n", errno_string(-err));
         return err;
     }
     
-    media = media_player_current_media(media_player);
+    err = media_player_play_media(media_player, media);
     
     client_print_current_media(client, media_player);
     
-    return 0;
+    return err;
 }
 
 static int play_file(struct client *client, const struct message *msg)
@@ -354,61 +350,61 @@ static int play_file(struct client *client, const struct message *msg)
 
 static int play_track(struct client *client, const struct message *msg)
 {
-    struct playlist *pl;
-    struct media *m;
-    long index;
-    const char *arg;
-    int err;
-    
-    arg = ipc_message_arg(msg);
-    
-    errno = 0;
-    index = strtol(arg, NULL, 10);
-    if(errno != 0)
-        return -errno;
-    
-    pl = media_player_playlist(media_player);
-    
-    m = playlist_at(pl, index);
-    if(!m)
-        return -EINVAL;
-    
-    err = media_player_play_media(media_player, m);
-    if(err < 0)
-        return err;
-    
-    client_print_current_media(client, media_player);
-    
-    return 0;
+//     struct playlist *pl;
+//     struct media *m;
+//     long index;
+//     const char *arg;
+//     int err;
+//     
+//     arg = ipc_message_arg(msg);
+//     
+//     errno = 0;
+//     index = strtol(arg, NULL, 10);
+//     if(errno != 0)
+//         return -errno;
+//     
+//     pl = media_player_playlist(media_player);
+//     
+//     m = playlist_at(pl, index);
+//     if(!m)
+//         return -EINVAL;
+//     
+//     err = media_player_play_media(media_player, m);
+//     if(err < 0)
+//         return err;
+//     
+//     client_print_current_media(client, media_player);
+//     
+//     return 0;
 }
 
 static int add_media_realpath(struct client *client, const char *path)
 {
-    struct playlist *pl;
-    struct stat s;
-    int err;
-    
-    err = stat(path, &s);
-    if(err < 0) {
-        err = -errno;
-        client_err(client, "climpd: %s - %s\n", path, errno_string(errno));
-        return err;
-    }
-    
-    if(!S_ISREG(s.st_mode)) {
-        client_err(client, "climpd: %s is not a file\n", path);
-        return -EINVAL;
-    }
-    
-    pl = media_player_playlist(media_player);
-    
-    err = playlist_add_media_path(pl, path);
-    if(err < 0) {
-        client_err(client, "climpd: add-file: %s\n", errno_string(-err));
-        return err;
-    }
-    
-    return 0;
+//     struct playlist *pl;
+//     struct stat s;
+//     int err;
+//     
+//     err = stat(path, &s);
+//     if(err < 0) {
+//         err = -errno;
+//         client_err(client, "climpd: %s - %s\n", path, errno_string(errno));
+//         return err;
+//     }
+//     
+//     if(!S_ISREG(s.st_mode)) {
+//         client_err(client, "climpd: %s is not a file\n", path);
+//         return -EINVAL;
+//     }
+//     
+//     pl = media_player_playlist(media_player);
+//     
+//     err = playlist_add_media_path(pl, path);
+//     if(err < 0) {
+//         client_err(client, "climpd: add-file: %s\n", errno_string(-err));
+//         return err;
+//     }
+//     
+//     return 0;
 }
 
 static int add_media(struct client *client, const struct message *msg)
@@ -440,27 +436,27 @@ static int add_playlist(struct client *client, const struct message *msg)
 
 static int remove_media_realpath(struct client *client, const char *path)
 {
-    struct playlist *pl;
-    struct media *m, *current;
-    int err;
-    
-    current = media_player_current_media(media_player);
-    pl = media_player_playlist(media_player);
-    
-    if(!media_is_from_file(current, path)) {
-        playlist_delete_media_path(pl, path);
-        return 0;
-    }
-    
-    m = playlist_next(pl, current);
-    
-    err = media_player_play_media(media_player, m);
-    
-    playlist_delete_media_path(pl, path);
-    
-    client_print_current_media(client, media_player);
-    
-    return err;
+//     struct playlist *pl;
+//     struct media *m, *current;
+//     int err;
+//     
+//     current = media_player_current_media(media_player);
+//     pl = media_player_playlist(media_player);
+//     
+//     if(!media_is_from_file(current, path)) {
+//         playlist_delete_media_path(pl, path);
+//         return 0;
+//     }
+//     
+//     m = playlist_next(pl, current);
+//     
+//     err = media_player_play_media(media_player, m);
+//     
+//     playlist_delete_media_path(pl, path);
+//     
+//     client_print_current_media(client, media_player);
+//     
+//     return err;
 }
 
 static int remove_media(struct client *client, const struct message *msg)

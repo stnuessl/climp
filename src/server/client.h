@@ -52,10 +52,10 @@ void client_err(struct client *__restrict client, const char *format, ...)
 void client_print_volume(struct client *__restrict client, unsigned int vol);
 
 
-void client_print_current_media(struct client *__restrict client,
-                                struct media_player *mp);
+void client_print_current_media(const struct client *__restrict client,
+                                const struct media_player *mp);
 
-void client_print_media_player_playlist(struct client *__restrict client, 
-                                        struct media_player *mp);
+void client_print_media_player_playlist(const struct client *__restrict client, 
+                                        const struct media_player *mp);
 
 #endif /* _CLIENT_H_ */
