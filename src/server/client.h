@@ -43,10 +43,10 @@ void client_set_out_fd(struct client *__restrict client, int fd);
 
 void client_set_err_fd(struct client *__restrict client, int fd);
 
-void client_out(struct client *__restrict client, const char *format, ...)
+void client_out(const struct client *__restrict client, const char *format, ...)
                                           __attribute__((format(printf, 2, 3)));
 
-void client_err(struct client *__restrict client, const char *format, ...)
+void client_err(const struct client *__restrict client, const char *format, ...)
                                           __attribute__((format(printf, 2, 3)));
                                           
 void client_print_volume(struct client *__restrict client, unsigned int vol);

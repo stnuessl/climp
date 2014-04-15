@@ -214,6 +214,17 @@ int media_player_play_media(struct media_player *__restrict mp,
     return 0;
 }
 
+int media_player_play_track(struct media_player *__restrict mp, unsigned int i)
+{
+    struct media *m;
+    
+    m = playlist_at(mp->current_playlist, i);
+    if(!m)
+        return -EINVAL;
+    
+    return media_player_play_media(mp, m);
+}
+
 int media_player_play_file(struct media_player *__restrict mp,
                            const char *__restrict path)
 {
@@ -353,16 +364,27 @@ int media_player_add_playlist(struct media_player *__restrict mp,
 int media_player_set_playlist(struct media_player *__restrict mp,
                               struct playlist *pl)
 {
+    const char *path;
     int err;
     
-    if(playlist_contains_media(mp->deprecated_playlist, mp->current_media)) {
-        err = playlist_merge(mp->deprecated_playlist, mp->current_playlist);
-        if(err < 0)
-            return err;
-        
-        mp->current_playlist = pl;
+    if(!mp->deprecated_playlist) {
+        mp->deprecated_playlist = mp->current_playlist;
+        mp->current_playlist    = pl;
         
         return 0;
+    }
+    
+    if(mp->current_media) {
+        path = mp->current_media->path;
+        
+        if(playlist_contains(mp->deprecated_playlist, path)) {
+            err = playlist_merge(mp->deprecated_playlist, mp->current_playlist);
+            if(err < 0)
+                return err;
+            
+            mp->current_playlist = pl;
+            return 0;
+        }
     }
     
     playlist_delete(mp->deprecated_playlist);

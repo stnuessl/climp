@@ -91,7 +91,7 @@ void client_set_err_fd(struct client *__restrict client, int fd)
     client->err_fd = fd;
 }
 
-void client_out(struct client *__restrict client, const char *format, ...)
+void client_out(const struct client *__restrict client, const char *format, ...)
 {
     va_list args;
     
@@ -105,7 +105,7 @@ void client_out(struct client *__restrict client, const char *format, ...)
     va_end(args);
 }
 
-void client_err(struct client *__restrict client, const char *format, ...)
+void client_err(const struct client *__restrict client, const char *format, ...)
 {
     va_list args;
     
