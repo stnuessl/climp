@@ -49,6 +49,7 @@
 #include "media_player/playlist.h"
 #include "media_player/media.h"
 
+#include "config.h"
 #include "color.h"
 #include "client.h"
 
@@ -71,11 +72,8 @@
 
 #define log_func_e(func, err)                                                  \
     log_error(&log, "%s: %s at %s:%d\n", (func), (err), __FILE__, __LINE__)
-
-unsigned int media_meta_length = 24;
-const char *current_media_meta_color = COLOR_GREEN;
-const char *media_meta_color = COLOR_DEFAULT;
-
+    
+extern struct climpd_config conf;
 
 static struct media_player *media_player;
 static struct client client;
@@ -142,12 +140,19 @@ static int get_volume(struct client *client, const struct message *msg)
     return 0;
 }
 
-static int get_status(struct client *client, const struct message *msg)
+static int get_state(struct client *client, const struct message *msg)
 {
+    if(media_player_playing(media_player))
+        client_out(client, "climpd: playing\n");
+    else if(media_player_stopped(media_player))
+        client_out(client, "climpd: stopped\n");
+    else
+        client_out(client, "climpd: state unknown\n");
+    
     return 0;
 }
 
-static int set_status(struct client *client, const struct message *msg)
+static int set_state(struct client *client, const struct message *msg)
 {
     const char *arg, *err_msg;
     int err;
@@ -527,8 +532,8 @@ static int (*msg_handler[])(struct client *, const struct message *) = {
     [IPC_MESSAGE_GET_PLAYLIST]          = &get_playlist,
     [IPC_MESSAGE_GET_FILES]             = &get_files,
     [IPC_MESSAGE_GET_VOLUME]            = &get_volume,
-    [IPC_MESSAGE_GET_STATUS]            = &get_status,
-    [IPC_MESSAGE_SET_STATUS]            = &set_status,
+    [IPC_MESSAGE_GET_STATE]             = &get_state,
+    [IPC_MESSAGE_SET_STATE]             = &set_state,
     [IPC_MESSAGE_SET_PLAYLIST]          = &set_playlist,
     [IPC_MESSAGE_SET_VOLUME]            = &set_volume,
     [IPC_MESSAGE_PLAY_NEXT]             = &play_next,
@@ -753,11 +758,11 @@ static int init(void)
     if(pid > 0)
         _exit(EXIT_SUCCESS);
     
-#endif
     
     err = close_std_streams();
     if(err < 0)
         goto cleanup1;
+#endif
     
     main_loop = g_main_loop_new(NULL, false);
     if(!main_loop)
@@ -770,6 +775,10 @@ static int init(void)
     media_player = media_player_new();
     if(!media_player)
         goto cleanup3;
+    
+    media_player_set_volume(media_player, conf.volume);
+    media_player_set_repeat(media_player, conf.repeat);
+    media_player_set_shuffle(media_player, conf.shuffle);
     
     media_player_on_bus_error(media_player, &media_player_handle_bus_error);
 

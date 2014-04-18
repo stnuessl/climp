@@ -19,6 +19,7 @@
  */
 
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 #include <errno.h>
 #include <assert.h>
@@ -75,6 +76,55 @@ struct playlist *playlist_new(void)
     err = playlist_init(pl);
     if(err < 0) {
         free(pl);
+        return NULL;
+    }
+    
+    return pl;
+}
+
+struct playlist *playlist_new_file(const char *__restrict path)
+{
+    struct playlist *pl;
+    FILE *file;
+    char *buf;
+    size_t size;
+    ssize_t n;
+    int err;
+    
+    file = fopen(path, "r");
+    if(!file)
+        return NULL;
+    
+    pl = playlist_new();
+    if(!pl) {
+        fclose(file);
+        return NULL;
+    }
+    
+    buf  = NULL;
+    size = 0;
+    
+    while(1) {
+        n = getline(&buf, &size, file);
+        if(n < 0)
+            break;
+        
+        buf[n - 1] = '\0';
+        
+        if(buf[0] != '/')
+            continue;
+        
+        err = playlist_add_media_path(pl, buf);
+        if(err < 0)
+            continue;
+    }
+    
+    free(buf);
+    fclose(file);
+    
+    if(playlist_empty(pl)) {
+        playlist_delete(pl);
+        errno = EINVAL;
         return NULL;
     }
     
@@ -264,4 +314,27 @@ bool playlist_empty(const struct playlist *__restrict pl)
 unsigned int playlist_size(const struct playlist *__restrict pl)
 {
     return map_size(&pl->map_path);
+}
+
+int playlist_save_to_file(const struct playlist *__restrict pl, 
+                          const char *__restrict path,
+                          const char *__restrict mode)
+{
+    FILE *file;
+    const struct link *link;
+    const struct media *m;
+    
+    file = fopen(path, mode);
+    if(!file)
+        return -errno;
+    
+    playlist_for_each(pl, link) {
+        m = container_of(link, struct media, link);
+        
+        fprintf(file, "%s\n", m->path);
+    }
+    
+    fclose(file);
+    
+    return 0;
 }

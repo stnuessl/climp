@@ -35,6 +35,8 @@
 #define CLIMP_VERSION_MINOR "0"
 #define CLIMP_VERSION_MICRO "4"
 
+#define CLIMP_CONFIG_PATH "~/.config/climp/climp.conf"
+
 
 const char *climp_version(void)
 {
@@ -108,31 +110,13 @@ struct command_handle {
     bool arg;
 };
 
-/*
- * get-playlist
- * get-files
- * get-volume
- * get-status
- * 
- * set-status [play / stop / pause / mute / unmute]
- * set-playlist [file1 file2 file3]
- * set-volume [0..120]
- * 
- * play-next
- * play-previous
- * play-title [file1 file2 file3]
- * play-number [number]
- * 
- * add-file
- * remove-file
- */
-
 
 static struct command_handle command_handles[] = {
     { "get-playlist",    IPC_MESSAGE_GET_PLAYLIST,      false   },
     { "get-files",       IPC_MESSAGE_GET_FILES,         false   },
     { "get-volume",      IPC_MESSAGE_GET_VOLUME,        false   },
-    { "set-status",      IPC_MESSAGE_SET_STATUS,        true    },
+    { "get-state",       IPC_MESSAGE_GET_STATE,         false   },
+    { "set-state",       IPC_MESSAGE_SET_STATE,         true    },
     { "set-playlist",    IPC_MESSAGE_SET_PLAYLIST,      true    },
     { "set-volume",      IPC_MESSAGE_SET_VOLUME,        true    },
     { "play-next",       IPC_MESSAGE_PLAY_NEXT,         false   },

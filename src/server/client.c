@@ -31,12 +31,15 @@
 #include "media_player/playlist.h"
 #include "media_player/media.h"
 
+#include "config.h"
 #include "color.h"
 #include "client.h"
 
 extern int media_meta_length;
 extern const char *current_media_meta_color;
 extern const char *media_meta_color;
+
+extern struct climpd_config conf;
 
 static void media_player_print_media(const struct client *__restrict client, 
                                      const struct media *m,
@@ -52,9 +55,9 @@ static void media_player_print_media(const struct client *__restrict client,
     client_out(client, 
                "%s    ( %3d )\t%-*.*s %-*.*s %-*.*s\n" COLOR_DEFAULT,
                color, index,
-               media_meta_length, media_meta_length, i->title, 
-               media_meta_length, media_meta_length, i->artist, 
-               media_meta_length, media_meta_length, i->album);
+               conf.media_meta_length, conf.media_meta_length, i->title, 
+               conf.media_meta_length, conf.media_meta_length, i->artist, 
+               conf.media_meta_length, conf.media_meta_length, i->album);
 }
 
 void client_init(struct client *__restrict client, pid_t pid, int unix_fd)
@@ -141,7 +144,7 @@ void client_print_current_media(const struct client *__restrict client,
         m = container_of(link, const struct media, link);
         
         if(m == media_player_current_media(mp)) {
-            media_player_print_media(client, m, i, current_media_meta_color);
+            media_player_print_media(client, m, i, conf.current_media_color);
             break;
         }
     }
@@ -164,8 +167,8 @@ void client_print_media_player_playlist(const struct client *__restrict client,
         m = container_of(link, const struct media, link);
         
         if(m == media_player_current_media(mp))
-            media_player_print_media(client, m, i, current_media_meta_color);
+            media_player_print_media(client, m, i, conf.current_media_color);
         else
-            media_player_print_media(client, m, i, media_meta_color);
+            media_player_print_media(client, m, i, conf.default_media_color);
     }
 }

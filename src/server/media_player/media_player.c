@@ -152,6 +152,8 @@ int media_player_init(struct media_player *__restrict mp)
     mp->repeat          = false;
     mp->shuffle         = false;
     
+    g_object_set(mp->playbin2, "volume", (double) mp->volume / 100.0f, NULL);
+    
     return 0;
     
 cleanup2:
@@ -181,8 +183,7 @@ int media_player_play(struct media_player *__restrict mp)
     if(mp->state == GST_STATE_PLAYING)
         return 0;
     
-    if(!mp->current_media)
-        mp->current_media = playlist_first(mp->current_playlist);
+    mp->current_media = playlist_first(mp->current_playlist);
     
     if(!mp->current_media)
         return -EINVAL;
@@ -220,7 +221,7 @@ int media_player_play_track(struct media_player *__restrict mp, unsigned int i)
     
     m = playlist_at(mp->current_playlist, i);
     if(!m)
-        return -EINVAL;
+        return -ENOENT;
     
     return media_player_play_media(mp, m);
 }
@@ -242,6 +243,8 @@ void media_player_pause(struct media_player *__restrict mp)
     if(mp->state == GST_STATE_PAUSED)
         return;
     
+    mp->state = GST_STATE_PAUSED;
+    
     gst_element_set_state(mp->playbin2, GST_STATE_PAUSED);
 }
 
@@ -249,6 +252,8 @@ void media_player_stop(struct media_player *__restrict mp)
 {
     if(mp->state == GST_STATE_NULL)
         return;
+    
+    mp->state = GST_STATE_NULL;
     
     gst_element_set_state(mp->playbin2, GST_STATE_NULL);
 }
@@ -308,6 +313,7 @@ int media_player_next(struct media_player *__restrict mp)
     playlist_clear(mp->deprecated_playlist);
     
     if(!m) {
+        mp->current_media = NULL;
         media_player_stop(mp);
         return 0;
     }
@@ -330,6 +336,7 @@ int media_player_previous(struct media_player *__restrict mp)
     playlist_clear(mp->deprecated_playlist);
     
     if(!m) {
+        mp->current_media = NULL;
         media_player_stop(mp);
         return 0;
     }

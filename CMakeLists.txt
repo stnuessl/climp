@@ -36,6 +36,7 @@ set(SOURCE
 set(SOURCE_SERVER
     src/server/client.c
     src/server/main.c
+    src/server/config.c
     src/server/media_player/media.c
     src/server/media_player/playlist.c
     src/server/media_player/media_player.c
