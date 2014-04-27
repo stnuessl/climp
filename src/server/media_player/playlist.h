@@ -24,12 +24,20 @@
 #include <libvci/link.h>
 #include <libvci/list.h>
 #include <libvci/map.h>
+#include <libvci/random.h>
 
 #include "media.h"
 
 struct playlist {
     struct map map_path;
-    struct link list;
+    struct link list_all;
+    struct link list_next;
+    struct link list_prev;
+    
+    struct random rand;
+    
+    bool shuffle;
+    bool repeat;
 };
 
 struct playlist *playlist_new(void);
@@ -56,9 +64,7 @@ int playlist_add_media_path(struct playlist *__restrict pl, const char *path);
 
 void playlist_delete_media_path(struct playlist *__restrict pl, const char *path);
 
-struct media *playlist_first(struct playlist *__restrict pl);
-
-struct media *playlist_last(struct playlist *__restrict pl);
+struct media *playlist_begin(struct playlist *__restrict pl);
 
 struct media *playlist_next(struct playlist *__restrict pl, struct media *m);
 
@@ -78,9 +84,9 @@ int playlist_save_to_file(const struct playlist *__restrict pl,
                           const char *__restrict mode);
 
 #define playlist_for_each(playlist, link)                                      \
-    list_for_each(&(playlist)->list, (link))
+    list_for_each(&(playlist)->list_all, (link))
     
 #define playlist_for_each_safe(playlist, link, safe)                           \
-    list_for_each_safe(&(playlist)->list, (link), (safe))
+    list_for_each_safe(&(playlist)->list_all, (link), (safe))
 
 #endif /* _PLAYLIST_H_ */
