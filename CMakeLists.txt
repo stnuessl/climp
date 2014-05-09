@@ -36,9 +36,11 @@ set(SOURCE
 set(SOURCE_SERVER
     src/server/client.c
     src/server/main.c
+    src/server/climp_player.c
     src/server/config.c
     src/server/media_player/media.c
     src/server/media_player/playlist.c
+    src/server/media_player/playlist_iterator.c
     src/server/media_player/media_player.c
     src/shared/ipc.c
     src/shared/util.c

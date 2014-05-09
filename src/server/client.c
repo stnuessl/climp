@@ -41,7 +41,7 @@ extern const char *media_meta_color;
 
 extern struct climpd_config conf;
 
-static void media_player_print_media(const struct client *__restrict client, 
+static void client_print_media(const struct client *__restrict client, 
                                      const struct media *m,
                                      int index,
                                      const char *color)
@@ -128,47 +128,48 @@ void client_print_volume(struct client *__restrict client, unsigned int vol)
 }
 
 void client_print_current_media(const struct client *__restrict client,
-                                const struct media_player *mp)
+                                const struct climp_player *cp)
 {
-    const struct playlist *pl;
-    const struct link *link;
-    const struct media *m;
-    int i;
-    
-    pl = media_player_playlist(mp);
-    i = 0;
-    
-    playlist_for_each(pl, link) {
-        i += 1;
-        
-        m = container_of(link, const struct media, link);
-        
-        if(m == media_player_current_media(mp)) {
-            media_player_print_media(client, m, i, conf.current_media_color);
-            break;
-        }
-    }
+    /* TODO: implement me */
 }
+//     const struct playlist *pl;
+//     const struct link *link;
+//     const struct media *m;
+//     int i;
+//     
+//     pl = climp_player_playlist(cp);
+//     i = 0;
+//     
+//     playlist_for_each(pl, link) {
+//         i += 1;
+//         
+//         m = container_of(link, const struct media, link_pl);
+//         
+//         if(m == media_player_current_media(cp)) {
+//             media_player_print_media(client, m, i, conf.current_media_color);
+//             break;
+//         }
+//     }
+//}
 
 void client_print_media_player_playlist(const struct client *__restrict client, 
-                                        const struct media_player *mp)
+                                        const struct climp_player *cp)
 {
     const struct playlist *pl;
     const struct link *link;
     const struct media *m;
     int i;
     
-    pl = media_player_playlist(mp);
+    /* TODO: color for current media */
+    
+    pl = climp_player_playlist(cp);
     i = 0;
 
     playlist_for_each(pl, link) {
         i += 1;
         
-        m = container_of(link, const struct media, link);
+        m = container_of(link, const struct media, link_pl);
         
-        if(m == media_player_current_media(mp))
-            media_player_print_media(client, m, i, conf.current_media_color);
-        else
-            media_player_print_media(client, m, i, conf.default_media_color);
+        client_print_media(client, m, i, conf.default_media_color);
     }
 }

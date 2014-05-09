@@ -28,18 +28,19 @@
 
 #include "climp_player.h"
 
-static void on_end_of_stream(struct media_player *mp)
+static void on_end_of_stream(struct player *mp)
 {
     struct climp_player *cp;
+    const struct media *m;
     
     cp = container_of(mp, struct climp_player, mp);
     
-    if(!cp->next)
+    if(!playlist_iterator_has_next(cp->pl))
         return;
     
-    media_player_play_media(mp, cp->next);
+    m = playlist_iterator_next(cp->it);
     
-    cp->next = playlist_next(cp->pl, cp->next);
+    media_player_play_media(mp, m);
 }
 
 struct climp_player *climp_player_new(void)
@@ -82,19 +83,10 @@ int climp_player_init(struct climp_player *__restrict cp)
         goto cleanup1;
     }
     
-    err = random_init(&cp->rand);
-    if(err < 0)
-        goto cleanup2;
-    
-    cp->next = NULL;
-    
-    cp->repeat  = false;
-    cp->shuffle = false;
+    cp->it = playlist_iterator(cp->pl);
     
     return 0;
     
-cleanup2:
-    playlist_delete(cp->pl);
 cleanup1:
     media_player_destroy(&cp->mp);
 out:
@@ -103,26 +95,77 @@ out:
 
 void climp_player_destroy(struct climp_player *__restrict cp)
 {
-    random_destroy(&cp->rand);
     playlist_delete(cp->pl);
     media_player_delete(&cp->mp);
+}
+
+const struct playlist *
+climp_player_playlist(const struct climp_player *__restrict cp)
+{
+    return cp->pl;
 }
 
 int climp_player_play_file(struct climp_player *__restrict cp, 
                            const char *__restrict path)
 {
+    struct media *m;
+    int err;
     
+    m = playlist_retrieve_path(cp->pl, path);
+    if(!m) {
+        m = media_new(path);
+        if(!m)
+            return -errno;
+        
+        err = playlist_insert_media(cp->pl, m);
+        if(err < 0) {
+            media_delete(m);
+            return err;
+        }
+    }
+
+    playlist_iterator_set_current(cp->it, m);
+    media_player_play_media(&cp->mp, m);
+    
+    return 0;
 }
 
 int climp_player_play_media(struct climp_player *__restrict cp, 
                             struct media *m)
 {
+    int err;
     
+    if(!playlist_contains(cp->pl, m)) {
+        err = playlist_insert_media(cp->pl, m);
+        if(err < 0)
+            return err;
+    }
+    
+    playlist_iterator_set_current(cp->it, m);
+    media_player_play_media(&cp->mp, m);
+    
+    return 0;
+}
+
+int climp_player_play_track(struct climp_player *__restrict cp, 
+                            unsigned int index)
+{
+    /* TODO: implement me */
+    return 0;
 }
 
 int climp_player_play(struct climp_player *__restrict cp)
 {
+    const struct media *m;
     
+    if(!playlist_iterator_has_next(cp->it))
+        return -ENOENT;
+    
+    m = playlist_iterator_next(cp->it);
+    
+    media_player_play_media(&cp->mp, m);
+    
+    return 0;
 }
 
 void climp_player_pause(struct climp_player *__restrict cp)
@@ -137,32 +180,50 @@ void climp_player_stop(struct climp_player *__restrict cp)
 
 int climp_player_next(struct climp_player *__restrict cp)
 {
-    
+    return climp_player_play(cp);
 }
 
 int climp_player_previous(struct climp_player *__restrict cp)
 {
+    const struct media *m;
     
+    if(!playlist_iterator_has_previous(cp->it))
+        return -ENOENT;
+    
+    m = playlist_iterator_previous(cp->it);
+    
+    media_player_play_media(&cp->mp, m);
+    
+    return 0;
 }
 
 int climp_player_add_file(struct climp_player *__restrict cp, const char *path)
 {
-    return playlist_add_media_path(cp->pl, path);
+    return playlist_insert_path(cp->pl, path);
 }
 
 int climp_player_add_media(struct climp_player *__restrict cp, struct media *m)
 {
-    return playlist_add_media(cp->pl, m);
+    return playlist_insert_media(cp->pl, m);
 }
 
 void climp_player_delete_file(struct climp_player *__restrict cp,
-                              const char *path);
+                              const char *path)
+{
+    playlist_delete_path(cp->pl, path);
+}
 
 void climp_player_delete_media(struct climp_player *__restrict cp,
-                               struct media *m);
+                               struct media *m)
+{
+    playlist_delete_media(cp->pl, m);
+}
 
-void climp_player_remove_media(struct climp_player *__restrict cp,
-                               const struct media *m);
+void climp_player_take_media(struct climp_player *__restrict cp,
+                             struct media *m)
+{
+    playlist_take_media(cp->pl, m);
+}
 
 void climp_player_set_volume(struct climp_player *__restrict cp, 
                              unsigned int volume)
@@ -190,20 +251,27 @@ bool climp_player_muted(const struct climp_player *__restrict cp)
 
 void climp_player_set_repeat(struct climp_player *__restrict cp, bool repeat)
 {
-    cp->repeat = repeat;
+    playlist_iterator_set_repeat(cp->it, repeat);
 }
 
 bool climp_player_repeat(const struct climp_player *__restrict cp)
 {
-    return cp->repeat;
+    return playlist_iterator_repeat(cp->it);
 }
 
 void climp_player_set_shuffle(struct climp_player *__restrict cp, bool shuffle)
 {
-    cp->shuffle = shuffle;
+    playlist_iterator_set_shuffle(cp->it, shuffle);
 }
 
 bool climp_player_shuffle(const struct climp_player *__restrict cp)
 {
-    return cp->shuffle;
+    return playlist_iterator_shuffle(cp->it);
+}
+
+void climp_player_set_playlist(struct climp_player *__restrict cp, 
+                               struct playlist *pl)
+{
+    playlist_delete(cp->pl);
+    cp->pl = pl;
 }

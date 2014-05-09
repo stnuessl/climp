@@ -135,7 +135,7 @@ void media_player_destroy(struct media_player *__restrict mp)
 }
 
 void media_player_play_media(struct media_player *__restrict mp,
-                            struct media *m)
+                             const struct media *m)
 {
     int err;
     
@@ -148,8 +148,6 @@ void media_player_play_media(struct media_player *__restrict mp,
     mp->state = GST_STATE_PLAYING;
     
     gst_element_set_state(mp->playbin2, GST_STATE_PLAYING);
-    
-    return 0;
 }
 
 void media_player_pause(struct media_player *__restrict mp)

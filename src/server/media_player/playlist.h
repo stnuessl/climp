@@ -25,19 +25,15 @@
 #include <libvci/list.h>
 #include <libvci/map.h>
 #include <libvci/random.h>
+#include <libvci/subject.h>
 
+#include "playlist_iterator.h"
 #include "media.h"
 
 struct playlist {
     struct map map_path;
-    struct link list_all;
-    struct link list_next;
-    struct link list_prev;
-    
-    struct random rand;
-    
-    bool shuffle;
-    bool repeat;
+    struct link list;
+    struct playlist_iterator it;
 };
 
 struct playlist *playlist_new(void);
@@ -52,7 +48,7 @@ void playlist_destroy(struct playlist *__restrict pl);
 
 void playlist_clear(struct playlist *__restrict pl);
 
-int playlist_add_media(struct playlist *__restrict pl, struct media *m);
+int playlist_insert_media(struct playlist *__restrict pl, struct media *m);
 
 void playlist_take_media(struct playlist *__restrict pl, struct media *m);
 
@@ -60,22 +56,20 @@ void playlist_delete_media(struct playlist *__restrict pl, struct media *m);
 
 bool playlist_contains(const struct playlist *__restrict pl, const char *path);
 
-int playlist_add_media_path(struct playlist *__restrict pl, const char *path);
+int playlist_insert_path(struct playlist *__restrict pl, 
+                         const char *__restrict path);
 
-void playlist_delete_media_path(struct playlist *__restrict pl, const char *path);
+struct media *playlist_retrieve_path(struct playlist *__restrict pl, 
+                                     const char *__restrict path);
 
-struct media *playlist_begin(struct playlist *__restrict pl);
-
-struct media *playlist_next(struct playlist *__restrict pl, struct media *m);
-
-struct media *playlist_previous(struct playlist *__restrict pl, 
-                                struct media *m);
-
-struct media *playlist_at(struct playlist *__restrict pl, unsigned int index);
+void playlist_delete_path(struct playlist *__restrict pl,
+                                const char *path);
 
 int playlist_merge(struct playlist *__restrict pl1, struct playlist *pl2);
 
 bool playlist_empty(const struct playlist *__restrict pl);
+
+struct playlist_iterator *playlist_iterator(struct playlist *__restrict pl);
 
 unsigned int playlist_size(const struct playlist *__restrict pl);
 
@@ -84,9 +78,9 @@ int playlist_save_to_file(const struct playlist *__restrict pl,
                           const char *__restrict mode);
 
 #define playlist_for_each(playlist, link)                                      \
-    list_for_each(&(playlist)->list_all, (link))
-    
+    list_for_each(&(playlist)->list, (link))
+
 #define playlist_for_each_safe(playlist, link, safe)                           \
-    list_for_each_safe(&(playlist)->list_all, (link), (safe))
+    list_for_each_safe(&(playlist)->list, (link), (safe))
 
 #endif /* _PLAYLIST_H_ */

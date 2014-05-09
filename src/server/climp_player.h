@@ -25,17 +25,13 @@
 
 #include "media_player/media_player.h"
 #include "media_player/playlist.h"
+#include "media_player/playlist_iterator.h"
 #include "media_player/media.h"
 
 struct climp_player {
     struct media_player mp;
     struct playlist *pl;
-    struct media *next;
-    
-    struct random rand;
-    
-    bool repeat;
-    bool shuffle;
+    struct playlist_iterator *it;
 };
 
 struct climp_player *climp_player_new(void);
@@ -51,6 +47,9 @@ int climp_player_play_file(struct climp_player *__restrict cp,
 
 int climp_player_play_media(struct climp_player *__restrict cp, 
                             struct media *m);
+
+int climp_player_play_track(struct climp_player *__restrict cp, 
+                            unsigned int index);
 
 int climp_player_play(struct climp_player *__restrict cp);
 
@@ -72,8 +71,8 @@ void climp_player_delete_file(struct climp_player *__restrict cp,
 void climp_player_delete_media(struct climp_player *__restrict cp,
                                struct media *m);
 
-void climp_player_remove_media(struct climp_player *__restrict cp,
-                               const struct media *m);
+void climp_player_take_media(struct climp_player *__restrict cp,
+                             const struct media *m);
 
 void climp_player_set_volume(struct climp_player *__restrict cp, 
                              unsigned int volume);
@@ -91,5 +90,8 @@ bool climp_player_repeat(const struct climp_player *__restrict cp);
 void climp_player_set_shuffle(struct climp_player *__restrict cp, bool shuffle);
 
 bool climp_player_shuffle(const struct climp_player *__restrict cp);
+
+void climp_player_set_playlist(struct climp_player *__restrict cp, 
+                               struct playlist *pl);
 
 #endif /* _CLIMP_PLAYER_H_ */
