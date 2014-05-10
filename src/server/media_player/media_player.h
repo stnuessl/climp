@@ -35,41 +35,44 @@ struct media_player {
     unsigned int volume;
     bool muted;
     
-    void (*on_end_of_stream)(struct player *);
-    void (*on_bus_error)(struct player *, GstMessage *);
+    void (*on_end_of_stream)(struct media_player *);
+    void (*on_bus_error)(struct media_player *, GstMessage *);
 };
 
-struct player *media_player_new(void);
+struct media_player *media_player_new(void);
 
-void media_player_delete(struct player *__restrict mp);
+void media_player_delete(struct media_player *__restrict mp);
 
-int media_player_init(struct player *__restrict mp);
+int media_player_init(struct media_player *__restrict mp);
 
-void media_player_destroy(struct player *__restrict mp);
+void media_player_destroy(struct media_player *__restrict mp);
 
-int media_player_play_media(struct player *__restrict mp,
+void media_player_play_media(struct media_player *__restrict mp,
                             const struct media *m);
 
-void media_player_pause(struct player *__restrict mp);
+void media_player_pause(struct media_player *__restrict mp);
 
-void media_player_stop(struct player *__restrict mp);
+void media_player_stop(struct media_player *__restrict mp);
 
-void media_player_set_muted(struct player *__restrict mp, bool muted);
+void media_player_set_muted(struct media_player *__restrict mp, bool muted);
 
-bool media_player_muted(const struct player *__restrict mp);
+bool media_player_muted(const struct media_player *__restrict mp);
 
-void media_player_set_volume(struct player *__restrict mp,
+void media_player_set_volume(struct media_player *__restrict mp,
                              unsigned int volume);
 
-unsigned int media_player_volume(const struct player *__restrict mp);
+unsigned int media_player_volume(const struct media_player *__restrict mp);
 
-bool media_player_playing(const struct player *__restrict mp);
+bool media_player_playing(const struct media_player *__restrict mp);
 
-bool media_player_paused(const struct player *__restrict mp);
+bool media_player_paused(const struct media_player *__restrict mp);
 
-bool media_player_stopped(const struct player *__restrict mp);
+bool media_player_stopped(const struct media_player *__restrict mp);
 
-void media_player_on_bus_error(struct player *__restrict mp,
-                             void (*func)(struct player *, GstMessage *));
+void media_player_on_end_of_stream(struct media_player *__restrict mp,
+                                   void (*func)(struct media_player *));
+
+void media_player_on_bus_error(struct media_player *__restrict mp,
+                             void (*func)(struct media_player *, GstMessage *));
 
 #endif /* _MEDIA_PLAYER_H_ */

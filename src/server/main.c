@@ -134,7 +134,7 @@ static int get_volume(struct client *client, const struct message *msg)
 {
     unsigned int vol;
     
-    vol = media_player_volume(player);
+    vol = climp_player_volume(player);
     
     client_print_volume(client, vol);
     
@@ -237,11 +237,7 @@ static int set_playlist(struct client *client, const struct message *msg)
     free(buf);
     fclose(file);
     
-    err = climp_player_set_playlist(player, pl);
-    if(err < 0) {
-        client_err(client, "climpd: set-playlist: %s\n", errno_string(-err));
-        return err;
-    }
+    climp_player_set_playlist(player, pl);
     
     return 0;
 }
@@ -261,7 +257,7 @@ static int set_volume(struct client *client, const struct message *msg)
         return err;
     }
     
-    media_player_set_volume(media_player, val);
+    climp_player_set_volume(player, val);
     
     return 0;
 }
@@ -299,14 +295,13 @@ static int play_previous(struct client *client, const struct message *msg)
 //     if(climp_player_stopped(player))
 //         client_out(client, "climpd: play-previous: no track available\n");
 //     else
-        client_print_current_media(client, media_player);
+        client_print_current_media(client, player);
     
     return 0;
 }
 
 static int play_file_realpath(struct client *client, const char *path)
 {
-    struct media *media;
     struct stat s;
     int err;
     
@@ -325,7 +320,7 @@ static int play_file_realpath(struct client *client, const char *path)
     
     err = climp_player_play_file(player, path);
     
-    client_print_current_media(client, media_player);
+    client_print_current_media(client, player);
     
     return err;
 }
@@ -748,10 +743,10 @@ static int init(void)
         _exit(EXIT_SUCCESS);
     
     
-#endif
     err = close_std_streams();
     if(err < 0)
         goto cleanup1;
+#endif
     
     main_loop = g_main_loop_new(NULL, false);
     if(!main_loop)
@@ -761,7 +756,7 @@ static int init(void)
     if(err < 0)
         goto cleanup2;
     
-    player = media_player_new();
+    player = climp_player_new();
     if(!player)
         goto cleanup3;
     

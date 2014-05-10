@@ -25,15 +25,14 @@
 #include <libvci/list.h>
 #include <libvci/map.h>
 #include <libvci/random.h>
-#include <libvci/subject.h>
 
 #include "playlist_iterator.h"
 #include "media.h"
 
 struct playlist {
+    struct playlist_iterator it;
     struct map map_path;
     struct link list;
-    struct playlist_iterator it;
 };
 
 struct playlist *playlist_new(void);
@@ -53,6 +52,9 @@ int playlist_insert_media(struct playlist *__restrict pl, struct media *m);
 void playlist_take_media(struct playlist *__restrict pl, struct media *m);
 
 void playlist_delete_media(struct playlist *__restrict pl, struct media *m);
+
+bool playlist_contains_media(const struct playlist *__restrict pl,
+                             const struct media *m);
 
 bool playlist_contains(const struct playlist *__restrict pl, const char *path);
 

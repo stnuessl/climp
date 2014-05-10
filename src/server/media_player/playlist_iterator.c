@@ -61,6 +61,8 @@ int playlist_iterator_init(struct playlist_iterator *__restrict it)
     if(err < 0)
         return err;
     
+    list_init(&it->list);
+    
     it->current = &it->list;
     
     it->size    = 0;
@@ -86,7 +88,7 @@ void playlist_iterator_take(struct playlist_iterator *__restrict it,
                             struct media *m)
 {
     if(it->current == &m->link_it)
-        it->current = it->current.prev;
+        it->current = it->current->prev;
         
     list_take(&m->link_it);
     it->size += 1;
@@ -98,17 +100,15 @@ bool playlist_iterator_has_next(const struct playlist_iterator *__restrict it)
         return true;
     
     /* Start position */
-    if(!it->current == &it->list)
+    if(it->current == &it->list)
         return true;
     
-    return it->media->link_it.next != &it->list;
+    return it->current->next != &it->list;
 }
 
 const struct media *
 playlist_iterator_next(struct playlist_iterator *__restrict it)
 {
-    struct link *link;
-    
     it->current = it->current->next;
     
     if(it->current != &it->list)
@@ -131,17 +131,15 @@ playlist_iterator_has_previous(const struct playlist_iterator *__restrict it)
     if(it->repeat)
         return true;
     
-    if(!it->current == &it->list)
+    if(it->current == &it->list)
         return true;
     
-    return it->media->link_it.prev != &it->list;
+    return it->current->prev != &it->list;
 }
 
 const struct media *
 playlist_iterator_previous(struct playlist_iterator *__restrict it)
 {
-    struct link *link;
-    
     it->current = it->current->prev;
     
     if(it->current != &it->list)
@@ -193,7 +191,7 @@ void playlist_iterator_set_current(struct playlist_iterator *__restrict it,
 const struct media *
 playlist_iterator_current(const struct playlist_iterator *__restrict it)
 {
-    return it->media;
+    return container_of(it->current, struct media, link_it);
 }
 
 void playlist_iterator_do_shuffle(struct playlist_iterator *__restrict it)
@@ -204,7 +202,7 @@ void playlist_iterator_do_shuffle(struct playlist_iterator *__restrict it)
     /* Create new list with random order */
     list_init(&list);
     
-    while(!list_empty(it->list)) {
+    while(!list_empty(&it->list)) {
         index = random_uint_range(&it->rand, 0, it->size - 1);
         
         link = list_at(&it->list, index);
@@ -214,6 +212,6 @@ void playlist_iterator_do_shuffle(struct playlist_iterator *__restrict it)
     }
     
     /* Merge it back */
-    list_merge(&it->list, list);
+    list_merge(&it->list, &list);
 }
 

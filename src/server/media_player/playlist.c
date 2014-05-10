@@ -119,13 +119,13 @@ int playlist_init(struct playlist *__restrict pl)
     if(err < 0)
         return err;
     
+    map_set_data_delete(&pl->map_path, (void(*)(void*)) &media_delete);
+    
     err = playlist_iterator_init(&pl->it);
     if(err < 0) {
         map_destroy(&pl->map_path);
         return err;
     }
-    
-    map_set_data_delete(&pl->map_path, (void(*)(void*)) &media_delete);
     
     list_init(&pl->list);
     
@@ -171,7 +171,7 @@ void playlist_take_media(struct playlist* pl, struct media* m)
     
     assert(media == m && "Media mismatch");
 
-    list_take(&media->link_it);
+    list_take(&media->link_pl);
     playlist_iterator_take(&pl->it, media);
 }
 
@@ -185,14 +185,14 @@ void playlist_delete_media(struct playlist *__restrict pl, struct media *m)
     
     assert(m == media && "Media mismatch");
     
-    list_take(&media->link_it);
+    list_take(&media->link_pl);
     playlist_iterator_take(&pl->it, media);
     
     media_delete(media);
 }
 
 bool playlist_contains_media(const struct playlist *__restrict pl,
-                             struct media *m)
+                             const struct media *m)
 {
     return map_contains(&pl->map_path, m->path);
 }
@@ -231,8 +231,8 @@ void playlist_delete_path(struct playlist *__restrict pl,
     if(!m)
         return;
     
-    list_take(&m->link_it);
-    playlist_iterator_take(&pl->it, media);
+    list_take(&m->link_pl);
+    playlist_iterator_take(&pl->it, m);
     
     media_delete(m);
 }
@@ -244,7 +244,7 @@ int playlist_merge(struct playlist *__restrict pl1, struct playlist *pl2)
     int err;
     
     list_for_each(&pl2->list, link) {
-        m = container_of(link, struct media, link);
+        m = container_of(link, struct media, link_pl);
         
         err = map_insert(&pl1->map_path, m->path, m);
         if(err < 0)
@@ -260,7 +260,7 @@ int playlist_merge(struct playlist *__restrict pl1, struct playlist *pl2)
 
 out:
     list_for_each(&pl2->list, link) {
-        m = container_of(link, struct media, link);
+        m = container_of(link, struct media, link_pl);
         
         if(!map_take(&pl1->map_path, m->path))
             break;
@@ -272,6 +272,11 @@ out:
 bool playlist_empty(const struct playlist *__restrict pl)
 {
     return map_empty(&pl->map_path);
+}
+
+struct playlist_iterator *playlist_iterator(struct playlist *__restrict pl)
+{
+    return &pl->it;
 }
 
 unsigned int playlist_size(const struct playlist *__restrict pl)
@@ -292,7 +297,7 @@ int playlist_save_to_file(const struct playlist *__restrict pl,
         return -errno;
     
     playlist_for_each(pl, link) {
-        m = container_of(link, struct media, link);
+        m = container_of(link, struct media, link_pl);
         
         fprintf(file, "%s\n", m->path);
     }

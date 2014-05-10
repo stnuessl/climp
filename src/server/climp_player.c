@@ -26,16 +26,17 @@
 
 #include <libvci/macro.h>
 
+#include "media_player/playlist.h"
 #include "climp_player.h"
 
-static void on_end_of_stream(struct player *mp)
+static void on_end_of_stream(struct media_player *mp)
 {
     struct climp_player *cp;
     const struct media *m;
     
     cp = container_of(mp, struct climp_player, mp);
     
-    if(!playlist_iterator_has_next(cp->pl))
+    if(!playlist_iterator_has_next(cp->it))
         return;
     
     m = playlist_iterator_next(cp->it);
@@ -77,8 +78,8 @@ int climp_player_init(struct climp_player *__restrict cp)
     
     media_player_on_end_of_stream(&cp->mp, &on_end_of_stream);
     
-    mp->pl = playlist_new();
-    if(!mp->pl) {
+    cp->pl = playlist_new();
+    if(!cp->pl) {
         err = -errno;
         goto cleanup1;
     }
@@ -97,12 +98,6 @@ void climp_player_destroy(struct climp_player *__restrict cp)
 {
     playlist_delete(cp->pl);
     media_player_delete(&cp->mp);
-}
-
-const struct playlist *
-climp_player_playlist(const struct climp_player *__restrict cp)
-{
-    return cp->pl;
 }
 
 int climp_player_play_file(struct climp_player *__restrict cp, 
@@ -135,7 +130,7 @@ int climp_player_play_media(struct climp_player *__restrict cp,
 {
     int err;
     
-    if(!playlist_contains(cp->pl, m)) {
+    if(!playlist_contains_media(cp->pl, m)) {
         err = playlist_insert_media(cp->pl, m);
         if(err < 0)
             return err;
@@ -154,14 +149,18 @@ int climp_player_play_track(struct climp_player *__restrict cp,
     return 0;
 }
 
+#include <stdio.h>
+
 int climp_player_play(struct climp_player *__restrict cp)
 {
     const struct media *m;
-    
+
     if(!playlist_iterator_has_next(cp->it))
         return -ENOENT;
     
     m = playlist_iterator_next(cp->it);
+    
+    printf("path: %s\n", m->path);
     
     media_player_play_media(&cp->mp, m);
     
@@ -228,8 +227,8 @@ void climp_player_take_media(struct climp_player *__restrict cp,
 void climp_player_set_volume(struct climp_player *__restrict cp, 
                              unsigned int volume)
 {
-    volume = max(volume, MEDIA_PLAYER_MIN_VOLUME);
-    volume = min(volume, MEDIA_PLAYER_MAX_VOLUME);
+    volume = max(volume, 0);
+    volume = min(volume, 120);
     
     media_player_set_volume(&cp->mp, volume);
 }
@@ -274,4 +273,11 @@ void climp_player_set_playlist(struct climp_player *__restrict cp,
 {
     playlist_delete(cp->pl);
     cp->pl = pl;
+    cp->it = playlist_iterator(pl);
+}
+
+const struct playlist *
+climp_player_playlist(const struct climp_player *__restrict cp)
+{
+    return cp->pl;
 }

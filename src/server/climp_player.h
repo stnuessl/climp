@@ -21,8 +21,6 @@
 #ifndef _CLIMP_PLAYER_H_
 #define _CLIMP_PLAYER_H_
 
-#include <libvci/random.h>
-
 #include "media_player/media_player.h"
 #include "media_player/playlist.h"
 #include "media_player/playlist_iterator.h"
@@ -72,7 +70,7 @@ void climp_player_delete_media(struct climp_player *__restrict cp,
                                struct media *m);
 
 void climp_player_take_media(struct climp_player *__restrict cp,
-                             const struct media *m);
+                             struct media *m);
 
 void climp_player_set_volume(struct climp_player *__restrict cp, 
                              unsigned int volume);
@@ -93,5 +91,8 @@ bool climp_player_shuffle(const struct climp_player *__restrict cp);
 
 void climp_player_set_playlist(struct climp_player *__restrict cp, 
                                struct playlist *pl);
+
+const struct playlist *
+climp_player_playlist(const struct climp_player *__restrict cp);
 
 #endif /* _CLIMP_PLAYER_H_ */

@@ -30,14 +30,6 @@
 
 #include "media_player.h"
 
-#define MEDIA_PLAYER_MAX_VOLUME         120
-#define MEDIA_PLAYER_MIN_VOLUME         0
-
-static void media_player_on_end_of_stream(struct media_player *__restrict mp)
-{
-    media_player_next(mp);
-}
-
 static gboolean bus_watcher(GstBus *bus, GstMessage *msg, gpointer data)
 {
     struct media_player *mp;
@@ -137,8 +129,6 @@ void media_player_destroy(struct media_player *__restrict mp)
 void media_player_play_media(struct media_player *__restrict mp,
                              const struct media *m)
 {
-    int err;
-    
     assert(m && "No media passed");
 
     media_player_stop(mp);
@@ -172,7 +162,7 @@ void media_player_stop(struct media_player *__restrict mp)
 
 void media_player_set_muted(struct media_player *__restrict mp, bool muted)
 {
-    mp->muted = muted
+    mp->muted = muted;
 }
 
 bool media_player_muted(const struct media_player *__restrict mp)
@@ -208,13 +198,13 @@ bool media_player_stopped(const struct media_player *__restrict mp)
 }
 
 void media_player_on_end_of_stream(struct media_player *__restrict mp,
-                                   void (*func)(struct media_player *__restrict mp))
+                               void (*func)(struct media_player *))
 {
     mp->on_end_of_stream = func;
 }
 
 void media_player_on_bus_error(struct media_player *__restrict mp,
-                               void (*func)(struct media_player *, GstMessage *))
+                              void (*func)(struct media_player *, GstMessage *))
 {
     mp->on_bus_error = func;
 }

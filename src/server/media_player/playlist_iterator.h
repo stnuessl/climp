@@ -26,7 +26,7 @@
 #include <libvci/random.h>
 #include <libvci/link.h>
 
-#include "playlist.h"
+#include "media.h"
 
 struct playlist_iterator {
     struct link list;
