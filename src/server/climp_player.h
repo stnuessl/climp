@@ -23,13 +23,11 @@
 
 #include "media_player/media_player.h"
 #include "media_player/playlist.h"
-#include "media_player/playlist_iterator.h"
 #include "media_player/media.h"
 
 struct climp_player {
     struct media_player mp;
     struct playlist *pl;
-    struct playlist_iterator *it;
 };
 
 struct climp_player *climp_player_new(void);
@@ -43,8 +41,8 @@ void climp_player_destroy(struct climp_player *__restrict cp);
 int climp_player_play_file(struct climp_player *__restrict cp, 
                            const char *__restrict path);
 
-int climp_player_play_media(struct climp_player *__restrict cp, 
-                            struct media *m);
+void climp_player_play_media(struct climp_player *__restrict cp, 
+                             struct media *m);
 
 int climp_player_play_track(struct climp_player *__restrict cp, 
                             unsigned int index);

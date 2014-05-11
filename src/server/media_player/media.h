@@ -35,8 +35,8 @@ struct media_info {
 
 struct media {
     struct media_info info;
-    struct link link_pl;
-    struct link link_it;
+    struct link link;
+    struct link link_rand;
     
     char *uri;
     char *path;

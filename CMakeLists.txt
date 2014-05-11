@@ -40,10 +40,17 @@ set(SOURCE_SERVER
     src/server/config.c
     src/server/media_player/media.c
     src/server/media_player/playlist.c
-    src/server/media_player/playlist_iterator.c
     src/server/media_player/media_player.c
     src/shared/ipc.c
     src/shared/util.c
+    )
+    
+set(SOURCE_TESTS
+    src/server/tests.c
+    src/server/climp_player.c
+    src/server/media_player/media.c
+    src/server/media_player/playlist.c
+    src/server/media_player/media_player.c
     )
 
 find_package(Threads)
@@ -55,6 +62,9 @@ target_link_libraries(climp ${CLIMP_LIBS})
 
 add_executable(climpd ${SOURCE_SERVER})
 target_link_libraries(climpd ${CLIMPD_LIBS} ${CMAKE_THREAD_LIBS_INIT})
+
+add_executable(tests ${SOURCE_TESTS})
+target_link_libraries(tests ${CLIMPD_LIBS} ${CMAKE_THREAD_LIBS_INIT})
 
 install(PROGRAMS
         ${CMAKE_BINARY_DIR}/climp

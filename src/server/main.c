@@ -122,7 +122,7 @@ static int get_files(struct client *client, const struct message *msg)
     pl = climp_player_playlist(player);
     
     playlist_for_each(pl, link) {
-        m = container_of(link, const struct media, link_pl);
+        m = container_of(link, const struct media, link);
         
         client_out(client, "%s\n", m->path);
     }

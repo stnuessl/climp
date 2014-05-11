@@ -168,7 +168,7 @@ void client_print_media_player_playlist(const struct client *__restrict client,
     playlist_for_each(pl, link) {
         i += 1;
         
-        m = container_of(link, const struct media, link_pl);
+        m = container_of(link, const struct media, link);
         
         client_print_media(client, m, i, conf.default_media_color);
     }

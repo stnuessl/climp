@@ -29,8 +29,6 @@
 #include <sys/eventfd.h>
 #include <sys/epoll.h>
 
-#include <vlc/vlc.h>
-
 #include <libvci/macro.h>
 
 #include "../shared/ipc.h"

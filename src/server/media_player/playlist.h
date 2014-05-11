@@ -26,13 +26,24 @@
 #include <libvci/map.h>
 #include <libvci/random.h>
 
-#include "playlist_iterator.h"
 #include "media.h"
 
 struct playlist {
-    struct playlist_iterator it;
     struct map map_path;
+    
+    /* standard order */
     struct link list;
+    struct link *it;
+    
+    /* random order */
+    struct link list_rand;
+    struct link list_done;
+    struct random rand;
+    
+    unsigned int rand_range;
+    
+    bool shuffle;
+    bool repeat;
 };
 
 struct playlist *playlist_new(void);
@@ -65,13 +76,29 @@ struct media *playlist_retrieve_path(struct playlist *__restrict pl,
                                      const char *__restrict path);
 
 void playlist_delete_path(struct playlist *__restrict pl,
-                                const char *path);
+                          const char *__restrict path);
 
 int playlist_merge(struct playlist *__restrict pl1, struct playlist *pl2);
 
 bool playlist_empty(const struct playlist *__restrict pl);
 
-struct playlist_iterator *playlist_iterator(struct playlist *__restrict pl);
+void playlist_set_shuffle(struct playlist *__restrict pl, bool shuffle);
+
+bool playlist_shuffle(const struct playlist *__restrict pl);
+
+void playlist_set_repeat(struct playlist *__restrict pl, bool repeat);
+
+bool playlist_repeat(const struct playlist *__restrict pl);
+
+const struct media *playlist_next(struct playlist *__restrict pl);
+
+const struct media *playlist_previous(struct playlist *__restrict pl);
+
+const struct media *playlist_current(const struct playlist *__restrict pl);
+
+void playlist_set_current(struct playlist *__restrict pl, struct media *m);
+
+struct media *playlist_at(struct playlist *__restrict pl, unsigned int i);
 
 unsigned int playlist_size(const struct playlist *__restrict pl);
 
