@@ -32,7 +32,6 @@
 #define MEDIA_FILE_PREFIX        "file://"
 #define MEDIA_META_ELEMENT_SIZE  64
 
-
 static void media_parse_tags(const GstTagList *list, 
                              const gchar *tag, 
                              gpointer data)

@@ -27,10 +27,10 @@
 
 #include <libvci/macro.h>
 
-#include "media_player/media_player.h"
 #include "media_player/playlist.h"
 #include "media_player/media.h"
 
+#include "climp_player.h"
 #include "config.h"
 #include "color.h"
 #include "client.h"
@@ -130,46 +130,46 @@ void client_print_volume(struct client *__restrict client, unsigned int vol)
 void client_print_current_media(const struct client *__restrict client,
                                 const struct climp_player *cp)
 {
-    /* TODO: implement me */
+    const struct playlist *pl;
+    const struct link *link;
+    const struct media *m;
+    int i;
+    
+    pl = climp_player_playlist(cp);
+    i = 0;
+    
+    playlist_for_each(pl, link) {
+        i += 1;
+        
+        m = container_of(link, const struct media, link);
+        
+        if(m == climp_player_current(cp)) {
+            client_print_media(client, m, i, conf.current_media_color);
+            break;
+        }
+    }
 }
-//     const struct playlist *pl;
-//     const struct link *link;
-//     const struct media *m;
-//     int i;
-//     
-//     pl = climp_player_playlist(cp);
-//     i = 0;
-//     
-//     playlist_for_each(pl, link) {
-//         i += 1;
-//         
-//         m = container_of(link, const struct media, link_pl);
-//         
-//         if(m == media_player_current_media(cp)) {
-//             media_player_print_media(client, m, i, conf.current_media_color);
-//             break;
-//         }
-//     }
-//}
 
 void client_print_media_player_playlist(const struct client *__restrict client, 
                                         const struct climp_player *cp)
 {
     const struct playlist *pl;
     const struct link *link;
-    const struct media *m;
+    const struct media *m, *current;
     int i;
-    
-    /* TODO: color for current media */
     
     pl = climp_player_playlist(cp);
     i = 0;
+    current = climp_player_current(cp);
 
     playlist_for_each(pl, link) {
         i += 1;
         
         m = container_of(link, const struct media, link);
         
-        client_print_media(client, m, i, conf.default_media_color);
+        if(m == current)
+            client_print_media(client, m, i, conf.current_media_color);
+        else
+            client_print_media(client, m, i, conf.default_media_color);
     }
 }

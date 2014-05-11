@@ -96,7 +96,7 @@ const struct media *playlist_previous(struct playlist *__restrict pl);
 
 const struct media *playlist_current(const struct playlist *__restrict pl);
 
-void playlist_set_current(struct playlist *__restrict pl, struct media *m);
+int playlist_set_current(struct playlist *__restrict pl, struct media *m);
 
 struct media *playlist_at(struct playlist *__restrict pl, unsigned int i);
 

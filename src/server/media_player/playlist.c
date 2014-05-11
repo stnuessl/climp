@@ -380,12 +380,22 @@ const struct media *playlist_current(const struct playlist *__restrict pl)
     return container_of(pl->it, struct media, link);
 }
 
-void playlist_set_current(struct playlist *__restrict pl, struct media *m)
+int playlist_set_current(struct playlist *__restrict pl, struct media *m)
 {
-    if(!playlist_contains_media(pl, m))
-        return;
+    int err;
+    
+    if(!playlist_contains_media(pl, m)) {
+        err = map_insert(&pl->map_path, m->path, m);
+        if(err < 0)
+            return err;
+        
+        list_insert(pl->it, &m->link);
+        list_insert_front(&pl->list_done, &m->link_rand);
+    }
     
     pl->it = &m->link;
+    
+    return 0;
 }
 
 struct media *playlist_at(struct playlist *__restrict pl, unsigned int i)

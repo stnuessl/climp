@@ -41,8 +41,8 @@ void climp_player_destroy(struct climp_player *__restrict cp);
 int climp_player_play_file(struct climp_player *__restrict cp, 
                            const char *__restrict path);
 
-void climp_player_play_media(struct climp_player *__restrict cp, 
-                             struct media *m);
+int climp_player_play_media(struct climp_player *__restrict cp, 
+                            struct media *m);
 
 int climp_player_play_track(struct climp_player *__restrict cp, 
                             unsigned int index);
@@ -86,6 +86,15 @@ bool climp_player_repeat(const struct climp_player *__restrict cp);
 void climp_player_set_shuffle(struct climp_player *__restrict cp, bool shuffle);
 
 bool climp_player_shuffle(const struct climp_player *__restrict cp);
+
+bool climp_player_playing(const struct climp_player *__restrict cp);
+
+bool climp_player_paused(const struct climp_player *__restrict cp);
+
+bool climp_player_stopped(const struct climp_player *__restrict cp);
+
+const struct media *
+climp_player_current(const struct climp_player *__restrict cp);
 
 void climp_player_set_playlist(struct climp_player *__restrict cp, 
                                struct playlist *pl);

@@ -101,28 +101,42 @@ int climp_player_play_file(struct climp_player *__restrict cp,
                            const char *__restrict path)
 {
     struct media *m;
+    int err;
     
-    m = media_new(path);
-    if(!m)
-        return -errno;
+    m = playlist_retrieve_path(cp->pl, path);
+    if(!m) {
+        m = media_new(path);
+        if(!m)
+            return -errno;
+        
+        err = climp_player_play_media(cp, m);
+        if(err < 0) {
+            media_delete(m);
+            return err;
+        }
+    }
     
-    climp_player_play_media(cp, m);
-    
-    media_delete(m);
-    
-    return 0;
+    return climp_player_play_media(cp, m);
 }
 
-void climp_player_play_media(struct climp_player *__restrict cp, 
-                             struct media *m)
+int climp_player_play_media(struct climp_player *__restrict cp, 
+                            struct media *m)
 {
+    int err;
+    
+    err = playlist_set_current(cp->pl, m);
+    if(err < 0)
+        return err;
+    
     media_player_play_media(&cp->mp, m);
+    
+    return 0;
 }
 
 int climp_player_play_track(struct climp_player *__restrict cp, 
                             unsigned int index)
 {
-    const struct media *m;
+    struct media *m;
     
     if(index >= playlist_size(cp->pl))
         return -EINVAL;
@@ -256,6 +270,27 @@ void climp_player_set_shuffle(struct climp_player *__restrict cp, bool shuffle)
 bool climp_player_shuffle(const struct climp_player *__restrict cp)
 {
     return playlist_shuffle(cp->pl);
+}
+
+bool climp_player_playing(const struct climp_player *__restrict cp)
+{
+    return media_player_playing(&cp->mp);
+}
+
+bool climp_player_paused(const struct climp_player *__restrict cp)
+{
+    return media_player_paused(&cp->mp);
+}
+
+bool climp_player_stopped(const struct climp_player *__restrict cp)
+{
+    return media_player_stopped(&cp->mp);
+}
+
+const struct media *
+climp_player_current(const struct climp_player *__restrict cp)
+{
+    return playlist_current(cp->pl);
 }
 
 void climp_player_set_playlist(struct climp_player *__restrict cp, 

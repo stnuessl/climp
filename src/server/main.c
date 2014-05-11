@@ -143,13 +143,12 @@ static int get_volume(struct client *client, const struct message *msg)
 
 static int get_state(struct client *client, const struct message *msg)
 {
-    /* TODO: get state */
-//     if(climp_player_playing(media_player))
-//         client_out(client, "climpd: playing\n");
-//     else if(climp_player_stopped(media_player))
-//         client_out(client, "climpd: stopped\n");
-//     else
-//         client_out(client, "climpd: state unknown\n");
+    if(climp_player_playing(player))
+        client_out(client, "climpd: playing\n");
+    else if(climp_player_stopped(player))
+        client_out(client, "climpd: stopped\n");
+    else
+        client_out(client, "climpd: state unknown\n");
     
     return 0;
 }
@@ -276,7 +275,7 @@ static int play_next(struct client *client, const struct message *msg)
 //     if(climp_player_stopped(player))
 //         client_out(client, "climpd: play-next: no track available\n");
 //     else
-        client_print_current_media(client, player);
+    client_print_current_media(client, player);
     
     return 0;
 }
@@ -295,7 +294,7 @@ static int play_previous(struct client *client, const struct message *msg)
 //     if(climp_player_stopped(player))
 //         client_out(client, "climpd: play-previous: no track available\n");
 //     else
-        client_print_current_media(client, player);
+    client_print_current_media(client, player);
     
     return 0;
 }
@@ -360,7 +359,7 @@ static int play_track(struct client *client, const struct message *msg)
     if(errno != 0)
         return -errno;
     
-    err = climp_player_play_track(player, index);
+    err = climp_player_play_track(player, index - 1);
     if(err < 0) {
         client_err(client, "climpd: play-track: %s\n", errno_string(-err));
         return err;
@@ -743,10 +742,10 @@ static int init(void)
         _exit(EXIT_SUCCESS);
     
     
+#endif
     err = close_std_streams();
     if(err < 0)
         goto cleanup1;
-#endif
     
     main_loop = g_main_loop_new(NULL, false);
     if(!main_loop)
