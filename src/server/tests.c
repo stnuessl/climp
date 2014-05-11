@@ -14,21 +14,21 @@ void test_playlist(void)
 {
     fprintf(stdout, "Testing playlist... ");
     
-    fprintf(stdout, "[ DONE ]\n");
+    fprintf(stdout, "\t\t[ DONE ]\n");
 }
 
 void test_media_player(void)
 {
     fprintf(stdout, "Testing media player... ");
     
-    fprintf(stdout, "[ DONE ]\n");
+    fprintf(stdout, " \t[ DONE ]\n");
 }
 
 void test_climp_player(void)
 {
     fprintf(stdout, "Testing climp player... ");
     
-    fprintf(stdout, "[ DONE ]\n");
+    fprintf(stdout, "\t[ DONE ]\n");
 }
 
 int main(int argc, char *argv[])
