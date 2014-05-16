@@ -28,7 +28,7 @@
 
 #include <libvci/macro.h>
 
-#include "media_player.h"
+#include "media-player.h"
 
 static gboolean bus_watcher(GstBus *bus, GstMessage *msg, gpointer data)
 {

@@ -36,21 +36,29 @@ set(SOURCE
 set(SOURCE_SERVER
     src/server/client.c
     src/server/main.c
-    src/server/climp_player.c
-    src/server/config.c
-    src/server/media_player/media.c
-    src/server/media_player/playlist.c
-    src/server/media_player/media_player.c
+    src/server/terminal-color-map.c
+    src/server/bool-map.c
+    src/server/climpd-log.c
+    src/server/climpd-player.c
+    src/server/climpd-config.c
+    src/server/media-player/media.c
+    src/server/media-player/playlist.c
+    src/server/media-player/media-player.c
     src/shared/ipc.c
     src/shared/util.c
     )
     
 set(SOURCE_TESTS
     src/server/tests.c
-    src/server/climp_player.c
-    src/server/media_player/media.c
-    src/server/media_player/playlist.c
-    src/server/media_player/media_player.c
+    src/server/terminal-color-map.c
+    src/server/bool-map.c
+    src/server/climpd-log.c
+    src/server/climpd-player.c
+    src/server/climpd-config.c
+    src/server/media-player/media.c
+    src/server/media-player/playlist.c
+    src/server/media-player/media-player.c
+    src/shared/util.c
     )
 
 find_package(Threads)

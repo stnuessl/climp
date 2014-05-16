@@ -25,58 +25,25 @@
 
 #include <gst/gst.h>
 
-#include <libvci/macro.h>
-
-#include "media_player/playlist.h"
-#include "media_player/media.h"
-
-#include "climp_player.h"
-#include "config.h"
-#include "color.h"
 #include "client.h"
-
-extern int media_meta_length;
-extern const char *current_media_meta_color;
-extern const char *media_meta_color;
-
-extern struct climpd_config conf;
-
-static void client_print_media(const struct client *__restrict client, 
-                                     const struct media *m,
-                                     int index,
-                                     const char *color)
-{
-    const struct media_info *i;
-    
-    assert(m && "No track to print");
-    
-    i = media_info(m);
-
-    client_out(client, 
-               "%s    ( %3d )\t%-*.*s %-*.*s %-*.*s\n" COLOR_DEFAULT,
-               color, index,
-               conf.media_meta_length, conf.media_meta_length, i->title, 
-               conf.media_meta_length, conf.media_meta_length, i->artist, 
-               conf.media_meta_length, conf.media_meta_length, i->album);
-}
 
 void client_init(struct client *__restrict client, pid_t pid, int unix_fd)
 {
     client->pid     = pid;
     client->io      = g_io_channel_unix_new(unix_fd);
-    client->out_fd  = -1;
-    client->err_fd  = -1;
+    client->stdout  = -1;
+    client->stderr  = -1;
 }
 
 void client_destroy(struct client *__restrict client)
 {
     g_io_channel_unref(client->io);
     
-    if(client->out_fd >= 0)
-        close(client->out_fd);
+    if(client->stdout >= 0)
+        close(client->stdout);
     
-    if(client->err_fd >= 0)
-        close(client->err_fd);
+    if(client->stderr >= 0)
+        close(client->stderr);
 }
 
 int client_unix_fd(const struct client *__restrict client)
@@ -84,92 +51,26 @@ int client_unix_fd(const struct client *__restrict client)
     return g_io_channel_unix_get_fd(client->io);
 }
 
-void client_set_out_fd(struct client *__restrict client, int fd)
+void client_set_stdout(struct client *__restrict client, int fd)
 {
-    client->out_fd = fd;
+    client->stdout = fd;
 }
 
-void client_set_err_fd(struct client *__restrict client, int fd)
+void client_set_stderr(struct client *__restrict client, int fd)
 {
-    client->err_fd = fd;
+    client->stderr = fd;
 }
 
-void client_out(const struct client *__restrict client, const char *format, ...)
+void client_err(const struct client *__restrict client, const char *fmt, ...)
 {
     va_list args;
     
-    if(client->out_fd < 0)
+    if(client->stderr < 0)
         return;
     
-    va_start(args, format);
+    va_start(args, fmt);
     
-    vdprintf(client->out_fd, format, args);
-    
-    va_end(args);
-}
-
-void client_err(const struct client *__restrict client, const char *format, ...)
-{
-    va_list args;
-    
-    if(client->err_fd < 0)
-        return;
-    
-    va_start(args, format);
-    
-    vdprintf(client->err_fd, format, args);
+    vdprintf(client->stderr, fmt, args);
     
     va_end(args);
-}
-
-void client_print_volume(struct client *__restrict client, unsigned int vol)
-{
-    client_out(client, "\tVolume: %u\n", vol);
-}
-
-void client_print_current_media(const struct client *__restrict client,
-                                const struct climp_player *cp)
-{
-    const struct playlist *pl;
-    const struct link *link;
-    const struct media *m;
-    int i;
-    
-    pl = climp_player_playlist(cp);
-    i = 0;
-    
-    playlist_for_each(pl, link) {
-        i += 1;
-        
-        m = container_of(link, const struct media, link);
-        
-        if(m == climp_player_current(cp)) {
-            client_print_media(client, m, i, conf.media_active_color);
-            break;
-        }
-    }
-}
-
-void client_print_media_player_playlist(const struct client *__restrict client, 
-                                        const struct climp_player *cp)
-{
-    const struct playlist *pl;
-    const struct link *link;
-    const struct media *m, *current;
-    int i;
-    
-    pl = climp_player_playlist(cp);
-    i = 0;
-    current = climp_player_current(cp);
-
-    playlist_for_each(pl, link) {
-        i += 1;
-        
-        m = container_of(link, const struct media, link);
-        
-        if(m == current)
-            client_print_media(client, m, i, conf.media_active_color);
-        else
-            client_print_media(client, m, i, conf.media_passive_color);
-    }
 }

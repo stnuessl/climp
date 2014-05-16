@@ -18,27 +18,23 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef _CLIMPD_CONFIG_H_
-#define _CLIMPD_CONFIG_H_
+#ifndef _CLIMPD_LOG_H_
+#define _CLIMPD_LOG_H_
 
-#include <stdbool.h>
+int climpd_log_init(void);
 
-struct climpd_config {
-    /* output options */
-    unsigned int media_meta_length;
-    const char *media_active_color;
-    const char *media_passive_color;
-    
-    /* media player options */
-    unsigned int volume;
-    bool repeat;
-    bool shuffle;
-};
+void climpd_log_destroy(void);
 
-int climp_config_init(void);
+void climpd_log_d(const char *fmt, ...);
 
-int climp_config_reload(void);
+void climpd_log_i(const char *fmt, ...);
 
-void climp_config_destroy(void);
+void climpd_log_m(const char *fmt, ...);
 
-#endif /* _CLIMPD_CONFIG_H_ */
+void climpd_log_w(const char *fmt, ...);
+
+void climpd_log_c(const char *fmt, ...);
+
+void climpd_log_e(const char *fmt, ...);
+
+#endif /* _CLIMPD_LOG_H_ */

@@ -40,46 +40,26 @@
 #include <gst/gst.h>
 
 #include <libvci/macro.h>
-#include <libvci/log.h>
 
 #include "../shared/ipc.h"
 #include "../shared/util.h"
 
-#include "media_player/playlist.h"
-#include "media_player/media.h"
+#include "media-player/playlist.h"
+#include "media-player/media.h"
 
-#include "climp_player.h"
-#include "config.h"
-#include "color.h"
+#include "climpd-log.h"
+#include "climpd-player.h"
+#include "climpd-config.h"
+#include "terminal-color-map.h"
+#include "bool-map.h"
 #include "client.h"
 
-#define CLIMP_SERVER_MAX_EPOLL_EVENTS   10
-#define CLIMP_SERVER_LOGFILE_PATH       "/tmp/climpd.log"
-#define CLIMP_MIN_VOLUME                0
-#define CLIMP_MAX_VOLUME                120
-
-#define log_i(format, ...)                                                     \
-    log_info(&log, format, ##__VA_ARGS__)
-    
-#define log_m(format, ...)                                                     \
-    log_message(&log, format, ##__VA_ARGS__)
-    
-#define log_w(format, ...)                                                     \
-    log_warning(&log, format, ##__VA_ARGS__)
-
-#define log_e(format, ...)                                                     \
-    log_error(&log, format, ##__VA_ARGS__)
-
-#define log_func_e(func, err)                                                  \
-    log_error(&log, "%s: %s at %s:%d\n", (func), (err), __FILE__, __LINE__)
-    
 extern struct climpd_config conf;
 
-static struct climp_player *player;
 static struct client client;
 static struct message msg_in;
 static struct message msg_out;
-static struct log log;
+
 static int server_fd;
 GIOChannel *io_server;
 static GMainLoop *main_loop;
@@ -108,47 +88,28 @@ static GMainLoop *main_loop;
 
 static int get_playlist(struct client *client, const struct message *msg)
 {
-    client_print_media_player_playlist(client, player);
+    climpd_player_print_playlist(client->stdout);
     
     return 0;
 }
 
 static int get_files(struct client *client, const struct message *msg)
 {
-    const struct playlist *pl;
-    const struct media *m;
-    const struct link *link;
-    
-    pl = climp_player_playlist(player);
-    
-    playlist_for_each(pl, link) {
-        m = container_of(link, const struct media, link);
-        
-        client_out(client, "%s\n", m->path);
-    }
+    climpd_player_print_files(client->stdout);
     
     return 0;
 }
 
 static int get_volume(struct client *client, const struct message *msg)
 {
-    unsigned int vol;
-    
-    vol = climp_player_volume(player);
-    
-    client_print_volume(client, vol);
+    climpd_player_print_volume(client->stdout);
     
     return 0;
 }
 
 static int get_state(struct client *client, const struct message *msg)
 {
-    if(climp_player_playing(player))
-        client_out(client, "climpd: playing\n");
-    else if(climp_player_stopped(player))
-        client_out(client, "climpd: stopped\n");
-    else
-        client_out(client, "climpd: state unknown\n");
+    climpd_player_print_state(client->stdout);
     
     return 0;
 }
@@ -161,26 +122,26 @@ static int set_state(struct client *client, const struct message *msg)
     arg = ipc_message_arg(msg);
     
     if(strcmp("play", arg) == 0) {
-        err = climp_player_play(player);
+        err = climpd_player_play();
         if(err < 0) {
             err_msg = errno_string(-err);
             client_err(client, "climpd: set-status play: %s\n", err_msg);
             return err;
         }
         
-        client_print_current_media(client, player);
+        climpd_player_print_current_track(client->stdout);
         
     } else if(strcmp("pause", arg) == 0) {
-        climp_player_pause(player);
+        climpd_player_pause();
         
     } else if(strcmp("stop", arg) == 0) {
-        climp_player_stop(player);
+        climpd_player_stop();
         
     } else if(strcmp("mute", arg) == 0) {
-        climp_player_set_muted(player, true);
+        climpd_player_set_muted(true);
         
     } else if(strcmp("unmute", arg) == 0) {
-        climp_player_set_muted(player, false);
+        climpd_player_set_muted(false);
     }
     
     return 0;
@@ -189,54 +150,35 @@ static int set_state(struct client *client, const struct message *msg)
 static int set_playlist(struct client *client, const struct message *msg)
 {
     struct playlist *pl;
-    FILE *file;
-    const char *arg;
-    char *buf;
-    size_t size;
-    ssize_t n;
+    const char *arg, *err_msg;
+    char *path;
     int err;
     
     arg = ipc_message_arg(msg);
     
-    file = fopen(arg, "r");
-    if(!file) {
-        err = -errno;
-        client_err(client, "climpd: %s: %s\n", arg, errno_string(errno));
-        return err;
+    if(arg[0] == '/') {
+        pl = playlist_new_file(arg);
+    } else {
+        path = realpath(arg, NULL);
+        if(!path) {
+            err = -errno;
+            err_msg = errno_string(errno);
+            client_err(client, "climpd: set-playlist: %s\n", err_msg);
+            return err;
+        }
+        
+        pl = playlist_new_file(path);
+        
+        free(path);
     }
-    
-    pl = playlist_new();
+ 
     if(!pl) {
         err = -errno;
         client_err(client, "climpd: set-playlist: %s\n", errno_string(errno));
-        fclose(file);
         return err;
     }
     
-    size = 0;
-    buf = NULL;
-    
-    while(1) {
-        n = getline(&buf, &size, file);
-        if(n < 0)
-            break;
-        
-        buf[n - 1] = '\0';
-        
-        if(buf[0] != '/') {
-            client_err(client, "climpd: %s: no realpath\n", buf);
-            continue;
-        }
-            
-        err = playlist_insert_path(pl, buf);
-        if(err < 0)
-            client_err(client, "climpd: %s: %s\n", buf, errno_string(-err));
-    }
-    
-    free(buf);
-    fclose(file);
-    
-    climp_player_set_playlist(player, pl);
+    climpd_player_set_playlist(pl);
     
     return 0;
 }
@@ -256,7 +198,77 @@ static int set_volume(struct client *client, const struct message *msg)
         return err;
     }
     
-    climp_player_set_volume(player, val);
+    climpd_player_set_volume(val);
+    
+    return 0;
+}
+
+static int set_repeat(struct client *client, const struct message *msg)
+{
+    const char *arg, *err_msg;
+    bool val;
+    
+    arg = ipc_message_arg(msg);
+    
+    if(strcmp(arg, "true") == 0)
+        val = true;
+    else if(strcmp(arg, "on") == 0)
+        val = true;
+    else if(strcmp(arg, "yes") == 0)
+        val = true;
+    else if(strcmp(arg, "1") == 0)
+        val = true;
+    else if(strcmp(arg, "false") == 0)
+        val = false;
+    else if(strcmp(arg, "off") == 0)
+        val = false;
+    else if(strcmp(arg, "no") == 0)
+        val = false;
+    else if(strcmp(arg, "0") == 0)
+        val = false;
+    else {
+        /* TODO: bool map */
+        err_msg = errno_string(EINVAL);
+        client_err(client, "climpd: set-repeat: %s - %s\n", err_msg, arg);
+        return -EINVAL;
+    }
+    
+    climpd_player_set_repeat(val);
+    
+    return 0;
+}
+
+static int set_shuffle(struct client *client, const struct message *msg)
+{
+    const char *arg, *err_msg;
+    bool val;
+    
+    arg = ipc_message_arg(msg);
+    
+    if(strcmp(arg, "true") == 0)
+        val = true;
+    else if(strcmp(arg, "on") == 0)
+        val = true;
+    else if(strcmp(arg, "yes") == 0)
+        val = true;
+    else if(strcmp(arg, "1") == 0)
+        val = true;
+    else if(strcmp(arg, "false") == 0)
+        val = false;
+    else if(strcmp(arg, "off") == 0)
+        val = false;
+    else if(strcmp(arg, "no") == 0)
+        val = false;
+    else if(strcmp(arg, "0") == 0)
+        val = false;
+    else {
+        /* TODO: bool map */
+        err_msg = errno_string(EINVAL);
+        client_err(client, "climpd: set-repeat: %s - %s\n", err_msg, arg);
+        return -EINVAL;
+    }
+    
+    climpd_player_set_shuffle(val);
     
     return 0;
 }
@@ -265,7 +277,7 @@ static int play_next(struct client *client, const struct message *msg)
 {
     int err;
 
-    err = climp_player_next(player);
+    err = climpd_player_next();
     if(err < 0) {
         client_err(client, "climpd: play-next: %s\n", errno_string(-err));
         return err;
@@ -275,7 +287,7 @@ static int play_next(struct client *client, const struct message *msg)
 //     if(climp_player_stopped(player))
 //         client_out(client, "climpd: play-next: no track available\n");
 //     else
-    client_print_current_media(client, player);
+    climpd_player_print_current_track(client->stdout);
     
     return 0;
 }
@@ -284,7 +296,7 @@ static int play_previous(struct client *client, const struct message *msg)
 {
     int err;
     
-    err = climp_player_previous(player);
+    err = climpd_player_previous();
     if(err < 0) {
         client_err(client, "climpd: play-previous: %s\n", errno_string(-err));
         return err;
@@ -294,7 +306,7 @@ static int play_previous(struct client *client, const struct message *msg)
 //     if(climp_player_stopped(player))
 //         client_out(client, "climpd: play-previous: no track available\n");
 //     else
-    client_print_current_media(client, player);
+    climpd_player_print_current_track(client->stdout);
     
     return 0;
 }
@@ -317,9 +329,9 @@ static int play_file_realpath(struct client *client, const char *path)
         return -EINVAL;
     }
     
-    err = climp_player_play_file(player, path);
+    err = climpd_player_play_file(path);
     
-    client_print_current_media(client, player);
+    climpd_player_print_current_track(client->stdout);
     
     return err;
 }
@@ -359,13 +371,13 @@ static int play_track(struct client *client, const struct message *msg)
     if(errno != 0)
         return -errno;
     
-    err = climp_player_play_track(player, index - 1);
+    err = climpd_player_play_track(index);
     if(err < 0) {
         client_err(client, "climpd: play-track: %s\n", errno_string(-err));
         return err;
     }
     
-    client_print_current_media(client, player);
+    climpd_player_print_current_track(client->stdout);
     
     return 0;
 }
@@ -387,7 +399,7 @@ static int add_media_realpath(struct client *client, const char *path)
         return -EINVAL;
     }
     
-    err = climp_player_add_file(player, path);
+    err = climpd_player_add_file(path);
     if(err < 0) {
         client_err(client, "climpd: add-file: %s\n", errno_string(-err));
         return err;
@@ -431,7 +443,7 @@ static int remove_media(struct client *client, const struct message *msg)
     arg = ipc_message_arg(msg);
     
     if(arg[0] == '/') {
-        climp_player_delete_file(player, arg);
+        climpd_player_delete_file(arg);
         return 0;
     }
         
@@ -439,7 +451,7 @@ static int remove_media(struct client *client, const struct message *msg)
     if(!path)
         return -errno;
     
-    climp_player_delete_file(player, path);
+    climpd_player_delete_file(path);
     
     free(path);
     
@@ -474,8 +486,8 @@ static int handle_message_hello(struct client *client,
         return -EINVAL;
     }
     
-    client_set_out_fd(client, fd0);
-    client_set_err_fd(client, fd1);
+    client_set_stdout(client, fd0);
+    client_set_stderr(client, fd1);
     
     ipc_message_set_id(&msg_out, IPC_MESSAGE_OK);
     
@@ -494,10 +506,33 @@ static int handle_message_goodbye(struct client *client,
     
     ipc_send_message(fd, &msg_out);
     
+    climpd_log_i("User %d disconnected on socket %d\n", client->uid, fd);
+    
     client_destroy(client);
     
-    log_i("Unregistered process %d at socket %d\n", 
-          client->pid, fd);
+    return 0;
+}
+
+static int reload_config(struct client *client, const struct message *msg)
+{
+    int err;
+    
+    err = climpd_config_reload();
+    if(err < 0) {
+        climpd_log_e("climpd_config_reload(): %s\n", errno_string(-err));
+        return err;
+    }
+    
+    climpd_player_set_volume(conf.volume);
+    climpd_player_set_repeat(conf.repeat);
+    climpd_player_set_shuffle(conf.shuffle);
+    
+    return 0;
+}
+
+static int print_config(struct client *client, const struct message *msg)
+{
+    climpd_config_print(client->stdout);
     
     return 0;
 }
@@ -520,6 +555,8 @@ static int (*msg_handler[])(struct client *, const struct message *) = {
     [IPC_MESSAGE_SET_STATE]             = &set_state,
     [IPC_MESSAGE_SET_PLAYLIST]          = &set_playlist,
     [IPC_MESSAGE_SET_VOLUME]            = &set_volume,
+    [IPC_MESSAGE_SET_REPEAT]            = &set_repeat,
+    [IPC_MESSAGE_SET_SHUFFLE]           = &set_shuffle,
     [IPC_MESSAGE_PLAY_NEXT]             = &play_next,
     [IPC_MESSAGE_PLAY_PREVIOUS]         = &play_previous,
     [IPC_MESSAGE_PLAY_FILE]             = &play_file,
@@ -527,7 +564,9 @@ static int (*msg_handler[])(struct client *, const struct message *) = {
     [IPC_MESSAGE_ADD_MEDIA]             = &add_media,
     [IPC_MESSAGE_ADD_PLAYLIST]          = &add_playlist,
     [IPC_MESSAGE_REMOVE_MEDIA]          = &remove_media,
-    [IPC_MESSAGE_REMOVE_PLAYLIST]       = &remove_playlist
+    [IPC_MESSAGE_REMOVE_PLAYLIST]       = &remove_playlist,
+    [IPC_MESSAGE_CONFIG_RELOAD]         = &reload_config,
+    [IPC_MESSAGE_CONFIG_PRINT]          = &print_config
 };
 
 static gboolean handle_unix_fd(GIOChannel *src, GIOCondition cond, void *data)
@@ -544,30 +583,33 @@ static gboolean handle_unix_fd(GIOChannel *src, GIOCondition cond, void *data)
     
     err = ipc_recv_message(fd, &msg_in);
     if(err < 0) {
-        log_w("ipc_recv_message() on socket %d failed: %s -> "
-        "closing connection...\n", 
-        fd, errno_string(-err));
-        
+        climpd_log_e("ipc_recv_message(): %s\n", errno_string(-err));
         client_destroy(&client);
         return false;
     }
     
     id = ipc_message_id(&msg_in);
     
+    climpd_log_d("Received ' %s '\n", ipc_message_id_string(id));
+    
     if(id >= IPC_MESSAGE_MAX_ID) {
-        log_w("Received invalid message with id%d\n", id);
-        return false;
+        climpd_log_w("Received invalid message id %d\n", id);
+        return true;
     }
     
     err = msg_handler[id](&client, &msg_in);
     if(err < 0) {
-        log_w("Handling message %s failed - %s\n", 
-              ipc_message_id_string(id), strerror(-err));
+        climpd_log_e("Message ' %s ': %s\n", 
+                     ipc_message_id_string(id), errno_string(-err));
+
         return false;
     }
     
+    climpd_log_d("Handling ' %s ' was successful\n", ipc_message_id_string(id));
+    
     if(id == IPC_MESSAGE_GOODBYE)
         return false;
+    
     
     return true;
 }
@@ -593,22 +635,24 @@ static gboolean handle_server_fd(GIOChannel *src, GIOCondition cond, void *data)
     err = getsockopt(fd, SOL_SOCKET, SO_PEERCRED, &creds, &cred_len);
     if(err < 0) {
         err = -errno;
-        log_func_e("getsockopt()", errno_string(errno));
+        climpd_log_e("getsockopt(): %s\n", errno_string(errno));
         goto out;
     }
     
     if(creds.uid != getuid()) {
-        log_w("Non authorized user %d tried to connect\n", creds.uid);
+        climpd_log_w("Non authorized user %d tried to connect\n", creds.uid);
         err = -EPERM;
         goto out;
     }
     
     client_init(&client, creds.pid, fd);
+    
+    client.uid = creds.uid;
  
     g_io_add_watch(client.io, G_IO_IN, &handle_unix_fd, NULL);
     g_io_channel_set_close_on_unref(client.io, true);
     
-    log_i("New connection on socket %d with process %d\n", fd, creds.pid);
+    climpd_log_i("User %d connected on socket %d\n", creds.uid, fd);
     
     return true;
     
@@ -693,20 +737,15 @@ static void destroy_server_fd(void)
 
 static int init(void)
 {
+    struct playlist *pl;
     pid_t sid, pid;
     int err;
-    uint8_t flags;
-    
-    flags = LOG_PRINT_DATE | 
-            LOG_PRINT_TIMESTAMP | 
-            LOG_PRINT_PID | 
-            LOG_PRINT_NAME | 
-            LOG_PRINT_HOSTNAME | 
-            LOG_PRINT_LEVEL;
-    
-    err = log_init(&log, CLIMP_SERVER_LOGFILE_PATH, "climpd", flags);
+
+    err = climpd_log_init();
     if(err < 0)
         goto out;
+    
+    climpd_log_i("Starting initialization...\n");
 #if 0
     pid = fork();
     if(pid < 0) {
@@ -744,26 +783,58 @@ static int init(void)
     
 #endif
     err = close_std_streams();
-    if(err < 0)
+    if(err < 0) {
+        climpd_log_e("close_std_streams(): %s\n", errno_string(-err));
         goto cleanup1;
+    }
     
-    err = climp_config_init();
+    err = terminal_color_map_init();
+    if(err < 0) {
+        climpd_log_e("terminal_color_map_init(): %s\n", errno_string(-err));
+        goto cleanup1;
+    }
+    
+    err = bool_map_init();
+    if(err < 0) {
+        climpd_log_e("bool_map_init(): %s\n", errno_string(-err));
+        goto cleanup2;
+    }
+    
+    err = climpd_config_init();
+    if(err < 0) {
+        climpd_log_e("climpd_config_init(): %s\n", errno_string(-err));
+        goto cleanup3;
+    }
     
     main_loop = g_main_loop_new(NULL, false);
-    if(!main_loop)
-        goto cleanup1;
+    if(!main_loop) {
+        climpd_log_e("g_main_loop_new()\n");
+        goto cleanup4;
+    }
     
     err = init_server_fd();
-    if(err < 0)
-        goto cleanup2;
+    if(err < 0) {
+        climpd_log_e("init_server_fd(): %s\n", errno_string(-err));
+        goto cleanup5;
+    }
     
-    player = climp_player_new();
-    if(!player)
-        goto cleanup3;
+    err = climpd_player_init();
+    if(err < 0) {
+        climpd_log_e("climp_player_init(): %s\n", errno_string(errno));
+        goto cleanup6;
+    }
+
+    climpd_player_set_volume(conf.volume);
+    climpd_player_set_repeat(conf.repeat);
+    climpd_player_set_shuffle(conf.shuffle);
     
-    climp_player_set_volume(player, conf.volume);
-    climp_player_set_repeat(player, conf.repeat);
-    climp_player_set_shuffle(player, conf.shuffle);
+    if(conf.default_playlist) {
+        pl = playlist_new_file(conf.default_playlist);
+        if(!pl)
+            climpd_log_e("Default playlist failed: %s\n", errno_string(errno));
+        else
+            climpd_player_set_playlist(pl);
+    }
     
     /* TODO: handle bus errors */
 //     climp_player_on_bus_error(player, &media_player_handle_bus_error);
@@ -773,24 +844,34 @@ static int init(void)
     ipc_message_init(&msg_in);
     ipc_message_init(&msg_out);
     
+    climpd_log_i("Initialization successful\n");
+    
     return 0;
 
-cleanup3:
+    
+cleanup6:
     destroy_server_fd();
-cleanup2:
+cleanup5:
     g_main_loop_unref(main_loop);
+cleanup4:
+    climpd_config_destroy();
+cleanup3:
+    bool_map_destroy();
+cleanup2:
+    terminal_color_map_destroy();
 cleanup1:
-    log_destroy(&log);
+    climpd_log_i("Initialization failed\n");
+    climpd_log_destroy();
 out:
     return err;
 }
 
 static void destroy(void)
 {
-    climp_player_delete(player);
+    climpd_player_destroy();
     destroy_server_fd();
     g_main_loop_unref(main_loop);
-    log_destroy(&log);
+    climpd_log_destroy();
 }
 
 

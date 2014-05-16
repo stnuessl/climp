@@ -18,31 +18,15 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef _CLIENT_H_
-#define _CLIENT_H_
+#ifndef _BOOL_MAP_H_
+#define _BOOL_MAP_H_
 
-#include <gst/gst.h>
+int bool_map_init(void);
 
-struct client {
-    GIOChannel *io;
-    
-    uid_t uid;
-    pid_t pid;
-    
-    int stderr;
-    int stdout;
-};
+void bool_map_destroy(void);
 
-void client_init(struct client *__restrict client, pid_t pid, int unix_fd);
+const bool *bool_map_value(const char *key);
 
-void client_destroy(struct client *__restrict client);
+void bool_map_print(int fd);
 
-int client_unix_fd(const struct client *__restrict client);
-
-void client_set_stdout(struct client *__restrict client, int fd);
-
-void client_set_stderr(struct client *__restrict client, int fd);
-
-void client_err(const struct client *__restrict client, const char *fmt, ...);
-
-#endif /* _CLIENT_H_ */
+#endif /* _BOOL_MAP_H_ */

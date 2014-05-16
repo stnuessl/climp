@@ -172,6 +172,8 @@ int playlist_insert_media(struct playlist *__restrict pl, struct media *m)
     list_insert_back(&pl->list, &m->link);
     list_insert_back(&pl->list_rand, &m->link_rand);
     
+    pl->rand_range += 1;
+    
     return 0;
 }
 
@@ -184,6 +186,8 @@ void playlist_take_media(struct playlist *__restrict pl, struct media* m)
     
     list_take(&m->link);
     list_take(&m->link_rand);
+    
+    pl->rand_range -= 1;
 }
 
 void playlist_delete_media(struct playlist *__restrict pl, struct media *m)
@@ -377,6 +381,9 @@ const struct media *playlist_previous(struct playlist *__restrict pl)
 
 const struct media *playlist_current(const struct playlist *__restrict pl)
 {
+    if(pl->it == &pl->list)
+        return NULL;
+
     return container_of(pl->it, struct media, link);
 }
 
@@ -401,6 +408,26 @@ int playlist_set_current(struct playlist *__restrict pl, struct media *m)
 struct media *playlist_at(struct playlist *__restrict pl, unsigned int i)
 {
     return container_of(list_at(&pl->list, i), struct media, link);
+}
+
+int playlist_index_of(const struct playlist *__restrict pl, 
+                      const struct media *m)
+{
+    const struct link *link;
+    int index;
+    
+    if(!playlist_contains_media(pl, m))
+        return -1;
+    
+    link  = &m->link;
+    index = 0;
+    
+    while(link != &pl->list) {
+        link = link->prev;
+        index += 1;
+    }
+    
+    return index;
 }
 
 unsigned int playlist_size(const struct playlist *__restrict pl)

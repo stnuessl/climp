@@ -18,31 +18,30 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef _CLIENT_H_
-#define _CLIENT_H_
+#ifndef _CLIMPD_CONFIG_H_
+#define _CLIMPD_CONFIG_H_
 
-#include <gst/gst.h>
+#include <stdbool.h>
 
-struct client {
-    GIOChannel *io;
+struct climpd_config {
+    const char *default_playlist;
+    /* output options */
+    const char *media_active_color;
+    const char *media_passive_color;
+    unsigned int media_meta_length;
     
-    uid_t uid;
-    pid_t pid;
-    
-    int stderr;
-    int stdout;
+    /* media player options */
+    unsigned int volume;
+    bool repeat;
+    bool shuffle;
 };
 
-void client_init(struct client *__restrict client, pid_t pid, int unix_fd);
+int climpd_config_init(void);
 
-void client_destroy(struct client *__restrict client);
+int climpd_config_reload(void);
 
-int client_unix_fd(const struct client *__restrict client);
+void climpd_config_print(int fd);
 
-void client_set_stdout(struct client *__restrict client, int fd);
+void climpd_config_destroy(void);
 
-void client_set_stderr(struct client *__restrict client, int fd);
-
-void client_err(const struct client *__restrict client, const char *fmt, ...);
-
-#endif /* _CLIENT_H_ */
+#endif /* _CLIMPD_CONFIG_H_ */

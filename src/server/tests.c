@@ -4,10 +4,10 @@
 #include <errno.h>
 #include <assert.h>
 
-#include "media_player/media.h"
-#include "media_player/playlist.h"
-#include "media_player/media_player.h"
-#include "climp_player.h"
+#include "media-player/media.h"
+#include "media-player/playlist.h"
+#include "media-player/media-player.h"
+#include "climp-player.h"
 
 
 void test_playlist(void)

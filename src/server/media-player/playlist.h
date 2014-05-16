@@ -100,6 +100,9 @@ int playlist_set_current(struct playlist *__restrict pl, struct media *m);
 
 struct media *playlist_at(struct playlist *__restrict pl, unsigned int i);
 
+int playlist_index_of(const struct playlist *__restrict pl, 
+                      const struct media *m);
+
 unsigned int playlist_size(const struct playlist *__restrict pl);
 
 int playlist_save_to_file(const struct playlist *__restrict pl, 

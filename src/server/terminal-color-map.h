@@ -18,31 +18,24 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef _CLIENT_H_
-#define _CLIENT_H_
+#ifndef _TERMINAL_COLOR_MAP_H_
+#define _TERMINAL_COLOR_MAP_H_
 
-#include <gst/gst.h>
+#define COLOR_CODE_DEFAULT  "\x1B[0m"
+#define COLOR_CODE_RED      "\x1B[31m"
+#define COLOR_CODE_GREEN    "\x1B[32m"
+#define COLOR_CODE_YELLOW   "\x1B[33m"
+#define COLOR_CODE_BLUE     "\x1B[34m"
+#define COLOR_CODE_MAGENTA  "\x1B[35m"
+#define COLOR_CODE_CYAN     "\x1B[36m"
+#define COLOR_CODE_WHITE    "\x1B[37m"
 
-struct client {
-    GIOChannel *io;
-    
-    uid_t uid;
-    pid_t pid;
-    
-    int stderr;
-    int stdout;
-};
+int terminal_color_map_init(void);
 
-void client_init(struct client *__restrict client, pid_t pid, int unix_fd);
+void terminal_color_map_destroy(void);
 
-void client_destroy(struct client *__restrict client);
+const char *terminal_color_map_color_code(const char *key);
 
-int client_unix_fd(const struct client *__restrict client);
+void terminal_color_map_print(int fd);
 
-void client_set_stdout(struct client *__restrict client, int fd);
-
-void client_set_stderr(struct client *__restrict client, int fd);
-
-void client_err(const struct client *__restrict client, const char *fmt, ...);
-
-#endif /* _CLIENT_H_ */
+#endif /* _TERMINAL_COLOR_MAP_H_ */
