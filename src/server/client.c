@@ -144,7 +144,7 @@ void client_print_current_media(const struct client *__restrict client,
         m = container_of(link, const struct media, link);
         
         if(m == climp_player_current(cp)) {
-            client_print_media(client, m, i, conf.current_media_color);
+            client_print_media(client, m, i, conf.media_active_color);
             break;
         }
     }
@@ -168,8 +168,8 @@ void client_print_media_player_playlist(const struct client *__restrict client,
         m = container_of(link, const struct media, link);
         
         if(m == current)
-            client_print_media(client, m, i, conf.current_media_color);
+            client_print_media(client, m, i, conf.media_active_color);
         else
-            client_print_media(client, m, i, conf.default_media_color);
+            client_print_media(client, m, i, conf.media_passive_color);
     }
 }

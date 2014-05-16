@@ -18,16 +18,16 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef _CONFIG_H_
-#define _CONFIG_H_
+#ifndef _CLIMPD_CONFIG_H_
+#define _CLIMPD_CONFIG_H_
 
 #include <stdbool.h>
 
 struct climpd_config {
     /* output options */
     unsigned int media_meta_length;
-    char *current_media_color;
-    char *default_media_color;
+    const char *media_active_color;
+    const char *media_passive_color;
     
     /* media player options */
     unsigned int volume;
@@ -35,8 +35,10 @@ struct climpd_config {
     bool shuffle;
 };
 
-int config_init(void);
+int climp_config_init(void);
 
-void config_destroy(void);
+int climp_config_reload(void);
 
-#endif /* _CONFIG_H_ */
+void climp_config_destroy(void);
+
+#endif /* _CLIMPD_CONFIG_H_ */

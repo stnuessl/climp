@@ -747,6 +747,8 @@ static int init(void)
     if(err < 0)
         goto cleanup1;
     
+    err = climp_config_init();
+    
     main_loop = g_main_loop_new(NULL, false);
     if(!main_loop)
         goto cleanup1;
