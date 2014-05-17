@@ -7,7 +7,7 @@
 #include "media-player/media.h"
 #include "media-player/playlist.h"
 #include "media-player/media-player.h"
-#include "climp-player.h"
+#include "climpd-player.h"
 
 
 void test_playlist(void)

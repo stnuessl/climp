@@ -88,13 +88,17 @@ const bool *bool_map_value(const char *key)
 
 void bool_map_print(int fd)
 {
-    struct entry *e;
-    const char *key, *val;
+    const char *p, *q;
+    int i, size;
     
-    map_for_each(&bool_map, e) {
-        key = entry_key(e);
-        val = entry_data(e);
-        
-        dprintf(fd, " %s --> %s\n", key, (*val) ? "true" : "false");
+    size = max(ARRAY_SIZE(t), ARRAY_SIZE(f));
+    
+    dprintf(fd, " true  --> %s\t\tfalse --> %s\n", t[0], f[0]);
+    
+    for(i = 1; i < size; ++i) {
+        p = (i < ARRAY_SIZE(t)) ? t[i] : "";
+        q = (i < ARRAY_SIZE(f)) ? f[i] : "";
+     
+        dprintf(fd, " %-5s --> %s\t\t%-5s --> %s\n", "", p, "", q);
     }
 }

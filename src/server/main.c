@@ -205,70 +205,40 @@ static int set_volume(struct client *client, const struct message *msg)
 
 static int set_repeat(struct client *client, const struct message *msg)
 {
-    const char *arg, *err_msg;
-    bool val;
+    const char *arg;
+    const bool *val;
     
     arg = ipc_message_arg(msg);
     
-    if(strcmp(arg, "true") == 0)
-        val = true;
-    else if(strcmp(arg, "on") == 0)
-        val = true;
-    else if(strcmp(arg, "yes") == 0)
-        val = true;
-    else if(strcmp(arg, "1") == 0)
-        val = true;
-    else if(strcmp(arg, "false") == 0)
-        val = false;
-    else if(strcmp(arg, "off") == 0)
-        val = false;
-    else if(strcmp(arg, "no") == 0)
-        val = false;
-    else if(strcmp(arg, "0") == 0)
-        val = false;
-    else {
-        /* TODO: bool map */
-        err_msg = errno_string(EINVAL);
-        client_err(client, "climpd: set-repeat: %s - %s\n", err_msg, arg);
+    val = bool_map_value(arg);
+    if(!val) {
+        client_err(client, "climpd: set-repeat: unknown boolean value %s", arg);
+        client_err(client, " - possbile values are:\n");
+        bool_map_print(client->stderr);
         return -EINVAL;
     }
-    
-    climpd_player_set_repeat(val);
+
+    climpd_player_set_repeat(*val);
     
     return 0;
 }
 
 static int set_shuffle(struct client *client, const struct message *msg)
 {
-    const char *arg, *err_msg;
-    bool val;
+    const char *arg;
+    const bool *val;
     
     arg = ipc_message_arg(msg);
     
-    if(strcmp(arg, "true") == 0)
-        val = true;
-    else if(strcmp(arg, "on") == 0)
-        val = true;
-    else if(strcmp(arg, "yes") == 0)
-        val = true;
-    else if(strcmp(arg, "1") == 0)
-        val = true;
-    else if(strcmp(arg, "false") == 0)
-        val = false;
-    else if(strcmp(arg, "off") == 0)
-        val = false;
-    else if(strcmp(arg, "no") == 0)
-        val = false;
-    else if(strcmp(arg, "0") == 0)
-        val = false;
-    else {
-        /* TODO: bool map */
-        err_msg = errno_string(EINVAL);
-        client_err(client, "climpd: set-repeat: %s - %s\n", err_msg, arg);
+    val = bool_map_value(arg);
+    if(!val) {
+        client_err(client, "climpd: set-shuffle: unknown boolean value %s", arg);
+        client_err(client, " - possbile values are:\n");
+        bool_map_print(client->stderr);
         return -EINVAL;
     }
     
-    climpd_player_set_shuffle(val);
+    climpd_player_set_repeat(*val);
     
     return 0;
 }
@@ -602,7 +572,7 @@ static gboolean handle_unix_fd(GIOChannel *src, GIOCondition cond, void *data)
         climpd_log_e("Message ' %s ': %s\n", 
                      ipc_message_id_string(id), errno_string(-err));
 
-        return false;
+        return true;
     }
     
     climpd_log_d("Handling ' %s ' was successful\n", ipc_message_id_string(id));
