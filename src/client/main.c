@@ -129,8 +129,8 @@ static struct command_handle command_handles[] = {
     { "add-playlist",    IPC_MESSAGE_ADD_PLAYLIST,      true    },
     { "remove-media",    IPC_MESSAGE_REMOVE_MEDIA,      true    },
     { "remove-playlist", IPC_MESSAGE_REMOVE_PLAYLIST,   true    },
-    { "config-reload",   IPC_MESSAGE_CONFIG_RELOAD,     false   },
-    { "config-print",    IPC_MESSAGE_CONFIG_PRINT,      false   },
+    { "reload-config",   IPC_MESSAGE_RELOAD_CONFIG,     false   },
+    { "get-config",      IPC_MESSAGE_GET_CONFIG,        false   },
 };
 
 static struct map *command_map;

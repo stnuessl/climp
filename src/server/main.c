@@ -535,8 +535,8 @@ static int (*msg_handler[])(struct client *, const struct message *) = {
     [IPC_MESSAGE_ADD_PLAYLIST]          = &add_playlist,
     [IPC_MESSAGE_REMOVE_MEDIA]          = &remove_media,
     [IPC_MESSAGE_REMOVE_PLAYLIST]       = &remove_playlist,
-    [IPC_MESSAGE_CONFIG_RELOAD]         = &reload_config,
-    [IPC_MESSAGE_CONFIG_PRINT]          = &print_config
+    [IPC_MESSAGE_RELOAD_CONFIG]         = &reload_config,
+    [IPC_MESSAGE_GET_CONFIG]            = &print_config
 };
 
 static gboolean handle_unix_fd(GIOChannel *src, GIOCondition cond, void *data)
