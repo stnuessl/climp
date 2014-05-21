@@ -24,7 +24,7 @@
 #define COLOR_CODE_DEFAULT  "\x1B[0m"
 #define COLOR_CODE_RED      "\x1B[31m"
 #define COLOR_CODE_GREEN    "\x1B[32m"
-#define COLOR_CODE_YELLOW   "\x1B[33m"
+#define COLOR_CODE_ORANGE   "\x1B[33m"
 #define COLOR_CODE_BLUE     "\x1B[34m"
 #define COLOR_CODE_MAGENTA  "\x1B[35m"
 #define COLOR_CODE_CYAN     "\x1B[36m"

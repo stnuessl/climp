@@ -85,7 +85,6 @@ static const char default_config_text[] = {
     "\n"
     "# Play songs in random order?\n"
     "Shuffle = "DEFAULT_STR_SHUFFLE"\n"
-    "\n"
 };
 
 static struct config *config;
@@ -255,15 +254,8 @@ int climpd_config_init(void)
             goto cleanup2;
         
     } else {
-        
-        err = write(fd, default_config_text, sizeof(default_config_text));
-        
+        dprintf(fd, "%s\n", default_config_text);
         close(fd);
-        
-        if(err < 0) {
-            err = -errno;
-            goto cleanup2;
-        }
     }
     
     /* Read config file */

@@ -21,6 +21,7 @@
 #include <string.h>
 
 #include <libvci/map.h>
+#include <libvci/hash.h>
 #include <libvci/macro.h>
 
 #include "terminal-color-map.h"
@@ -29,7 +30,7 @@ static char *color_table[] = {
     "default",          COLOR_CODE_DEFAULT,
     "red",              COLOR_CODE_RED,
     "green",            COLOR_CODE_GREEN,
-    "yellow",           COLOR_CODE_YELLOW,
+    "orange",           COLOR_CODE_ORANGE,
     "blue",             COLOR_CODE_BLUE,
     "magenta",          COLOR_CODE_MAGENTA,
     "cyan",             COLOR_CODE_CYAN,

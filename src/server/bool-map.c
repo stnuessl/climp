@@ -21,6 +21,7 @@
 #include <string.h>
 
 #include <libvci/map.h>
+#include <libvci/hash.h>
 #include <libvci/macro.h>
 
 static struct map bool_map;
