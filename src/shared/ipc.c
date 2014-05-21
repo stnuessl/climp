@@ -57,8 +57,8 @@ const char *ipc_message_id_string(enum message_id id)
         [IPC_MESSAGE_ADD_PLAYLIST]      = "IPC_MESSAGE_ADD_PLAYLIST",
         [IPC_MESSAGE_REMOVE_MEDIA]      = "IPC_MESSAGE_REMOVE_MEDIA",
         [IPC_MESSAGE_REMOVE_PLAYLIST]   = "IPC_MESSAGE_REMOVE_PLAYLIST",
-        [IPC_MESSAGE_CONFIG_RELOAD]     = "IPC_MESSAGE_CONFIG_RELOAD",
-        [IPC_MESSAGE_CONFIG_PRINT]      = "IPC_MESSAGE_CONFIG_PRINT"
+        [IPC_MESSAGE_RELOAD_CONFIG]     = "IPC_MESSAGE_RELOAD_CONFIG",
+        [IPC_MESSAGE_GET_CONFIG]        = "IPC_MESSAGE_GET_CONFIG"
     };
     
     return message_names[id];
