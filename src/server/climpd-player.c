@@ -84,7 +84,7 @@ int climpd_player_init(void)
     
     media_player_on_end_of_stream(&media_player, &on_end_of_stream);
     
-    playlist = playlist_new();
+    playlist = playlist_new("Unnamed playlist");
     if(!playlist) {
         err = -errno;
         climpd_log_e("playlist_new(): %s\n", errno_string(-err));

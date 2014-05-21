@@ -116,6 +116,8 @@ static struct command_handle command_handles[] = {
     { "get-files",       IPC_MESSAGE_GET_FILES,         false   },
     { "get-volume",      IPC_MESSAGE_GET_VOLUME,        false   },
     { "get-state",       IPC_MESSAGE_GET_STATE,         false   },
+    { "get-config",      IPC_MESSAGE_GET_CONFIG,        false   },
+    { "get-colors",      IPC_MESSAGE_GET_COLORS,        false   },
     { "set-state",       IPC_MESSAGE_SET_STATE,         true    },
     { "set-playlist",    IPC_MESSAGE_SET_PLAYLIST,      true    },
     { "set-volume",      IPC_MESSAGE_SET_VOLUME,        true    },
@@ -130,7 +132,6 @@ static struct command_handle command_handles[] = {
     { "remove-media",    IPC_MESSAGE_REMOVE_MEDIA,      true    },
     { "remove-playlist", IPC_MESSAGE_REMOVE_PLAYLIST,   true    },
     { "reload-config",   IPC_MESSAGE_RELOAD_CONFIG,     false   },
-    { "get-config",      IPC_MESSAGE_GET_CONFIG,        false   },
 };
 
 static struct map *command_map;

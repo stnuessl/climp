@@ -38,7 +38,7 @@ static int media_compare(const void *__restrict s1, const void *__restrict s2)
     return strcmp(s1, s2);
 }
 
-struct playlist *playlist_new(void)
+struct playlist *playlist_new(const char *__restrict name)
 {
     struct playlist *pl;
     int err;
@@ -47,7 +47,7 @@ struct playlist *playlist_new(void)
     if(!pl)
         return NULL;
     
-    err = playlist_init(pl);
+    err = playlist_init(pl, name);
     if(err < 0) {
         free(pl);
         return NULL;
@@ -59,42 +59,19 @@ struct playlist *playlist_new(void)
 struct playlist *playlist_new_file(const char *__restrict path)
 {
     struct playlist *pl;
-    FILE *file;
-    char *buf;
-    size_t size;
-    ssize_t n;
     int err;
-    
-    file = fopen(path, "r");
-    if(!file)
+
+    pl = playlist_new(path);
+    if(!pl)
         return NULL;
     
-    pl = playlist_new();
-    if(!pl) {
-        fclose(file);
+    err = playlist_add_media_from_file(pl, path);
+    if(err < 0) {
+        playlist_delete(pl);
         return NULL;
     }
     
-    buf  = NULL;
-    size = 0;
-    
-    while(1) {
-        n = getline(&buf, &size, file);
-        if(n < 0)
-            break;
-        
-        buf[n - 1] = '\0';
-        
-        if(buf[0] != '/')
-            continue;
-        
-        err = playlist_insert_path(pl, buf);
-        if(err < 0)
-            continue;
-    }
-    
-    free(buf);
-    fclose(file);
+
     
     if(playlist_empty(pl)) {
         playlist_delete(pl);
@@ -111,21 +88,25 @@ void playlist_delete(struct playlist *__restrict pl)
     free(pl);
 }
 
-int playlist_init(struct playlist *__restrict pl)
+int playlist_init(struct playlist *__restrict pl, const char *__restrict name)
 {
     int err;
     
+    pl->name = strdup(name);
+    if(!pl->name) {
+        err = -errno;
+        goto out;
+    }
+    
     err = map_init(&pl->map_path, 0, &media_compare, &hash_string);
     if(err < 0)
-        return err;
+        goto cleanup1;
     
     map_set_data_delete(&pl->map_path, (void(*)(void*)) &media_delete);
     
     err = random_init(&pl->rand);
-    if(err < 0) {
-        map_destroy(&pl->map_path);
-        return err;
-    }
+    if(err < 0)
+        goto cleanup2;
     
     list_init(&pl->list);
     list_init(&pl->list_rand);
@@ -139,6 +120,13 @@ int playlist_init(struct playlist *__restrict pl)
     pl->shuffle = false;
     
     return 0;
+
+cleanup2:
+    map_destroy(&pl->map_path);
+cleanup1:
+    free(pl->name);
+out:
+    return err;
 }
 
 void playlist_destroy(struct playlist *__restrict pl)
@@ -148,6 +136,7 @@ void playlist_destroy(struct playlist *__restrict pl)
     list_destroy(&pl->list, NULL);
     random_destroy(&pl->rand);
     map_destroy(&pl->map_path);
+    free(pl->name);
 }
 
 void playlist_clear(struct playlist *__restrict pl)
@@ -454,6 +443,43 @@ int playlist_save_to_file(const struct playlist *__restrict pl,
         fprintf(file, "%s\n", m->path);
     }
     
+    fclose(file);
+    
+    return 0;
+}
+
+int playlist_add_media_from_file(struct playlist *__restrict pl, 
+                                 const char *path)
+{
+    FILE *file;
+    char *buf;
+    size_t size;
+    ssize_t n;
+    int err;
+    
+    file = fopen(path, "r");
+    if(!file)
+        return -errno;
+    
+    buf  = NULL;
+    size = 0;
+    
+    while(1) {
+        n = getline(&buf, &size, file);
+        if(n < 0)
+            break;
+        
+        buf[n - 1] = '\0';
+        
+        if(buf[0] != '/')
+            continue;
+        
+        err = playlist_insert_path(pl, buf);
+        if(err < 0)
+            continue;
+    }
+    
+    free(buf);
     fclose(file);
     
     return 0;

@@ -114,6 +114,13 @@ static int get_state(struct client *client, const struct message *msg)
     return 0;
 }
 
+static int get_colors(struct client *client, const struct message *msg)
+{
+    terminal_color_map_print(client->stdout);
+    
+    return 0;
+}
+
 static int set_state(struct client *client, const struct message *msg)
 {
     const char *arg, *err_msg;
@@ -521,6 +528,7 @@ static int (*msg_handler[])(struct client *, const struct message *) = {
     [IPC_MESSAGE_GET_PLAYLIST]          = &get_playlist,
     [IPC_MESSAGE_GET_FILES]             = &get_files,
     [IPC_MESSAGE_GET_VOLUME]            = &get_volume,
+    [IPC_MESSAGE_GET_COLORS]            = &get_colors,
     [IPC_MESSAGE_GET_STATE]             = &get_state,
     [IPC_MESSAGE_SET_STATE]             = &set_state,
     [IPC_MESSAGE_SET_PLAYLIST]          = &set_playlist,

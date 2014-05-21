@@ -39,6 +39,8 @@ struct playlist {
     struct link list_rand;
     struct link list_done;
     struct random rand;
+
+    char *name;
     
     unsigned int rand_range;
     
@@ -46,13 +48,13 @@ struct playlist {
     bool repeat;
 };
 
-struct playlist *playlist_new(void);
+struct playlist *playlist_new(const char *name);
 
 struct playlist *playlist_new_file(const char *__restrict path);
 
 void playlist_delete(struct playlist *__restrict pl);
 
-int playlist_init(struct playlist *__restrict pl);
+int playlist_init(struct playlist* pl, const char* name);
 
 void playlist_destroy(struct playlist *__restrict pl);
 
@@ -108,6 +110,9 @@ unsigned int playlist_size(const struct playlist *__restrict pl);
 int playlist_save_to_file(const struct playlist *__restrict pl, 
                           const char *__restrict path,
                           const char *__restrict mode);
+
+int playlist_add_media_from_file(struct playlist *__restrict pl, 
+                                 const char *path);
 
 #define playlist_for_each(playlist, link)                                      \
     list_for_each(&(playlist)->list, (link))
