@@ -71,8 +71,6 @@ struct playlist *playlist_new_file(const char *__restrict path)
         return NULL;
     }
     
-
-    
     if(playlist_empty(pl)) {
         playlist_delete(pl);
         errno = EINVAL;
@@ -288,6 +286,11 @@ bool playlist_repeat(const struct playlist *__restrict pl)
     return pl->repeat;
 }
 
+const char *playlist_name(const struct playlist *__restrict pl)
+{
+    return pl->name;
+}
+
 const struct media *playlist_next(struct playlist *__restrict pl)
 {
     struct link *link;
@@ -468,6 +471,9 @@ int playlist_add_media_from_file(struct playlist *__restrict pl,
         n = getline(&buf, &size, file);
         if(n < 0)
             break;
+        
+        if(n == 0)
+            continue;
         
         buf[n - 1] = '\0';
         

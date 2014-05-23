@@ -35,11 +35,11 @@ static struct log *log;
 
 int climpd_log_init(void)
 {
-    log = log_new(CLIMPD_LOG_FILE, "climpd", LOG_ALL);
+    log = log_new(CLIMPD_LOG_FILE, LOG_ALL);
     if(!log)
         return -errno;
     
-    log_set_severity_cap(log, LOG_DEBUG);
+    log_set_level(log, LOG_DEBUG);
     
     return 0;
 }
@@ -50,69 +50,46 @@ void climpd_log_destroy(void)
     log_delete(log);
 }
 
-void climpd_log_d(const char *fmt, ...)
+void climpd_log_d(const char *__restrict tag, const char *fmt, ...)
 {
     va_list vargs;
     
     va_start(vargs, fmt);
     
-    log_vprintf(log, LOG_DEBUG, fmt, vargs);
+    log_vprintf(log, LOG_DEBUG, tag, fmt, vargs);
     
     va_end(vargs);
 }
 
-void climpd_log_i(const char *fmt, ...)
+void climpd_log_i(const char *__restrict tag, const char *fmt, ...)
 {
     va_list vargs;
     
     va_start(vargs, fmt);
     
-    log_vprintf(log, LOG_INFO, fmt, vargs);
+    log_vprintf(log, LOG_INFO, tag, fmt, vargs);
     
     va_end(vargs);
 }
 
-void climpd_log_m(const char *fmt, ...)
+void climpd_log_w(const char *__restrict tag, const char *fmt, ...)
 {
     va_list vargs;
     
     va_start(vargs, fmt);
     
-    log_vprintf(log, LOG_MESSAGE, fmt, vargs);
+    log_vprintf(log, LOG_WARNING, tag, fmt, vargs);
     
     va_end(vargs);
 }
 
-void climpd_log_w(const char *fmt, ...)
+void climpd_log_e(const char *__restrict tag, const char *fmt, ...)
 {
     va_list vargs;
     
     va_start(vargs, fmt);
     
-    log_vprintf(log, LOG_WARNING, fmt, vargs);
-    
-    va_end(vargs);
-}
-
-void climpd_log_c(const char *fmt, ...)
-{
-    va_list vargs;
-    
-    va_start(vargs, fmt);
-    
-    log_vprintf(log, LOG_CRITICAL, fmt, vargs);
-    
-    va_end(vargs);
-}
-
-
-void climpd_log_e(const char *fmt, ...)
-{
-    va_list vargs;
-    
-    va_start(vargs, fmt);
-    
-    log_vprintf(log, LOG_ERROR, fmt, vargs);
+    log_vprintf(log, LOG_ERROR, tag, fmt, vargs);
     
     va_end(vargs);
 }

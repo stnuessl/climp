@@ -151,14 +151,14 @@ struct climpd *climpd_new(void)
         if(err < 0)
             goto cleanup1;
         
-        attempts = 10;
+        attempts = 1000;
         
         while(attempts--) {
+            usleep(10 * 1000);
+            
             err = climpd_connect(c);
-            if(err < 0) {
-                usleep(1000 * 1000);
+            if(err < 0)
                 continue;
-            }
             
             break;
         }

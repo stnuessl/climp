@@ -18,8 +18,11 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <stdbool.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 
@@ -28,4 +31,57 @@ const char* errno_string(int err)
     static __thread char s[64];
     
     return strerror_r(err, s, sizeof(s));
+}
+
+int create_leading_directories(const char *path, mode_t mode)
+{
+    struct stat st;
+    char *path_dup, *p;
+    int err;
+    
+    path_dup = strdup(path);
+    if(!path_dup)
+        return -errno;
+    
+    p = (path_dup[0] == '/') ? path_dup + 1 : path_dup;
+    
+    for(p = strchrnul(p, '/'); *p != '\0'; p = strchrnul(p + 1, '/')) {
+        
+        while(*++p == '/')
+            ;
+        
+        *--p = '\0';
+        
+        err = stat(path_dup, &st);
+        if(err < 0) {
+            if(errno != ENOENT) {
+                err = -errno;
+                goto fail;
+            }
+        } else {
+            if(S_ISDIR(st.st_mode)) {
+                *p = '/';
+                continue;
+            }
+        }
+
+        err = mkdir(path_dup, mode);
+        
+        *p++ = '/';
+        
+        if(err < 0) {
+            if(errno != EEXIST) {
+                err = -errno;
+                goto fail;
+            }
+        }
+    }
+    
+    free(path_dup);
+    
+    return 0;
+    
+fail:
+    free(path_dup);
+    return err;
 }

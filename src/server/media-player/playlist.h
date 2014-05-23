@@ -92,6 +92,8 @@ void playlist_set_repeat(struct playlist *__restrict pl, bool repeat);
 
 bool playlist_repeat(const struct playlist *__restrict pl);
 
+const char *playlist_name(const struct playlist *__restrict pl);
+
 const struct media *playlist_next(struct playlist *__restrict pl);
 
 const struct media *playlist_previous(struct playlist *__restrict pl);

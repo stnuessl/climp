@@ -36,6 +36,7 @@
 
 #include "../shared/util.h"
 
+static const char *tag = "climpd-player";
 static struct media_player media_player;
 static struct playlist *playlist;
 
@@ -44,12 +45,15 @@ extern struct climpd_config conf;
 static void on_end_of_stream(struct media_player *mp)
 {
     const struct media *m;
+    const struct media_info *i;
     
-    climpd_log_i("File ' %s ' finished playing\n", playlist_current(playlist));
+    i = media_info(playlist_current(playlist));
+    
+    climpd_log_i(tag, "finished playing ' %s '\n", i->title);
 
     m = playlist_next(playlist);
     if(!m) {
-        climpd_log_i("climpd-player finished playlist\n");
+        climpd_log_i(tag, "finished playlist\n");
         return;
     }
     
@@ -78,20 +82,20 @@ int climpd_player_init(void)
     
     err = media_player_init(&media_player);
     if(err < 0) {
-        climpd_log_e("media_player_init(): %s\n", errno_string(-err));
+        climpd_log_e(tag, "media_player_init(): %s\n", errno_string(-err));
         goto out;
     }
     
     media_player_on_end_of_stream(&media_player, &on_end_of_stream);
     
-    playlist = playlist_new("Unnamed playlist");
+    playlist = playlist_new("unnamed playlist");
     if(!playlist) {
         err = -errno;
-        climpd_log_e("playlist_new(): %s\n", errno_string(-err));
+        climpd_log_e(tag, "playlist_new(): %s\n", errno_string(-err));
         goto cleanup1;
     }
     
-    climpd_log_i("Initialized climpd-player\n");
+    climpd_log_i(tag, "initialization complete\n");
     
     return 0;
     
@@ -106,7 +110,7 @@ void climpd_player_destroy(void)
     playlist_delete(playlist);
     media_player_delete(&media_player);
     
-    climpd_log_i("Destroyed climpd-player\n");
+    climpd_log_i(tag, "destroyed\n");
 }
 
 int climpd_player_play_file(const char *__restrict path)

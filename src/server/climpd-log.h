@@ -25,16 +25,16 @@ int climpd_log_init(void);
 
 void climpd_log_destroy(void);
 
-void climpd_log_d(const char *fmt, ...);
+void climpd_log_d(const char *__restrict tag, const char *fmt, ...)
+                                            __attribute__((format(printf,2,3)));
 
-void climpd_log_i(const char *fmt, ...);
+void climpd_log_i(const char *__restrict tag, const char *fmt, ...)
+                                            __attribute__((format(printf,2,3)));
 
-void climpd_log_m(const char *fmt, ...);
+void climpd_log_w(const char *__restrict tag, const char *fmt, ...)
+                                            __attribute__((format(printf,2,3)));
 
-void climpd_log_w(const char *fmt, ...);
-
-void climpd_log_c(const char *fmt, ...);
-
-void climpd_log_e(const char *fmt, ...);
+void climpd_log_e(const char *__restrict tag, const char *fmt, ...)
+                                            __attribute__((format(printf,2,3)));
 
 #endif /* _CLIMPD_LOG_H_ */

@@ -36,6 +36,7 @@
 #include "bool-map.h"
 
 #include "../shared/util.h"
+#include "../shared/constants.h"
 
 #define DEFAULT_STR_DEFAULT_PLAYLIST     "None"
 #define DEFAULT_STR_MEDIA_META_LENGTH    "24"
@@ -87,6 +88,7 @@ static const char default_config_text[] = {
     "Shuffle = "DEFAULT_STR_SHUFFLE"\n"
 };
 
+static const char *tag = "climpd-config";
 static struct config *config;
 
 static void set_default_playlist(const char *str)
@@ -99,12 +101,12 @@ static void set_default_playlist(const char *str)
 
     err = stat(str, &st);
     if(err < 0) {
-        climpd_log_e("climpd-config: %s: %s\n", str, errno_string(errno));
+        climpd_log_e(tag, "%s: %s\n", str, errno_string(errno));
         return;
     }
     
     if(!S_ISREG(st.st_mode)) {
-        climpd_log_w("climpd-config: %s is not a file\n", str);
+        climpd_log_w(tag, "%s is not a file\n", str);
         return;
     }
     conf.default_playlist = str;
@@ -118,7 +120,7 @@ static void set_media_meta_length(const char *str)
     val = (unsigned int) strtol(str, NULL, 10);
     
     if(errno) {
-        climpd_log_w("climpd-config: invalid MediaMetaLength %s\n", str);
+        climpd_log_w(tag, "invalid MediaMetaLength %s\n", str);
         val = DEFAULT_VAL_MEDIA_META_LENGTH;
         return;
     }
@@ -132,7 +134,7 @@ static void set_media_active_color(const char *str)
     
     val = terminal_color_map_color_code(str);
     if(!val) {
-        climpd_log_w("climpd-config: invalid MediaActiceColor %s\n", str);
+        climpd_log_w(tag, "invalid MediaActiceColor %s\n", str);
         val = DEFAULT_VAL_MEDIA_ACTIVE_COLOR;
     }
     
@@ -145,7 +147,7 @@ static void set_media_passive_color(const char *str)
     
     val = terminal_color_map_color_code(str);
     if(!val) {
-        climpd_log_w("climpd-config: invalid MediaPassiveColor %s\n", str);
+        climpd_log_w(tag, "invalid MediaPassiveColor %s\n", str);
         val = DEFAULT_VAL_MEDIA_PASSIVE_COLOR;
     }
     
@@ -160,7 +162,7 @@ static void set_volume(const char *str)
     val = (unsigned int) strtol(str, NULL, 10);
     
     if(errno) {
-        climpd_log_w("climpd-config: invalid Volume %s\n", str);
+        climpd_log_w(tag, "invalid Volume %s\n", str);
         val = DEFAULT_VAL_VOLUME;
     }
     
@@ -173,7 +175,7 @@ static void set_repeat(const char *str)
     
     val = bool_map_value(str);
     if(!val) {
-        climpd_log_w("climpd-config: invalid Repeat %s\n", str);
+        climpd_log_w(tag, "invalid Repeat %s\n", str);
         conf.repeat = DEFAULT_VAL_REPEAT;
         return;
     }
@@ -187,7 +189,7 @@ static void set_shuffle(const char *str)
     
     val = bool_map_value(str);
     if(!val) {
-        climpd_log_w("climpd-config: invalid Shuffle %s\n", str);
+        climpd_log_w(tag, "invalid Shuffle %s\n", str);
         conf.shuffle = DEFAULT_VAL_SHUFFLE;
         return;
     }
@@ -201,9 +203,9 @@ int climpd_config_init(void)
     static const char *dir  = "/.config/climp/";
     static const char *path = "/.config/climp/climpd.conf";
     char *config_dir, *config_path;
-    char *home, *p;
+    char *home;
     size_t home_len;
-    int fd, mode, err;
+    int fd, err;
     
     /* Init some path variables */
 
@@ -223,36 +225,18 @@ int climpd_config_init(void)
     
     config_path = strcpy(config_path, home);
     config_path = strcat(config_path, path);
-    
-    /* Create folders if necessary */
-        
-    for(p = config_dir + home_len; *p != '\0'; ++p) {
-        if(*p == '/') {
-            *p = '\0';
-            
-            err = mkdir(config_dir, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
-            
-            *p = '/';
-            
-            if(err < 0) {
-                err = -errno;
-                if(err != -EEXIST && err != -EPERM)
-                    goto cleanup2;
-            }
-        }
-    }
+    err = create_leading_directories(config_dir, DEFAULT_DIR_MODE);
+    if(err < 0)
+        goto cleanup2;
     
     /* Create and initialize file if necessary */
-    
-    mode = S_IRUSR | S_IWUSR | S_IRGRP;
 
-    fd = open(config_path, O_CREAT | O_EXCL | O_WRONLY,  mode);
-    
+    fd = open(config_path, O_CREAT | O_EXCL | O_WRONLY,  DEFAULT_FILE_MODE);
     if(fd < 0) {
-        err = -errno;
-        if(err != -EEXIST)
+        if(errno != EEXIST) {
+            err = -errno;
             goto cleanup2;
-        
+        }
     } else {
         dprintf(fd, "%s\n", default_config_text);
         close(fd);

@@ -56,6 +56,7 @@
 
 extern struct climpd_config conf;
 
+static const char *tag = "main";
 static struct client client;
 static struct message msg_in;
 static struct message msg_out;
@@ -483,7 +484,7 @@ static int handle_message_goodbye(struct client *client,
     
     ipc_send_message(fd, &msg_out);
     
-    climpd_log_i("User %d disconnected on socket %d\n", client->uid, fd);
+    climpd_log_i(tag, "user %d disconnected on socket %d\n", client->uid, fd);
     
     client_destroy(client);
     
@@ -496,7 +497,7 @@ static int reload_config(struct client *client, const struct message *msg)
     
     err = climpd_config_reload();
     if(err < 0) {
-        climpd_log_e("climpd_config_reload(): %s\n", errno_string(-err));
+        climpd_log_e(tag, "climpd_config_reload(): %s\n", errno_string(-err));
         return err;
     }
     
@@ -550,6 +551,7 @@ static int (*msg_handler[])(struct client *, const struct message *) = {
 static gboolean handle_unix_fd(GIOChannel *src, GIOCondition cond, void *data)
 {
     enum message_id id;
+    const char *msg_id_str;
     int fd, err;
     
     if(cond != G_IO_IN)
@@ -561,17 +563,18 @@ static gboolean handle_unix_fd(GIOChannel *src, GIOCondition cond, void *data)
     
     err = ipc_recv_message(fd, &msg_in);
     if(err < 0) {
-        climpd_log_e("ipc_recv_message(): %s\n", errno_string(-err));
+        climpd_log_e(tag, "ipc_recv_message(): %s\n", errno_string(-err));
         client_destroy(&client);
         return false;
     }
     
     id = ipc_message_id(&msg_in);
+    msg_id_str  = ipc_message_id_string(id);
     
-    climpd_log_d("Received ' %s '\n", ipc_message_id_string(id));
+    climpd_log_d(tag, "received ' %s '\n", ipc_message_id_string(id));
     
     if(id >= IPC_MESSAGE_MAX_ID) {
-        climpd_log_w("Received invalid message id %d\n", id);
+        climpd_log_w(tag, "received invalid message id %d\n", id);
         return true;
     }
     
@@ -583,11 +586,10 @@ static gboolean handle_unix_fd(GIOChannel *src, GIOCondition cond, void *data)
         return true;
     }
     
-    climpd_log_d("Handling ' %s ' was successful\n", ipc_message_id_string(id));
+    climpd_log_d(tag, "handling ' %s ' was successful\n", msg_id_str);
     
     if(id == IPC_MESSAGE_GOODBYE)
         return false;
-    
     
     return true;
 }
@@ -613,12 +615,14 @@ static gboolean handle_server_fd(GIOChannel *src, GIOCondition cond, void *data)
     err = getsockopt(fd, SOL_SOCKET, SO_PEERCRED, &creds, &cred_len);
     if(err < 0) {
         err = -errno;
-        climpd_log_e("getsockopt(): %s\n", errno_string(errno));
+        climpd_log_e(tag, "getsockopt(): %s\n", errno_string(errno));
         goto out;
     }
     
     if(creds.uid != getuid()) {
-        climpd_log_w("Non authorized user %d tried to connect\n", creds.uid);
+        climpd_log_w(tag, 
+                     "non-authorized user %d connected -> closing connection\n", 
+                     creds.uid);
         err = -EPERM;
         goto out;
     }
@@ -630,7 +634,7 @@ static gboolean handle_server_fd(GIOChannel *src, GIOCondition cond, void *data)
     g_io_add_watch(client.io, G_IO_IN, &handle_unix_fd, NULL);
     g_io_channel_set_close_on_unref(client.io, true);
     
-    climpd_log_i("User %d connected on socket %d\n", creds.uid, fd);
+    climpd_log_i(tag, "user %d connected on socket %d\n", creds.uid, fd);
     
     return true;
     
@@ -723,7 +727,7 @@ static int init(void)
     if(err < 0)
         goto out;
     
-    climpd_log_i("Starting initialization...\n");
+    climpd_log_i(tag, "starting initialization...\n");
 #if 0
     pid = fork();
     if(pid < 0) {
@@ -762,43 +766,43 @@ static int init(void)
 #endif
     err = close_std_streams();
     if(err < 0) {
-        climpd_log_e("close_std_streams(): %s\n", errno_string(-err));
+        climpd_log_e(tag, "close_std_streams(): %s\n", errno_string(-err));
         goto cleanup1;
     }
     
     err = terminal_color_map_init();
     if(err < 0) {
-        climpd_log_e("terminal_color_map_init(): %s\n", errno_string(-err));
+        climpd_log_e(tag, "terminal_color_map_init(): %s\n", errno_string(-err));
         goto cleanup1;
     }
     
     err = bool_map_init();
     if(err < 0) {
-        climpd_log_e("bool_map_init(): %s\n", errno_string(-err));
+        climpd_log_e(tag, "bool_map_init(): %s\n", errno_string(-err));
         goto cleanup2;
     }
     
     err = climpd_config_init();
     if(err < 0) {
-        climpd_log_e("climpd_config_init(): %s\n", errno_string(-err));
+        climpd_log_e(tag, "climpd_config_init(): %s\n", errno_string(-err));
         goto cleanup3;
     }
     
     main_loop = g_main_loop_new(NULL, false);
     if(!main_loop) {
-        climpd_log_e("g_main_loop_new()\n");
+        climpd_log_e(tag, "g_main_loop_new()\n");
         goto cleanup4;
     }
     
     err = init_server_fd();
     if(err < 0) {
-        climpd_log_e("init_server_fd(): %s\n", errno_string(-err));
+        climpd_log_e(tag, "init_server_fd(): %s\n", errno_string(-err));
         goto cleanup5;
     }
     
     err = climpd_player_init();
     if(err < 0) {
-        climpd_log_e("climp_player_init(): %s\n", errno_string(errno));
+        climpd_log_e(tag, "climp_player_init(): %s\n", errno_string(errno));
         goto cleanup6;
     }
 
@@ -809,7 +813,7 @@ static int init(void)
     if(conf.default_playlist) {
         pl = playlist_new_file(conf.default_playlist);
         if(!pl)
-            climpd_log_e("Default playlist failed: %s\n", errno_string(errno));
+            climpd_log_e(tag, "DefaultPlaylist: %s\n", errno_string(errno));
         else
             climpd_player_set_playlist(pl);
     }
@@ -822,7 +826,7 @@ static int init(void)
     ipc_message_init(&msg_in);
     ipc_message_init(&msg_out);
     
-    climpd_log_i("Initialization successful\n");
+    climpd_log_i(tag, "initialization successful\n");
     
     return 0;
 
@@ -838,7 +842,7 @@ cleanup3:
 cleanup2:
     terminal_color_map_destroy();
 cleanup1:
-    climpd_log_i("Initialization failed\n");
+    climpd_log_i(tag, "initialization failed\n");
     climpd_log_destroy();
 out:
     return err;
