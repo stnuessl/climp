@@ -38,6 +38,7 @@ set(SOURCE_SERVER
     src/server/main.c
     src/server/terminal-color-map.c
     src/server/bool-map.c
+    src/server/playlist-manager.c
     src/server/climpd-log.c
     src/server/climpd-player.c
     src/server/climpd-config.c

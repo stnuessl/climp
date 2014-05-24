@@ -76,38 +76,30 @@ static void print_media(int fd,
             conf.media_meta_length, conf.media_meta_length, i->album);
 }
 
-int climpd_player_init(void)
+int climpd_player_init(struct playlist *pl, bool repeat, bool shuffle)
 {
     int err;
     
     err = media_player_init(&media_player);
     if(err < 0) {
         climpd_log_e(tag, "media_player_init(): %s\n", errno_string(-err));
-        goto out;
+        return err;
     }
     
     media_player_on_end_of_stream(&media_player, &on_end_of_stream);
     
-    playlist = playlist_new("unnamed playlist");
-    if(!playlist) {
-        err = -errno;
-        climpd_log_e(tag, "playlist_new(): %s\n", errno_string(-err));
-        goto cleanup1;
-    }
+    playlist = pl;
+    
+    playlist_set_repeat(playlist, repeat);
+    playlist_set_shuffle(playlist, shuffle);
     
     climpd_log_i(tag, "initialization complete\n");
     
     return 0;
-    
-cleanup1:
-    media_player_destroy(&media_player);
-out:
-    return err;
 }
 
 void climpd_player_destroy(void)
 {
-    playlist_delete(playlist);
     media_player_delete(&media_player);
     
     climpd_log_i(tag, "destroyed\n");
@@ -309,7 +301,6 @@ void climpd_player_set_playlist(struct playlist *pl)
     playlist_set_repeat(pl, playlist_repeat(playlist));
     playlist_set_shuffle(pl, playlist_shuffle(playlist));
     
-    playlist_delete(playlist);
     playlist = pl;
 }
 

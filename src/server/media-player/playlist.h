@@ -50,7 +50,8 @@ struct playlist {
 
 struct playlist *playlist_new(const char *name);
 
-struct playlist *playlist_new_file(const char *__restrict path);
+struct playlist *playlist_new_file(const char *__restrict name, 
+                                   const char *path);
 
 void playlist_delete(struct playlist *__restrict pl);
 

@@ -42,15 +42,33 @@ static struct map playlist_map;
 
 int playlist_manager_init(void)
 {
+    struct playlist *pl;
     int err;
     
     err = map_init(&playlist_map, 0, &compare_string, &hash_string);
     if(err < 0)
-        return err;
+        goto out;
     
-    map_set_data_delete(&playlist_map, &playlist_delete);
+    map_set_data_delete(&playlist_map, (void(*)(void *)) &playlist_delete);
+    
+    pl = playlist_new(CLIMPD_PLAYER_DEFAULT_PLAYLIST);
+    if(!pl) {
+        err = -errno;
+        goto cleanup1;
+    }
+    
+    err = playlist_manager_insert(pl);
+    if(err < 0)
+        goto cleanup2;
     
     return 0;
+
+cleanup2:
+    playlist_delete(pl);
+cleanup1:
+    map_destroy(&playlist_map);
+out:
+    return err;
 }
 
 void playlist_manager_destroy(void)
@@ -90,7 +108,7 @@ int playlist_manager_load_from_file(const char *__restrict path)
             continue;
         }
         
-        pl = playlist_new_file(line);
+        pl = playlist_new_file(NULL, line);
         if(!pl) {
             msg = errno_string(errno);
             climpd_log_w(tag, "playlist_new_file(): %s: %s\n", line, msg);
@@ -103,6 +121,8 @@ int playlist_manager_load_from_file(const char *__restrict path)
             climpd_log_w(tag, "failed to add %s: %s\n", line, msg);
             continue;
         }
+        
+        climpd_log_i(tag, "added %s as %s\n", line, playlist_name(pl));
     }
     
     free(line);
@@ -112,7 +132,6 @@ int playlist_manager_load_from_file(const char *__restrict path)
 
 int playlist_manager_save_to_file(const char *__restrict path)
 {
-    struct stat st;
     int fd, err;
     
     err = create_leading_directories(path, DEFAULT_DIR_MODE);
@@ -156,10 +175,10 @@ void playlist_manager_delete_playlist(const char *__restrict name)
     playlist_delete(pl);
 }
 
-void playlist_manager_print(inf fd)
+void playlist_manager_print(int fd)
 {
     struct entry *e;
     
     map_for_each(&playlist_map, e)
-        dprintf(fd, "%s\n", (const char *) entry_key(e));
+        dprintf(fd, " %s\n", (const char *) entry_key(e));
 }

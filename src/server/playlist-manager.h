@@ -39,6 +39,6 @@ struct playlist *playlist_manager_take(const char *__restrict name);
 
 void playlist_manager_delete_playlist(const char *__restrict name);
 
-void playlist_manager_print(inf fd);
+void playlist_manager_print(int fd);
 
 #endif /* _PLAYLIST_MANAGER_H_ */

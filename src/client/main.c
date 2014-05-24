@@ -112,6 +112,7 @@ struct command_handle {
 
 
 static struct command_handle command_handles[] = {
+    { "get-playlists",   IPC_MESSAGE_GET_PLAYLISTS,     false   },
     { "get-playlist",    IPC_MESSAGE_GET_PLAYLIST,      false   },
     { "get-files",       IPC_MESSAGE_GET_FILES,         false   },
     { "get-volume",      IPC_MESSAGE_GET_VOLUME,        false   },

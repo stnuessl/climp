@@ -38,7 +38,9 @@
 #include "../shared/util.h"
 #include "../shared/constants.h"
 
-#define DEFAULT_STR_DEFAULT_PLAYLIST     "None"
+#define DEFAULT_STR_PLAYLIST_FILE        ""
+#define DEFAULT_STR_SAVE_PLAYLIST_FILE   "false"
+#define DEFAULT_STR_DEFAULT_PLAYLIST     ""
 #define DEFAULT_STR_MEDIA_META_LENGTH    "24"
 #define DEFAULT_STR_MEDIA_ACTIVE_COLOR   "green"
 #define DEFAULT_STR_MEDIA_PASSIVE_COLOR  "default"
@@ -46,7 +48,9 @@
 #define DEFAULT_STR_REPEAT               "false"
 #define DEFAULT_STR_SHUFFLE              "false"
 
-#define DEFAULT_VAL_DEFAULT_PLAYLIST    DEFAULT_STR_DEFAULT_PLAYLIST
+#define DEFAULT_VAL_PLAYLIST_FILE       NULL
+#define DEFAULT_VAL_SAVE_PLAYLIST_FILE  false
+#define DEFAULT_VAL_DEFAULT_PLAYLIST    NULL
 #define DEFAULT_VAL_MEDIA_META_LENGTH   24
 #define DEFAULT_VAL_MEDIA_ACTIVE_COLOR  COLOR_CODE_GREEN
 #define DEFAULT_VAL_MEDIA_PASSIVE_COLOR COLOR_CODE_DEFAULT
@@ -55,6 +59,8 @@
 #define DEFAULT_VAL_SHUFFLE             false
 
 struct climpd_config conf = {
+    .playlist_file       = DEFAULT_VAL_PLAYLIST_FILE,
+    .save_playlist_file  = DEFAULT_VAL_SAVE_PLAYLIST_FILE,
     .default_playlist    = DEFAULT_VAL_DEFAULT_PLAYLIST,
     .media_active_color  = DEFAULT_VAL_MEDIA_ACTIVE_COLOR,
     .media_passive_color = DEFAULT_VAL_MEDIA_PASSIVE_COLOR,
@@ -66,8 +72,14 @@ struct climpd_config conf = {
 
 static const char default_config_text[] = {
     "\n"
-    "# Set automatically loaded playlist\n"
-    "; DefaultPlaylist = \n"
+    "# Set automatically loaded playlists\n"
+    ";PlaylistFile = "DEFAULT_STR_PLAYLIST_FILE"\n"
+    "\n"
+    "# Save changes in playlist file?\n"
+    ";SavePlaylistFile = "DEFAULT_STR_SAVE_PLAYLIST_FILE"\n"
+    "\n"
+    "# Set default played playlist\n"
+    ";DefaultPlaylist = "DEFAULT_STR_DEFAULT_PLAYLIST"\n"
     "\n"
     "# Table width of the playlist\n"
     "MediaMetaLength = "DEFAULT_STR_MEDIA_META_LENGTH"\n"
@@ -90,6 +102,33 @@ static const char default_config_text[] = {
 
 static const char *tag = "climpd-config";
 static struct config *config;
+
+static void set_playlist_file(const char *str)
+{
+    struct stat st;
+    int err;
+    
+    err = stat(str, &st);
+    if(err < 0) {
+        climpd_log_w(tag, "%s: %s\n", str, errno_string(errno));
+        return;
+    }
+    
+    conf.playlist_file = str;
+}
+
+static void set_save_playlist_file(const char *str)
+{
+    const bool *val;
+    
+    val = bool_map_value(str);
+    if(!val) {
+        climpd_log_w(tag, "unkown boolean value '%s'\n", str);
+        return;
+    }
+    
+    conf.save_playlist_file = *val;
+}
 
 static void set_default_playlist(const char *str)
 {
@@ -277,6 +316,14 @@ int climpd_config_reload(void)
     err = config_parse(config);
     if(err < 0)
         return err;
+    
+    str = config_value(config, "PlaylistFile");
+    if(str)
+        set_playlist_file(str);
+    
+    str = config_value(config, "SavePlaylistFile");
+    if(str)
+        set_save_playlist_file(str);
      
     str = config_value(config, "DefaultPlaylist");
     if(str)

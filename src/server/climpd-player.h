@@ -26,7 +26,7 @@
 #include "media-player/playlist.h"
 #include "media-player/media.h"
 
-int climpd_player_init(void);
+int climpd_player_init(struct playlist *pl, bool repeat, bool shuffle);
 
 void climpd_player_destroy(void);
 

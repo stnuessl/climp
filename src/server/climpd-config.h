@@ -24,7 +24,11 @@
 #include <stdbool.h>
 
 struct climpd_config {
+    const char *playlist_file;
+    bool save_playlist_file;
+    
     const char *default_playlist;
+    
     /* output options */
     const char *media_active_color;
     const char *media_passive_color;

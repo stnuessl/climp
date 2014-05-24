@@ -43,6 +43,7 @@
 
 #include "../shared/ipc.h"
 #include "../shared/util.h"
+#include "../shared/constants.h"
 
 #include "media-player/playlist.h"
 #include "media-player/media.h"
@@ -50,6 +51,7 @@
 #include "climpd-log.h"
 #include "climpd-player.h"
 #include "climpd-config.h"
+#include "playlist-manager.h"
 #include "terminal-color-map.h"
 #include "bool-map.h"
 #include "client.h"
@@ -86,6 +88,13 @@ static GMainLoop *main_loop;
 // 
 //     g_clear_error(&err);
 // }
+
+static int get_playlists(struct client *client, const struct message *msg)
+{
+    playlist_manager_print(client->stdout);
+    
+    return 0;
+}
 
 static int get_playlist(struct client *client, const struct message *msg)
 {
@@ -133,7 +142,7 @@ static int set_state(struct client *client, const struct message *msg)
         err = climpd_player_play();
         if(err < 0) {
             err_msg = errno_string(-err);
-            client_err(client, "climpd: set-status play: %s\n", err_msg);
+            client_err(client, "climpd: set-state play: %s\n", err_msg);
             return err;
         }
         
@@ -164,8 +173,14 @@ static int set_playlist(struct client *client, const struct message *msg)
     
     arg = ipc_message_arg(msg);
     
+    pl = playlist_manager_retrieve(arg);
+    if(pl) {
+        climpd_player_set_playlist(pl);
+        return 0;
+    }
+    
     if(arg[0] == '/') {
-        pl = playlist_new_file(arg);
+        pl = playlist_new_file(NULL, arg);
     } else {
         path = realpath(arg, NULL);
         if(!path) {
@@ -175,7 +190,7 @@ static int set_playlist(struct client *client, const struct message *msg)
             return err;
         }
         
-        pl = playlist_new_file(path);
+        pl = playlist_new_file(NULL, path);
         
         free(path);
     }
@@ -183,6 +198,13 @@ static int set_playlist(struct client *client, const struct message *msg)
     if(!pl) {
         err = -errno;
         client_err(client, "climpd: set-playlist: %s\n", errno_string(errno));
+        return err;
+    }
+    
+    err = playlist_manager_insert(pl);
+    if(err < 0) {
+        client_err(client, "climpd: set-playlist: %s\n", errno_string(-err));
+        playlist_delete(pl);
         return err;
     }
     
@@ -526,6 +548,7 @@ static int print_config(struct client *client, const struct message *msg)
 static int (*msg_handler[])(struct client *, const struct message *) = {
     [IPC_MESSAGE_HELLO]                 = &handle_message_hello,
     [IPC_MESSAGE_GOODBYE]               = &handle_message_goodbye,
+    [IPC_MESSAGE_GET_PLAYLISTS]         = &get_playlists,
     [IPC_MESSAGE_GET_PLAYLIST]          = &get_playlist,
     [IPC_MESSAGE_GET_FILES]             = &get_files,
     [IPC_MESSAGE_GET_VOLUME]            = &get_volume,
@@ -580,8 +603,9 @@ static gboolean handle_unix_fd(GIOChannel *src, GIOCondition cond, void *data)
     
     err = msg_handler[id](&client, &msg_in);
     if(err < 0) {
-        climpd_log_e("Message ' %s ': %s\n", 
-                     ipc_message_id_string(id), errno_string(-err));
+        climpd_log_e(tag, "Message ' %s ': %s\n", 
+                     ipc_message_id_string(id),
+                     errno_string(-err));
 
         return true;
     }
@@ -788,35 +812,64 @@ static int init(void)
         goto cleanup3;
     }
     
+    err = playlist_manager_init();
+    if(err < 0) {
+        climpd_log_e(tag, "playlist_manager_init(): %s\n", errno_string(-err));
+        goto cleanup4;
+    }
+    
+    if(conf.playlist_file) {
+        err = playlist_manager_load_from_file(conf.playlist_file);
+        if(err < 0)
+            goto cleanup5;
+    }
+    
     main_loop = g_main_loop_new(NULL, false);
     if(!main_loop) {
         climpd_log_e(tag, "g_main_loop_new()\n");
-        goto cleanup4;
+        goto cleanup5;
     }
     
     err = init_server_fd();
     if(err < 0) {
         climpd_log_e(tag, "init_server_fd(): %s\n", errno_string(-err));
-        goto cleanup5;
+        goto cleanup6;
     }
     
-    err = climpd_player_init();
+    if(conf.default_playlist) {
+        pl = playlist_manager_retrieve(conf.default_playlist);
+        if(!pl) {
+            pl = playlist_new_file(NULL, conf.default_playlist);
+            if(!pl) {
+                err = -errno;
+                climpd_log_e(tag, 
+                             "playlist_new_file(): %s: %s\n", 
+                             conf.default_playlist,
+                             errno_string(-err));
+                goto cleanup7;
+            }
+            
+            err = playlist_manager_insert(pl);
+            if(err < 0) {
+                climpd_log_e(tag,
+                             "playlist_manager_insert(): %s: %s\n",
+                             playlist_name(pl), errno_string(-err));
+                
+                playlist_delete(pl);
+                goto cleanup7;
+            }
+        }
+    } else {
+        pl = playlist_manager_retrieve(CLIMPD_PLAYER_DEFAULT_PLAYLIST);
+    }
+    
+    err = climpd_player_init(pl, conf.repeat, conf.shuffle);
     if(err < 0) {
         climpd_log_e(tag, "climp_player_init(): %s\n", errno_string(errno));
-        goto cleanup6;
+        goto cleanup7;
     }
 
     climpd_player_set_volume(conf.volume);
-    climpd_player_set_repeat(conf.repeat);
-    climpd_player_set_shuffle(conf.shuffle);
-    
-    if(conf.default_playlist) {
-        pl = playlist_new_file(conf.default_playlist);
-        if(!pl)
-            climpd_log_e(tag, "DefaultPlaylist: %s\n", errno_string(errno));
-        else
-            climpd_player_set_playlist(pl);
-    }
     
     /* TODO: handle bus errors */
 //     climp_player_on_bus_error(player, &media_player_handle_bus_error);
@@ -831,10 +884,12 @@ static int init(void)
     return 0;
 
     
-cleanup6:
+cleanup7:
     destroy_server_fd();
-cleanup5:
+cleanup6:
     g_main_loop_unref(main_loop);
+cleanup5:
+    playlist_manager_destroy();
 cleanup4:
     climpd_config_destroy();
 cleanup3:
@@ -853,6 +908,10 @@ static void destroy(void)
     climpd_player_destroy();
     destroy_server_fd();
     g_main_loop_unref(main_loop);
+    playlist_manager_destroy();
+    climpd_config_destroy();
+    bool_map_destroy();
+    terminal_color_map_destroy();
     climpd_log_destroy();
 }
 

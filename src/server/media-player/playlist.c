@@ -56,12 +56,22 @@ struct playlist *playlist_new(const char *__restrict name)
     return pl;
 }
 
-struct playlist *playlist_new_file(const char *__restrict path)
+struct playlist *playlist_new_file(const char *__restrict name, 
+                                   const char *path)
 {
     struct playlist *pl;
     int err;
+    
+    if(!name) {
+        name = strrchr(path, '/');
+        
+        if(name)
+            name += 1;
+        else
+            name = path;
+    }
 
-    pl = playlist_new(path);
+    pl = playlist_new(name);
     if(!pl)
         return NULL;
     
@@ -95,7 +105,7 @@ int playlist_init(struct playlist *__restrict pl, const char *__restrict name)
         err = -errno;
         goto out;
     }
-    
+        
     err = map_init(&pl->map_path, 0, &media_compare, &hash_string);
     if(err < 0)
         goto cleanup1;
