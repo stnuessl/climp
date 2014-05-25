@@ -23,6 +23,8 @@
 
 #include <stdbool.h>
 
+#define EVENT_CLIMPD_CONFIG_PARSED 1
+
 struct climpd_config {
     const char *playlist_file;
     bool save_playlist_file;

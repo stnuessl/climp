@@ -70,6 +70,181 @@ struct climpd_config conf = {
     .shuffle             = DEFAULT_VAL_SHUFFLE
 };
 
+static const char *tag = "climpd-config";
+static struct config *config;
+
+static void set_playlist_file(const char *key, const char *val, void *arg)
+{
+    struct stat st;
+    int err;
+    
+    (void) key;
+    (void) arg;
+    
+    err = stat(val, &st);
+    if(err < 0) {
+        climpd_log_w(tag, "%s: %s\n", val, errno_string(errno));
+        return;
+    }
+    
+    conf.playlist_file = val;
+}
+
+static void set_save_playlist_file(const char *key, const char *val, void *arg)
+{
+    const bool *bval;
+    
+    (void) key;
+    (void) arg;
+    
+    bval = bool_map_value(val);
+    if(!bval) {
+        climpd_log_w(tag, "unkown boolean value '%s'\n", val);
+        return;
+    }
+    
+    conf.save_playlist_file = *bval;
+}
+
+static void set_default_playlist(const char *key, const char *val, void *arg)
+{
+    struct stat st;
+    int err;
+    
+    (void) key;
+    (void) arg;
+    
+    if(strcasecmp(val, DEFAULT_STR_DEFAULT_PLAYLIST) == 0)
+        return;
+    
+    err = stat(val, &st);
+    if(err < 0) {
+        climpd_log_e(tag, "%s: %s\n", val, errno_string(errno));
+        return;
+    }
+    
+    if(!S_ISREG(st.st_mode)) {
+        climpd_log_w(tag, "%s is not a file\n", val);
+        return;
+    }
+    conf.default_playlist = val;
+}
+
+static void set_media_meta_length(const char *key, const char *val, void *arg)
+{
+    unsigned int num;
+    
+    (void) key;
+    (void) arg;
+    
+    errno = 0;
+    num = (unsigned int) strtol(val, NULL, 10);
+    
+    if(errno) {
+        climpd_log_w(tag, "invalid MediaMetaLength %s\n", val);
+        num = DEFAULT_VAL_MEDIA_META_LENGTH;
+        return;
+    }
+    
+    conf.media_meta_length = num;
+}
+
+static void set_media_active_color(const char *key, const char *val, void *arg)
+{
+    const char *code;
+    
+    (void) key;
+    (void) arg;
+    
+    code = terminal_color_map_color_code(val);
+    if(!code) {
+        climpd_log_w(tag, "invalid MediaActiceColor %s\n", val);
+        code = DEFAULT_VAL_MEDIA_ACTIVE_COLOR;
+    }
+    
+    conf.media_active_color = code;
+}
+
+static void set_media_passive_color(const char *key, const char *val, void *arg)
+{
+    const char *code;
+    
+    (void) key;
+    (void) arg;
+    
+    code = terminal_color_map_color_code(val);
+    if(!code) {
+        climpd_log_w(tag, "invalid MediaPassiveColor %s\n", val);
+        code = DEFAULT_VAL_MEDIA_PASSIVE_COLOR;
+    }
+    
+    conf.media_passive_color = code;
+}
+
+static void set_volume(const char *key, const char *val, void *arg)
+{
+    unsigned int num;
+    
+    (void) key;
+    (void) arg;
+    
+    errno = 0;
+    num = (unsigned int) strtol(val, NULL, 10);
+    
+    if(errno) {
+        climpd_log_w(tag, "invalid Volume %s\n", val);
+        num = DEFAULT_VAL_VOLUME;
+    }
+    
+    conf.volume = num;
+}
+
+static void set_repeat(const char *key, const char *val, void *arg)
+{
+    const bool *bval;
+    
+    (void) key;
+    (void) arg;
+    
+    bval = bool_map_value(val);
+    if(!bval) {
+        climpd_log_w(tag, "invalid Repeat %s\n", val);
+        conf.repeat = DEFAULT_VAL_REPEAT;
+        return;
+    }
+    
+    conf.repeat = *bval;
+}
+
+static void set_shuffle(const char *key, const char *val, void *arg)
+{
+    const bool *bval;
+    
+    (void) key;
+    (void) arg;
+    
+    bval = bool_map_value(val);
+    if(!bval) {
+        climpd_log_w(tag, "invalid Shuffle %s\n", val);
+        conf.shuffle = DEFAULT_VAL_SHUFFLE;
+        return;
+    }
+    
+    conf.shuffle = *bval;
+}
+
+static struct config_handle handles[] = {
+    { &set_playlist_file,          "PlaylistFile",         NULL },
+    { &set_save_playlist_file,     "SavePlaylistFile",     NULL },
+    { &set_default_playlist,       "DefaultPlaylist",      NULL },
+    { &set_media_active_color,     "MediaActiveColor",     NULL },
+    { &set_media_passive_color,    "MediaPassiveColor",    NULL },
+    { &set_media_meta_length,      "MediaMetaLength",      NULL },
+    { &set_volume,                 "Volume",               NULL },
+    { &set_repeat,                 "Repeat",               NULL },
+    { &set_shuffle,                "Shuffle",              NULL }
+};
+
 static const char default_config_text[] = {
     "\n"
     "# Set automatically loaded playlists\n"
@@ -100,142 +275,8 @@ static const char default_config_text[] = {
     "Shuffle = "DEFAULT_STR_SHUFFLE"\n"
 };
 
-static const char *tag = "climpd-config";
-static struct config *config;
 
-static void set_playlist_file(const char *str)
-{
-    struct stat st;
-    int err;
-    
-    err = stat(str, &st);
-    if(err < 0) {
-        climpd_log_w(tag, "%s: %s\n", str, errno_string(errno));
-        return;
-    }
-    
-    conf.playlist_file = str;
-}
 
-static void set_save_playlist_file(const char *str)
-{
-    const bool *val;
-    
-    val = bool_map_value(str);
-    if(!val) {
-        climpd_log_w(tag, "unkown boolean value '%s'\n", str);
-        return;
-    }
-    
-    conf.save_playlist_file = *val;
-}
-
-static void set_default_playlist(const char *str)
-{
-    struct stat st;
-    int err;
-    
-    if(strcasecmp(str, DEFAULT_STR_DEFAULT_PLAYLIST) == 0)
-        return;
-
-    err = stat(str, &st);
-    if(err < 0) {
-        climpd_log_e(tag, "%s: %s\n", str, errno_string(errno));
-        return;
-    }
-    
-    if(!S_ISREG(st.st_mode)) {
-        climpd_log_w(tag, "%s is not a file\n", str);
-        return;
-    }
-    conf.default_playlist = str;
-}
-
-static void set_media_meta_length(const char *str)
-{
-    unsigned int val;
-    
-    errno = 0;
-    val = (unsigned int) strtol(str, NULL, 10);
-    
-    if(errno) {
-        climpd_log_w(tag, "invalid MediaMetaLength %s\n", str);
-        val = DEFAULT_VAL_MEDIA_META_LENGTH;
-        return;
-    }
-        
-    conf.media_meta_length = val;
-}
-
-static void set_media_active_color(const char *str)
-{
-    const char *val;
-    
-    val = terminal_color_map_color_code(str);
-    if(!val) {
-        climpd_log_w(tag, "invalid MediaActiceColor %s\n", str);
-        val = DEFAULT_VAL_MEDIA_ACTIVE_COLOR;
-    }
-    
-    conf.media_active_color = val;
-}
-
-static void set_media_passive_color(const char *str)
-{
-    const char *val;
-    
-    val = terminal_color_map_color_code(str);
-    if(!val) {
-        climpd_log_w(tag, "invalid MediaPassiveColor %s\n", str);
-        val = DEFAULT_VAL_MEDIA_PASSIVE_COLOR;
-    }
-    
-    conf.media_passive_color = val;
-}
-
-static void set_volume(const char *str)
-{
-    unsigned int val;
-    
-    errno = 0;
-    val = (unsigned int) strtol(str, NULL, 10);
-    
-    if(errno) {
-        climpd_log_w(tag, "invalid Volume %s\n", str);
-        val = DEFAULT_VAL_VOLUME;
-    }
-    
-    conf.volume = val;
-}
-
-static void set_repeat(const char *str)
-{
-    const bool *val;
-    
-    val = bool_map_value(str);
-    if(!val) {
-        climpd_log_w(tag, "invalid Repeat %s\n", str);
-        conf.repeat = DEFAULT_VAL_REPEAT;
-        return;
-    }
-    
-    conf.repeat = *val;
-}
-
-static void set_shuffle(const char *str)
-{
-    const bool *val;
-    
-    val = bool_map_value(str);
-    if(!val) {
-        climpd_log_w(tag, "invalid Shuffle %s\n", str);
-        conf.shuffle = DEFAULT_VAL_SHUFFLE;
-        return;
-    }
-    
-    conf.shuffle = *val;
-    
-}
 
 int climpd_config_init(void)
 {
@@ -244,7 +285,7 @@ int climpd_config_init(void)
     char *config_dir, *config_path;
     char *home;
     size_t home_len;
-    int fd, err;
+    int i, fd, err;
     
     /* Init some path variables */
 
@@ -286,12 +327,21 @@ int climpd_config_init(void)
     config = config_new(config_path);
     if(!config) {
         err = -errno;
+        climpd_log_e(tag, "config_new(): %s\n", errno_string(errno));
         goto cleanup2;
+    }
+    
+    for(i = 0; i < ARRAY_SIZE(handles); ++i) {
+        err = config_insert_handle(config, handles + i);
+        if(err < 0)
+            goto cleanup3;
     }
 
     err = climpd_config_reload();
-    if(err < 0)
+    if(err < 0) {
+        climpd_log_e(tag, "loading config failed: %s\n", errno_string(-err));
         goto cleanup3;
+    }
     
     free(config_path);
     free(config_dir);
@@ -310,49 +360,12 @@ out:
 
 int climpd_config_reload(void)
 {
-    const char *str;
     int err;
     
     err = config_parse(config);
     if(err < 0)
         return err;
     
-    str = config_value(config, "PlaylistFile");
-    if(str)
-        set_playlist_file(str);
-    
-    str = config_value(config, "SavePlaylistFile");
-    if(str)
-        set_save_playlist_file(str);
-     
-    str = config_value(config, "DefaultPlaylist");
-    if(str)
-        set_default_playlist(str);
-    
-    str = config_value(config, "MediaMetaLength");
-    if(str)
-        set_media_meta_length(str);
-    
-    str = config_value(config, "MediaActiveColor");
-    if(str)
-        set_media_active_color(str);
-    
-    str = config_value(config, "MediaPassiveColor");
-    if(str)
-        set_media_passive_color(str);
-
-    str = config_value(config, "Volume");
-    if(str)
-        set_volume(str);
-
-    str = config_value(config, "Repeat");
-    if(str)
-        set_repeat(str);
-    
-    str = config_value(config, "Shuffle");
-    if(str)
-        set_shuffle(str);
-
     return 0;
 }
 
