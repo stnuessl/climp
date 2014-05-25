@@ -21,8 +21,6 @@
 #ifndef _UTIL_H_
 #define _UTIL_H_
 
-const char *errno_string(int err);
-
 int create_leading_directories(const char *path, mode_t mode);
 
 #endif /* _UTIL_H_ */

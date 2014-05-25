@@ -26,6 +26,7 @@
 #include <stdbool.h>
 
 #include <libvci/macro.h>
+#include <libvci/error.h>
 
 #include "media-player/playlist.h"
 #include "media-player/media-player.h"
@@ -33,8 +34,6 @@
 #include "climpd-log.h"
 #include "climpd-config.h"
 #include "terminal-color-map.h"
-
-#include "../shared/util.h"
 
 static const char *tag = "climpd-player";
 static struct media_player media_player;
@@ -49,7 +48,7 @@ static void on_end_of_stream(struct media_player *mp)
     
     i = media_info(playlist_current(playlist));
     
-    climpd_log_i(tag, "finished playing ' %s '\n", i->title);
+    climpd_log_i(tag, "finished playing '%s'\n", i->title);
 
     m = playlist_next(playlist);
     if(!m) {
@@ -82,7 +81,7 @@ int climpd_player_init(struct playlist *pl, bool repeat, bool shuffle)
     
     err = media_player_init(&media_player);
     if(err < 0) {
-        climpd_log_e(tag, "media_player_init(): %s\n", errno_string(-err));
+        climpd_log_e(tag, "media_player_init(): %s\n", strerr(-err));
         return err;
     }
     

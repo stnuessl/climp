@@ -31,18 +31,15 @@
 #include <dirent.h>
 #include <sys/socket.h>
 #include <sys/un.h>
-#include <sys/eventfd.h>
-#include <sys/epoll.h>
-#include <sys/timerfd.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 
 #include <gst/gst.h>
 
 #include <libvci/macro.h>
+#include <libvci/error.h>
 
 #include "../shared/ipc.h"
-#include "../shared/util.h"
 #include "../shared/constants.h"
 
 #include "media-player/playlist.h"
@@ -141,7 +138,7 @@ static int set_state(struct client *client, const struct message *msg)
     if(strcmp("play", arg) == 0) {
         err = climpd_player_play();
         if(err < 0) {
-            err_msg = errno_string(-err);
+            err_msg = strerr(-err);
             client_err(client, "climpd: set-state play: %s\n", err_msg);
             return err;
         }
@@ -185,7 +182,7 @@ static int set_playlist(struct client *client, const struct message *msg)
         path = realpath(arg, NULL);
         if(!path) {
             err = -errno;
-            err_msg = errno_string(errno);
+            err_msg = strerr(errno);
             client_err(client, "climpd: set-playlist: %s\n", err_msg);
             return err;
         }
@@ -197,13 +194,13 @@ static int set_playlist(struct client *client, const struct message *msg)
  
     if(!pl) {
         err = -errno;
-        client_err(client, "climpd: set-playlist: %s\n", errno_string(errno));
+        client_err(client, "climpd: set-playlist: %s\n", strerr(errno));
         return err;
     }
     
     err = playlist_manager_insert(pl);
     if(err < 0) {
-        client_err(client, "climpd: set-playlist: %s\n", errno_string(-err));
+        client_err(client, "climpd: set-playlist: %s\n", strerr(-err));
         playlist_delete(pl);
         return err;
     }
@@ -279,7 +276,7 @@ static int play_next(struct client *client, const struct message *msg)
 
     err = climpd_player_next();
     if(err < 0) {
-        client_err(client, "climpd: play-next: %s\n", errno_string(-err));
+        client_err(client, "climpd: play-next: %s\n", strerr(-err));
         return err;
     }
     
@@ -298,7 +295,7 @@ static int play_previous(struct client *client, const struct message *msg)
     
     err = climpd_player_previous();
     if(err < 0) {
-        client_err(client, "climpd: play-previous: %s\n", errno_string(-err));
+        client_err(client, "climpd: play-previous: %s\n", strerr(-err));
         return err;
     }
     
@@ -319,8 +316,7 @@ static int play_file_realpath(struct client *client, const char *path)
     err = stat(path, &s);
     if(err < 0) {
         err = -errno;
-        client_err(client, "climpd: play-file: %s - %s\n", 
-                   path, errno_string(errno));
+        client_err(client, "climpd: play-file: %s - %s\n", path, errstr);
         return err;
     }
     
@@ -373,7 +369,7 @@ static int play_track(struct client *client, const struct message *msg)
     
     err = climpd_player_play_track(index);
     if(err < 0) {
-        client_err(client, "climpd: play-track: %s\n", errno_string(-err));
+        client_err(client, "climpd: play-track: %s\n", strerr(-err));
         return err;
     }
     
@@ -390,7 +386,7 @@ static int add_media_realpath(struct client *client, const char *path)
     err = stat(path, &s);
     if(err < 0) {
         err = -errno;
-        client_err(client, "climpd: %s - %s\n", path, errno_string(errno));
+        client_err(client, "climpd: %s - %s\n", path, strerr(errno));
         return err;
     }
     
@@ -401,7 +397,7 @@ static int add_media_realpath(struct client *client, const char *path)
     
     err = climpd_player_add_file(path);
     if(err < 0) {
-        client_err(client, "climpd: add-file: %s\n", errno_string(-err));
+        client_err(client, "climpd: add-file: %s\n", strerr(-err));
         return err;
     }
     
@@ -477,7 +473,7 @@ static int handle_message_hello(struct client *client,
     
     if(fd0 < 0 || fd1 < 0) {
         ipc_message_set_id(&msg_out, IPC_MESSAGE_NO);
-        ipc_message_set_arg(&msg_out, errno_string(EINVAL));
+        ipc_message_set_arg(&msg_out, strerr(EINVAL));
         
         ipc_send_message(fd, &msg_out);
         
@@ -519,7 +515,7 @@ static int reload_config(struct client *client, const struct message *msg)
     
     err = climpd_config_reload();
     if(err < 0) {
-        climpd_log_e(tag, "climpd_config_reload(): %s\n", errno_string(-err));
+        climpd_log_e(tag, "climpd_config_reload(): %s\n", strerr(-err));
         return err;
     }
     
@@ -586,7 +582,7 @@ static gboolean handle_unix_fd(GIOChannel *src, GIOCondition cond, void *data)
     
     err = ipc_recv_message(fd, &msg_in);
     if(err < 0) {
-        climpd_log_e(tag, "ipc_recv_message(): %s\n", errno_string(-err));
+        climpd_log_e(tag, "ipc_recv_message(): %s\n", strerr(-err));
         client_destroy(&client);
         return false;
     }
@@ -594,7 +590,7 @@ static gboolean handle_unix_fd(GIOChannel *src, GIOCondition cond, void *data)
     id = ipc_message_id(&msg_in);
     msg_id_str  = ipc_message_id_string(id);
     
-    climpd_log_d(tag, "received ' %s '\n", ipc_message_id_string(id));
+    climpd_log_d(tag, "received '%s'\n", ipc_message_id_string(id));
     
     if(id >= IPC_MESSAGE_MAX_ID) {
         climpd_log_w(tag, "received invalid message id %d\n", id);
@@ -603,14 +599,14 @@ static gboolean handle_unix_fd(GIOChannel *src, GIOCondition cond, void *data)
     
     err = msg_handler[id](&client, &msg_in);
     if(err < 0) {
-        climpd_log_e(tag, "Message ' %s ': %s\n", 
+        climpd_log_e(tag, "Message '%s': %s\n", 
                      ipc_message_id_string(id),
-                     errno_string(-err));
+                     strerr(-err));
 
         return true;
     }
     
-    climpd_log_d(tag, "handling ' %s ' was successful\n", msg_id_str);
+    climpd_log_d(tag, "handling '%s' was successful\n", msg_id_str);
     
     if(id == IPC_MESSAGE_GOODBYE)
         return false;
@@ -639,7 +635,7 @@ static gboolean handle_server_fd(GIOChannel *src, GIOCondition cond, void *data)
     err = getsockopt(fd, SOL_SOCKET, SO_PEERCRED, &creds, &cred_len);
     if(err < 0) {
         err = -errno;
-        climpd_log_e(tag, "getsockopt(): %s\n", errno_string(errno));
+        climpd_log_e(tag, "getsockopt(): %s\n", strerr(errno));
         goto out;
     }
     
@@ -790,31 +786,31 @@ static int init(void)
 #endif
     err = close_std_streams();
     if(err < 0) {
-        climpd_log_e(tag, "close_std_streams(): %s\n", errno_string(-err));
+        climpd_log_e(tag, "close_std_streams(): %s\n", strerr(-err));
         goto cleanup1;
     }
     
     err = terminal_color_map_init();
     if(err < 0) {
-        climpd_log_e(tag, "terminal_color_map_init(): %s\n", errno_string(-err));
+        climpd_log_e(tag, "terminal_color_map_init(): %s\n", strerr(-err));
         goto cleanup1;
     }
     
     err = bool_map_init();
     if(err < 0) {
-        climpd_log_e(tag, "bool_map_init(): %s\n", errno_string(-err));
+        climpd_log_e(tag, "bool_map_init(): %s\n", strerr(-err));
         goto cleanup2;
     }
     
     err = climpd_config_init();
     if(err < 0) {
-        climpd_log_e(tag, "climpd_config_init(): %s\n", errno_string(-err));
+        climpd_log_e(tag, "climpd_config_init(): %s\n", strerr(-err));
         goto cleanup3;
     }
     
     err = playlist_manager_init();
     if(err < 0) {
-        climpd_log_e(tag, "playlist_manager_init(): %s\n", errno_string(-err));
+        climpd_log_e(tag, "playlist_manager_init(): %s\n", strerr(-err));
         goto cleanup4;
     }
     
@@ -832,7 +828,7 @@ static int init(void)
     
     err = init_server_fd();
     if(err < 0) {
-        climpd_log_e(tag, "init_server_fd(): %s\n", errno_string(-err));
+        climpd_log_e(tag, "init_server_fd(): %s\n", strerr(-err));
         goto cleanup6;
     }
     
@@ -845,7 +841,7 @@ static int init(void)
                 climpd_log_e(tag, 
                              "playlist_new_file(): %s: %s\n", 
                              conf.default_playlist,
-                             errno_string(-err));
+                             strerr(-err));
                 goto cleanup7;
             }
             
@@ -853,7 +849,7 @@ static int init(void)
             if(err < 0) {
                 climpd_log_e(tag,
                              "playlist_manager_insert(): %s: %s\n",
-                             playlist_name(pl), errno_string(-err));
+                             playlist_name(pl), strerr(-err));
                 
                 playlist_delete(pl);
                 goto cleanup7;
@@ -865,7 +861,7 @@ static int init(void)
     
     err = climpd_player_init(pl, conf.repeat, conf.shuffle);
     if(err < 0) {
-        climpd_log_e(tag, "climp_player_init(): %s\n", errno_string(errno));
+        climpd_log_e(tag, "climp_player_init(): %s\n", strerr(-err));
         goto cleanup7;
     }
 

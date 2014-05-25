@@ -29,6 +29,7 @@
 
 #include <libvci/config.h>
 #include <libvci/macro.h>
+#include <libvci/error.h>
 
 #include "climpd-log.h"
 #include "climpd-config.h"
@@ -83,7 +84,7 @@ static void set_playlist_file(const char *key, const char *val, void *arg)
     
     err = stat(val, &st);
     if(err < 0) {
-        climpd_log_w(tag, "%s: %s\n", val, errno_string(errno));
+        climpd_log_w(tag, "%s: %s\n", val, strerr(errno));
         return;
     }
     
@@ -119,7 +120,7 @@ static void set_default_playlist(const char *key, const char *val, void *arg)
     
     err = stat(val, &st);
     if(err < 0) {
-        climpd_log_e(tag, "%s: %s\n", val, errno_string(errno));
+        climpd_log_e(tag, "%s: %s\n", val, strerr(errno));
         return;
     }
     
@@ -127,6 +128,7 @@ static void set_default_playlist(const char *key, const char *val, void *arg)
         climpd_log_w(tag, "%s is not a file\n", val);
         return;
     }
+    
     conf.default_playlist = val;
 }
 
@@ -276,8 +278,6 @@ static const char default_config_text[] = {
 };
 
 
-
-
 int climpd_config_init(void)
 {
     static const char *dir  = "/.config/climp/";
@@ -288,32 +288,47 @@ int climpd_config_init(void)
     int i, fd, err;
     
     /* Init some path variables */
+    
+    climpd_log_i(tag, "starting initialization...\n");
 
     home = getenv("HOME");
+    if(!home) {
+        err = -ENOENT;
+        climpd_log_e(tag, "no home directory for user %d\n", getuid());
+        goto out;
+    }
+    
     home_len = strlen(home);
     
     config_dir = malloc(home_len + strlen(dir));
-    if(!config_dir)
+    if(!config_dir) {
+        climpd_log_e(tag, "malloc(): %s\n", errstr);
         goto out;
+    }
     
     config_dir = strcpy(config_dir, home);
     config_dir = strcat(config_dir, dir);
     
     config_path = malloc(home_len + strlen(path));
-    if(!config_path)
+    if(!config_path) {
+        climpd_log_e(tag, "malloc(): %s\n", errstr);
         goto cleanup1;
+    }
     
     config_path = strcpy(config_path, home);
     config_path = strcat(config_path, path);
     err = create_leading_directories(config_dir, DEFAULT_DIR_MODE);
-    if(err < 0)
+    if(err < 0) {
+        climpd_log_e(tag, "create_leading_directories(): %s\n", strerr(-err));
         goto cleanup2;
+    }
     
     /* Create and initialize file if necessary */
 
     fd = open(config_path, O_CREAT | O_EXCL | O_WRONLY,  DEFAULT_FILE_MODE);
     if(fd < 0) {
         if(errno != EEXIST) {
+            climpd_log_e(tag, "open(): %s\n", errstr);
             err = -errno;
             goto cleanup2;
         }
@@ -327,7 +342,7 @@ int climpd_config_init(void)
     config = config_new(config_path);
     if(!config) {
         err = -errno;
-        climpd_log_e(tag, "config_new(): %s\n", errno_string(errno));
+        climpd_log_e(tag, "config_new(): %s\n", strerr(errno));
         goto cleanup2;
     }
     
@@ -339,12 +354,14 @@ int climpd_config_init(void)
 
     err = climpd_config_reload();
     if(err < 0) {
-        climpd_log_e(tag, "loading config failed: %s\n", errno_string(-err));
+        climpd_log_e(tag, "loading config failed: %s\n", strerr(-err));
         goto cleanup3;
     }
     
     free(config_path);
     free(config_dir);
+    
+    climpd_log_i(tag, "initialization successful\n");
     
     return 0;
 
@@ -355,6 +372,7 @@ cleanup2:
 cleanup1:
     free(config_dir);
 out:
+    climpd_log_e(tag, "initialization failed\n");
     return err;
 }
 

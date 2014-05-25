@@ -26,7 +26,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
-const char* errno_string(int err)
+const char* strerr(int err)
 {
     static __thread char s[64];
     

@@ -28,14 +28,15 @@
 #include <libvci/map.h>
 #include <libvci/hash.h>
 #include <libvci/compare.h>
+#include <libvci/error.h>
 
 #include "media-player/playlist.h"
 
 #include "climpd-log.h"
 #include "playlist-manager.h"
 
-#include "../shared/util.h"
 #include "../shared/constants.h"
+#include "../shared/util.h"
 
 static const char *tag = "playlist-manager";
 static struct map playlist_map;
@@ -110,15 +111,14 @@ int playlist_manager_load_from_file(const char *__restrict path)
         
         pl = playlist_new_file(NULL, line);
         if(!pl) {
-            msg = errno_string(errno);
+            msg = strerr(errno);
             climpd_log_w(tag, "playlist_new_file(): %s: %s\n", line, msg);
             continue;
         }
         
         err = playlist_manager_insert(pl);
         if(err < 0) {
-            msg = errno_string(-err);
-            climpd_log_w(tag, "failed to add %s: %s\n", line, msg);
+            climpd_log_w(tag, "failed to add %s: %s\n", line, strerr(-err));
             continue;
         }
         
