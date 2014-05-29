@@ -26,7 +26,7 @@
 #include <libvci/map.h>
 #include <libvci/random.h>
 
-#include "media.h"
+#include "../media-objects/media.h"
 
 struct playlist {
     struct map map_path;

@@ -28,12 +28,15 @@
 #include <libvci/macro.h>
 #include <libvci/error.h>
 
-#include "media-player/playlist.h"
-#include "media-player/media-player.h"
-#include "climpd-player.h"
-#include "climpd-log.h"
+#include "../media-objects/media-player.h"
+
+#include "../util/terminal-color-map.h"
+
+#include "media-creator.h"
+#include "playlist.h"
 #include "climpd-config.h"
-#include "terminal-color-map.h"
+#include "climpd-log.h"
+#include "climpd-player.h"
 
 static const char *tag = "climpd-player";
 static struct media_player media_player;
@@ -111,13 +114,13 @@ int climpd_player_play_file(const char *__restrict path)
     
     m = playlist_retrieve_path(playlist, path);
     if(!m) {
-        m = media_new(path);
+        m = media_creator_new_media(path);
         if(!m)
             return -errno;
         
         err = climpd_player_play_media(m);
         if(err < 0) {
-            media_delete(m);
+            media_creator_delete_media(m);
             return err;
         }
     }
@@ -183,8 +186,10 @@ int climpd_player_next(void)
         return -ENOENT;
     
     m = playlist_next(playlist);
-    if(!m)
+    if(!m) {
+        climpd_player_stop();
         return 0;
+    }
     
     media_player_play_media(&media_player, m);
     
@@ -199,8 +204,10 @@ int climpd_player_previous(void)
         return -ENOENT;
     
     m = playlist_previous(playlist);
-    if(!m)
+    if(!m) {
+        climpd_player_stop();
         return 0;
+    }
     
     media_player_play_media(&media_player, m);
     

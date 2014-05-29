@@ -85,3 +85,31 @@ fail:
     free(path_dup);
     return err;
 }
+
+int is_file(const char *path, bool *ret)
+{
+    struct stat s;
+    int err;
+    
+    err = stat(path, &s);
+    if(err < 0)
+        return -errno;
+    
+    *ret = S_ISREG(s.st_mode);
+    
+    return 0;
+}
+
+int is_dir(const char *path, bool *ret)
+{
+    struct stat s;
+    int err;
+    
+    err = stat(path, &s);
+    if(err < 0)
+        return -errno;
+    
+    *ret = S_ISDIR(s.st_mode);
+    
+    return 0;
+}

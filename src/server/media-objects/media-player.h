@@ -25,7 +25,6 @@
 
 #include <gst/gst.h>
 
-#include "playlist.h"
 #include "media.h"
 
 struct media_player {

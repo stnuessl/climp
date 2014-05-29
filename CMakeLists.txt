@@ -34,31 +34,19 @@ set(SOURCE
     )
     
 set(SOURCE_SERVER
-    src/server/client.c
     src/server/main.c
-    src/server/terminal-color-map.c
-    src/server/bool-map.c
-    src/server/playlist-manager.c
-    src/server/climpd-log.c
-    src/server/climpd-player.c
-    src/server/climpd-config.c
-    src/server/media-player/media.c
-    src/server/media-player/playlist.c
-    src/server/media-player/media-player.c
+    src/server/util/terminal-color-map.c
+    src/server/util/bool-map.c
+    src/server/core/playlist-manager.c
+    src/server/core/media-creator.c
+    src/server/core/message-handler.c
+    src/server/core/climpd-log.c
+    src/server/core/climpd-player.c
+    src/server/core/climpd-config.c
+    src/server/core/playlist.c
+    src/server/media-objects/media.c
+    src/server/media-objects/media-player.c
     src/shared/ipc.c
-    src/shared/util.c
-    )
-    
-set(SOURCE_TESTS
-    src/server/tests.c
-    src/server/terminal-color-map.c
-    src/server/bool-map.c
-    src/server/climpd-log.c
-    src/server/climpd-player.c
-    src/server/climpd-config.c
-    src/server/media-player/media.c
-    src/server/media-player/playlist.c
-    src/server/media-player/media-player.c
     src/shared/util.c
     )
 
@@ -71,9 +59,6 @@ target_link_libraries(climp ${CLIMP_LIBS})
 
 add_executable(climpd ${SOURCE_SERVER})
 target_link_libraries(climpd ${CLIMPD_LIBS} ${CMAKE_THREAD_LIBS_INIT})
-
-add_executable(tests ${SOURCE_TESTS})
-target_link_libraries(tests ${CLIMPD_LIBS} ${CMAKE_THREAD_LIBS_INIT})
 
 install(PROGRAMS
         ${CMAKE_BINARY_DIR}/climp

@@ -28,6 +28,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <linux/sockios.h>
+#include <assert.h>
 
 #include <libvci/macro.h>
 
@@ -40,27 +41,36 @@ const char *ipc_message_id_string(enum message_id id)
         [IPC_MESSAGE_GOODBYE]           = "IPC_MESSAGE_GOODBYE",
         [IPC_MESSAGE_OK]                = "IPC_MESSAGE_OK",
         [IPC_MESSAGE_NO]                = "IPC_MESSAGE_NO",
-        [IPC_MESSAGE_GET_PLAYLISTS]     = "IPC_MESSAGE_GET_PLAYLISTS",
-        [IPC_MESSAGE_GET_PLAYLIST]      = "IPC_MESSAGE_GET_PLAYLIST",
-        [IPC_MESSAGE_GET_FILES]         = "IPC_MESSAGE_GET_FILES",
-        [IPC_MESSAGE_GET_VOLUME]        = "IPC_MESSAGE_GET_VOLUME",
-        [IPC_MESSAGE_GET_STATE]         = "IPC_MESSAGE_GET_STATUS",
+        
+        [IPC_MESSAGE_MUTE]              = "IPC_MESSAGE_MUTE",
+        [IPC_MESSAGE_PAUSE]             = "IPC_MESSAGE_PAUSE",
+        [IPC_MESSAGE_PLAY]              = "IPC_MESSAGE_PLAY",
+        [IPC_MESSAGE_STOP]              = "IPC_MESSAGE_STOP",
+        
         [IPC_MESSAGE_GET_COLORS]        = "IPC_MESSAGE_GET_COLORS",
-        [IPC_MESSAGE_SET_STATE]         = "IPC_MESSAGE_SET_STATUS",
+        [IPC_MESSAGE_GET_CONFIG]        = "IPC_MESSAGE_GET_CONFIG",
+        [IPC_MESSAGE_GET_FILES]         = "IPC_MESSAGE_GET_FILES",
+        [IPC_MESSAGE_GET_PLAYLISTS]     = "IPC_MESSAGE_GET_PLAYLISTS",
+        [IPC_MESSAGE_GET_STATE]         = "IPC_MESSAGE_GET_STATE",
+        [IPC_MESSAGE_GET_TITLES]        = "IPC_MESSAGE_GET_TITLES",
+        [IPC_MESSAGE_GET_VOLUME]        = "IPC_MESSAGE_GET_VOLUME",
+        
         [IPC_MESSAGE_SET_PLAYLIST]      = "IPC_MESSAGE_SET_PLAYLIST",
-        [IPC_MESSAGE_SET_VOLUME]        = "IPC_MESSAGE_SET_VOLUME",
         [IPC_MESSAGE_SET_REPEAT]        = "IPC_MESSAGE_SET_REPEAT",
         [IPC_MESSAGE_SET_SHUFFLE]       = "IPC_MESSAGE_SET_SHUFFLE",
+        [IPC_MESSAGE_SET_VOLUME]        = "IPC_MESSAGE_SET_VOLUME",
+        
         [IPC_MESSAGE_PLAY_NEXT]         = "IPC_MESSAGE_PLAY_NEXT",
         [IPC_MESSAGE_PLAY_PREVIOUS]     = "IPC_MESSAGE_PLAY_PREVIOUS",
         [IPC_MESSAGE_PLAY_FILE]         = "IPC_MESSAGE_PLAY_FILE",
         [IPC_MESSAGE_PLAY_TRACK]        = "IPC_MESSAGE_PLAY_TRACK",
-        [IPC_MESSAGE_ADD_MEDIA]         = "IPC_MESSAGE_ADD_MEDIA",
-        [IPC_MESSAGE_ADD_PLAYLIST]      = "IPC_MESSAGE_ADD_PLAYLIST",
+        
+        [IPC_MESSAGE_LOAD_CONFIG]       = "IPC_MESSAGE_LOAD_CONFIG",
+        [IPC_MESSAGE_LOAD_MEDIA]        = "IPC_MESSAGE_LOAD_MEDIA",
+        [IPC_MESSAGE_LOAD_PLAYLIST]     = "IPC_MESSAGE_LOAD_PLAYLIST",
+        
         [IPC_MESSAGE_REMOVE_MEDIA]      = "IPC_MESSAGE_REMOVE_MEDIA",
-        [IPC_MESSAGE_REMOVE_PLAYLIST]   = "IPC_MESSAGE_REMOVE_PLAYLIST",
-        [IPC_MESSAGE_RELOAD_CONFIG]     = "IPC_MESSAGE_RELOAD_CONFIG",
-        [IPC_MESSAGE_GET_CONFIG]        = "IPC_MESSAGE_GET_CONFIG"
+        [IPC_MESSAGE_REMOVE_PLAYLIST]   = "IPC_MESSAGE_REMOVE_PLAYLIST"
     };
     
     return message_names[id];

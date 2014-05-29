@@ -18,15 +18,15 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef _CLIMPD_H_
-#define _CLIMPD_H_
+#ifndef _MESSAGE_HANDLER_H_
+#define _MESSAGE_HANDLER_H_
 
-#include "../shared/ipc.h"
+int message_handler_init(void);
 
-int climpd_init(void);
+void message_handler_destroy(void);
 
-void climpd_destroy(void);
+bool message_handler_ready(void);
 
-void climpd_handle_args(int argc, char *argv[]);
+int message_handler_add_connection(int fd);
 
-#endif /* _CLIMPD_H_ */
+#endif /* _MESSAGE_HANDLER_H_ */

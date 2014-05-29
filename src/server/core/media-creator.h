@@ -18,27 +18,17 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef _PLAYLIST_MANAGER_H_
-#define _PLAYLIST_MANAGER_H_
+#ifndef _MEDIA_CREATOR_H_
+#define _MEDIA_CREATOR_H_
 
-#include "media-player/playlist.h"
+#include "../media-objects/media.h"
 
-int playlist_manager_init(void);
+int media_creator_init(void);
 
-void playlist_manager_destroy(void);
+void media_creator_destroy(void);
 
-int playlist_manager_load_from_file(const char *__restrict path);
+struct media *media_creator_new_media(const char *path);
 
-int playlist_manager_save_to_file(const char *__restrict path);
+void media_creator_delete_media(struct media *m);
 
-int playlist_manager_insert(struct playlist *__restrict pl);
-
-struct playlist *playlist_manager_retrieve(const char *__restrict name);
-
-struct playlist *playlist_manager_take(const char *__restrict name);
-
-void playlist_manager_delete_playlist(const char *__restrict name);
-
-void playlist_manager_print(int fd);
-
-#endif /* _PLAYLIST_MANAGER_H_ */
+#endif /* _MEDIA_CREATOR_H_ */

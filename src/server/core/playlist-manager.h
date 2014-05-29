@@ -18,31 +18,27 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef _CLIENT_H_
-#define _CLIENT_H_
+#ifndef _PLAYLIST_MANAGER_H_
+#define _PLAYLIST_MANAGER_H_
 
-#include <gst/gst.h>
+#include "playlist.h"
 
-struct client {
-    GIOChannel *io;
-    
-    uid_t uid;
-    pid_t pid;
-    
-    int stderr;
-    int stdout;
-};
+int playlist_manager_init(void);
 
-void client_init(struct client *__restrict client, pid_t pid, int unix_fd);
+void playlist_manager_destroy(void);
 
-void client_destroy(struct client *__restrict client);
+int playlist_manager_load_from_file(const char *__restrict path);
 
-int client_unix_fd(const struct client *__restrict client);
+int playlist_manager_save_to_file(const char *__restrict path);
 
-void client_set_stdout(struct client *__restrict client, int fd);
+int playlist_manager_insert(struct playlist *__restrict pl);
 
-void client_set_stderr(struct client *__restrict client, int fd);
+struct playlist *playlist_manager_retrieve(const char *__restrict name);
 
-void client_err(const struct client *__restrict client, const char *fmt, ...);
+struct playlist *playlist_manager_take(const char *__restrict name);
 
-#endif /* _CLIENT_H_ */
+void playlist_manager_delete_playlist(const char *__restrict name);
+
+void playlist_manager_print(int fd);
+
+#endif /* _PLAYLIST_MANAGER_H_ */

@@ -30,8 +30,9 @@
 #include <libvci/hash.h>
 #include <libvci/macro.h>
 
+#include "media-creator.h"
+
 #include "playlist.h"
-#include "media.h"
 
 static int media_compare(const void *__restrict s1, const void *__restrict s2)
 {
@@ -210,7 +211,7 @@ int playlist_insert_path(struct playlist *__restrict pl,
 {
     struct media *m;
     
-    m = media_new(path);
+    m = media_creator_new_media(path);
     if(!m)
         return -errno;
     
@@ -228,7 +229,7 @@ void playlist_delete_path(struct playlist *__restrict pl,
 {
     struct media *m;
     
-    m = map_take(&pl->map_path, path);
+    m = map_retrieve(&pl->map_path, path);
     if(!m)
         return;
     

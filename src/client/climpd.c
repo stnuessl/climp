@@ -29,7 +29,11 @@
 #include <sys/eventfd.h>
 #include <sys/epoll.h>
 
+#include <libvci/map.h>
+#include <libvci/hash.h>
+#include <libvci/compare.h>
 #include <libvci/macro.h>
+#include <libvci/error.h>
 
 #include "../shared/ipc.h"
 
@@ -37,13 +41,54 @@
 
 extern char **environ;
 
-static int climpd_connect(struct climpd *__restrict c)
+static int fd;
+static struct message *msg;
+
+static struct command_handle {
+    const char *command;
+    enum message_id message_id;
+    bool has_arg;
+    bool arg_is_path;
+} cmd_handles[] = {
+    { "pause",           IPC_MESSAGE_PAUSE,             false,  false   },
+    { "play",            IPC_MESSAGE_PLAY,              false,  false   },
+    { "stop",            IPC_MESSAGE_STOP,              false,  false   },
+    
+    { "get-colors",      IPC_MESSAGE_GET_COLORS,        false,  false   },
+    { "get-config",      IPC_MESSAGE_GET_CONFIG,        false,  false   },
+    { "get-files",       IPC_MESSAGE_GET_FILES,         false,  false   },
+    { "get-playlists",   IPC_MESSAGE_GET_PLAYLISTS,     false,  false   },
+    { "get-state",       IPC_MESSAGE_GET_STATE,         false,  false   },
+    { "get-titles",      IPC_MESSAGE_GET_TITLES,        false,  false   },
+    { "get-volume",      IPC_MESSAGE_GET_VOLUME,        false,  false   },
+    
+    { "set-playlist",    IPC_MESSAGE_SET_PLAYLIST,      true,   true    },
+    { "set-volume",      IPC_MESSAGE_SET_VOLUME,        true,   false   },
+    { "set-repeat",      IPC_MESSAGE_SET_REPEAT,        true,   false   },
+    { "set-shuffle",     IPC_MESSAGE_SET_SHUFFLE,       true,   false   },
+    
+    { "play-file",       IPC_MESSAGE_PLAY_FILE,         true,   true    },
+    { "play-next",       IPC_MESSAGE_PLAY_NEXT,         false,  false   },
+    { "play-previous",   IPC_MESSAGE_PLAY_PREVIOUS,     false,  false   },
+    { "play-track",      IPC_MESSAGE_PLAY_TRACK,        true,   false   },
+    
+    { "load-config",     IPC_MESSAGE_LOAD_CONFIG,       true,   false   },
+    { "load-media",      IPC_MESSAGE_LOAD_MEDIA,        true,   true    },
+    { "load-playlist",   IPC_MESSAGE_LOAD_PLAYLIST,     true,   true    },
+    
+    { "remove-media",    IPC_MESSAGE_REMOVE_MEDIA,      true,   true    },
+    { "remove-playlist", IPC_MESSAGE_REMOVE_PLAYLIST,   true,   false   },
+};
+
+static struct map *cmd_map;
+
+static int climpd_connect(void)
 {
     struct sockaddr_un addr;
     int err;
     
-    c->fd = socket(AF_UNIX, SOCK_STREAM, 0);
-    if(c->fd < 0) {
+    fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if(fd < 0) {
         err = -errno;
         goto out;
     }
@@ -53,29 +98,29 @@ static int climpd_connect(struct climpd *__restrict c)
     addr.sun_family = AF_UNIX;
     strncpy(addr.sun_path, IPC_SOCKET_PATH, sizeof(addr.sun_path));
     
-    err = connect(c->fd, (struct sockaddr *) &addr, sizeof(addr));
+    err = connect(fd, (struct sockaddr *) &addr, sizeof(addr));
     if(err < 0) {
         err = -errno;
         goto cleanup1;
     }
     
-    ipc_message_clear(&c->msg);
-    ipc_message_set_id(&c->msg, IPC_MESSAGE_HELLO);
-    ipc_message_set_fds(&c->msg, STDOUT_FILENO, STDERR_FILENO);
+    ipc_message_clear(msg);
+    ipc_message_set_id(msg, IPC_MESSAGE_HELLO);
+    ipc_message_set_fds(msg, STDOUT_FILENO, STDERR_FILENO);
     
-    err = ipc_send_message(c->fd, &c->msg);
+    err = ipc_send_message(fd, msg);
     if(err < 0) {
         fprintf(stderr, "climp: ipc_send_message(): %s\n", strerror(-err));
         goto cleanup1;
     }
     
-    err = ipc_recv_message(c->fd, &c->msg);
+    err = ipc_recv_message(fd, msg);
     if(err < 0) {
         fprintf(stderr, "climp: ipc_recv_message(): %s\n", strerror(-err));
         goto cleanup1;
     }
     
-    if(ipc_message_id(&c->msg) != IPC_MESSAGE_OK) {
+    if(ipc_message_id(msg) != IPC_MESSAGE_OK) {
         err = -EIO;
         goto cleanup1;
     }
@@ -83,23 +128,22 @@ static int climpd_connect(struct climpd *__restrict c)
     return 0;
     
 cleanup1:
-    close(c->fd);
+    close(fd);
 out:
     return err;
 }
 
-static int climpd_disconnect(struct climpd *__restrict c)
+static void climpd_disconnect(void)
 {
-    ipc_message_clear(&c->msg);
-    ipc_message_set_id(&c->msg, IPC_MESSAGE_GOODBYE);
+    ipc_message_clear(msg);
+    ipc_message_set_id(msg, IPC_MESSAGE_GOODBYE);
     
-    ipc_send_message(c->fd, &c->msg);
+    ipc_send_message(fd, msg);
     
     /* This step is needed for a flawless synchronisation */
-    ipc_recv_message(c->fd, &c->msg);
+    ipc_recv_message(fd, msg);
 
-    close(c->fd);
-    return 0;
+    close(fd);
 }
 
 static int spawn_climpd(void)
@@ -122,21 +166,41 @@ static int spawn_climpd(void)
     exit(EXIT_FAILURE);
 }
 
-struct climpd *climpd_new(void)
+static int climpd_send_message(enum message_id id, const char *__restrict arg)
 {
-    struct climpd *c;
-    int attempts, err;
+    int err;
     
-    c = malloc(sizeof(*c));
-    if(!c)
-        goto out;
+    ipc_message_clear(msg);
+    ipc_message_set_id(msg, id);
     
-    ipc_message_init(&c->msg);
+    if(arg) {
+        err = ipc_message_set_arg(msg, arg);
+        if(err < 0) {
+            fprintf(stderr, "climp: argument '%s' - %s\n", arg, strerror(-err));
+            return err;
+        }
+    }
     
-    c->int_err_cnt = 0;
-    c->ext_err_cnt = 0;
+    err = ipc_send_message(fd, msg);
+    if(err < 0) {
+        fprintf(stderr, "climp: sending message '%s' failed - %s\n", 
+                ipc_message_id_string(id), strerror(-err));
+
+        return err;
+    }
     
-    err = climpd_connect(c);
+    return 0;
+}
+
+int climpd_init(void)
+{
+    int i, attempts, err;
+
+    msg = ipc_message_new();
+    if(!msg)
+        return -errno;
+    
+    err = climpd_connect();
     if(err < 0) {
         if(err != -ENOENT && err != -ECONNREFUSED)
             goto cleanup1;
@@ -156,7 +220,7 @@ struct climpd *climpd_new(void)
         while(attempts--) {
             usleep(10 * 1000);
             
-            err = climpd_connect(c);
+            err = climpd_connect();
             if(err < 0)
                 continue;
             
@@ -164,49 +228,99 @@ struct climpd *climpd_new(void)
         }
         
         if(err < 0)
-            goto cleanup1;
-    }
-
-    return c;
-    
-cleanup1:
-    free(c);
-out:
-    return NULL;
-}
-
-void climpd_delete(struct climpd *__restrict c)
-{
-    int err;
-
-    err = climpd_disconnect(c);
-    if(err < 0) {
-        fprintf(stderr, 
-                "climp: client_destroy_instance(): %s\n", 
-                strerror(-err));
+            goto cleanup2;
     }
     
-    free(c);
-}
-
-int climpd_send_message(struct climpd *__restrict c,
-                         enum message_id id, 
-                         const char *__restrict arg)
-{
-    int err;
+    cmd_map = map_new(32, &compare_string, &hash_string);
+    if(!cmd_map) {
+        err = -errno;
+        goto cleanup2;
+    }
     
-    ipc_message_clear(&c->msg);
-    ipc_message_set_id(&c->msg, id);
-    
-    if(arg) {
-        err = ipc_message_set_arg(&c->msg, arg);
+    for(i = 0; i < ARRAY_SIZE(cmd_handles); ++i) {
+        err = map_insert(cmd_map, cmd_handles[i].command, cmd_handles + i);
         if(err < 0)
-            return err;
+            goto cleanup3;
     }
-    
-    err = ipc_send_message(c->fd, &c->msg);
-    if(err < 0)
-        return err;
-    
+
     return 0;
+
+cleanup3:
+    map_delete(cmd_map);
+cleanup2:
+    climpd_disconnect();
+cleanup1:
+    ipc_message_delete(msg);
+    
+    return err;
 }
+
+void climpd_destroy(void)
+{
+    map_delete(cmd_map);
+    climpd_disconnect();
+    ipc_message_delete(msg);
+}
+
+void climpd_handle_args(int argc, char *argv[])
+{
+    struct command_handle *handle;
+    char *path;
+    int i;
+    
+    for(i = 0; i < argc; ++i) {
+        handle = map_retrieve(cmd_map, argv[i]);
+        if(!handle) {
+            fprintf(stderr, "climp: unknown command '%s'\n", argv[i]);
+            continue;
+        }
+        
+        if(!handle->has_arg) {
+            climpd_send_message(handle->message_id, NULL);
+            continue;
+        }
+        
+        i += 1;
+        if(i >= argc) {
+            fprintf(stderr, "climp: missing argument for command '%s'\n", 
+                    handle->command);
+            continue;
+        }
+        
+        if(map_contains(cmd_map, argv[i])) {
+            fprintf(stderr, "climp: missing argument for command '%s'\n", 
+                    handle->command);
+            i -= 1;
+            continue;
+        }
+        
+        for(; i < argc; ++i) {
+            if(map_contains(cmd_map, argv[i])) {
+                i -= 1;
+                break;
+            }
+            
+            /* now we can be sure we got a valid argument */
+            if(!handle->arg_is_path) {
+                climpd_send_message(handle->message_id, argv[i]);
+                continue;
+            }
+            
+            /* 
+             * The climpd needs absolute paths since it may have a different 
+             * workind directory than this process
+             */
+            
+            path = realpath(argv[i], NULL);
+            if(!path) {
+                fprintf(stderr, "climp: %s - %s\n", argv[i], strerror(errno));
+                continue;
+            }
+            
+            climpd_send_message(handle->message_id, path);
+            
+            free(path);
+        }
+    }
+}
+

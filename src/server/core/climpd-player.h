@@ -23,8 +23,8 @@
 
 #include <stdbool.h>
 
-#include "media-player/playlist.h"
-#include "media-player/media.h"
+#include "../media-objects/media.h"
+#include "playlist.h"
 
 int climpd_player_init(struct playlist *pl, bool repeat, bool shuffle);
 

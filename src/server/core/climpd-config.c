@@ -33,11 +33,12 @@
 
 #include "climpd-log.h"
 #include "climpd-config.h"
-#include "terminal-color-map.h"
-#include "bool-map.h"
 
-#include "../shared/util.h"
-#include "../shared/constants.h"
+#include "../util/terminal-color-map.h"
+#include "../util/bool-map.h"
+
+#include "../../shared/util.h"
+#include "../../shared/constants.h"
 
 #define DEFAULT_STR_PLAYLIST_FILE        ""
 #define DEFAULT_STR_SAVE_PLAYLIST_FILE   "false"

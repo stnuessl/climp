@@ -30,13 +30,12 @@
 #include <libvci/compare.h>
 #include <libvci/error.h>
 
-#include "media-player/playlist.h"
+#include "../../shared/constants.h"
+#include "../../shared/util.h"
 
+#include "playlist.h"
 #include "climpd-log.h"
 #include "playlist-manager.h"
-
-#include "../shared/constants.h"
-#include "../shared/util.h"
 
 static const char *tag = "playlist-manager";
 static struct map playlist_map;

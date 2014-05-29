@@ -31,6 +31,9 @@ struct media_info {
     char title[MEDIA_META_ELEMENT_SIZE];
     char artist[MEDIA_META_ELEMENT_SIZE];
     char album[MEDIA_META_ELEMENT_SIZE];
+    unsigned int track; 
+    unsigned int duration;
+    bool seekable;
 };
 
 struct media {
@@ -40,6 +43,7 @@ struct media {
     
     char *uri;
     char *path;
+    char *name;
 };
 
 struct media *media_new(const char *path);
@@ -47,8 +51,5 @@ struct media *media_new(const char *path);
 void media_delete(struct media *__restrict media);
 
 const struct media_info *media_info(const struct media *__restrict media);
-
-bool media_is_from_file(const struct media *__restrict media, 
-                        const char *__restrict path);
 
 #endif /* _MEDIA_H_ */
