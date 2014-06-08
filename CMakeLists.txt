@@ -37,21 +37,23 @@ set(SOURCE_SERVER
     src/server/main.c
     src/server/util/terminal-color-map.c
     src/server/util/bool-map.c
+    src/server/util/climpd-log.c
     src/server/core/playlist-manager.c
-    src/server/core/media-creator.c
     src/server/core/message-handler.c
-    src/server/core/climpd-log.c
     src/server/core/climpd-player.c
     src/server/core/climpd-config.c
+    src/server/core/media-manager.c
+    src/server/core/media-scheduler.c
     src/server/core/playlist.c
-    src/server/media-objects/media.c
-    src/server/media-objects/media-player.c
+    src/server/core/media.c
     src/shared/ipc.c
     src/shared/util.c
     )
 
 find_package(Threads)
 
+include_directories(src/server/)
+include_directories(src/shared/)
 link_directories(${CMAKE_LIBRARY_PATH})
 
 add_executable(climp ${SOURCE})

@@ -24,20 +24,11 @@
 #include <errno.h>
 #include <assert.h>
 
-#include <libvci/link.h>
-#include <libvci/list.h>
-#include <libvci/map.h>
-#include <libvci/hash.h>
+#include <libvci/vector.h>
 #include <libvci/macro.h>
 
-#include "media-creator.h"
-
-#include "playlist.h"
-
-static int media_compare(const void *__restrict s1, const void *__restrict s2)
-{
-    return strcmp(s1, s2);
-}
+#include "core/playlist.h"
+#include "core/media.h"
 
 struct playlist *playlist_new(const char *__restrict name)
 {
@@ -57,40 +48,6 @@ struct playlist *playlist_new(const char *__restrict name)
     return pl;
 }
 
-struct playlist *playlist_new_file(const char *__restrict name, 
-                                   const char *path)
-{
-    struct playlist *pl;
-    int err;
-    
-    if(!name) {
-        name = strrchr(path, '/');
-        
-        if(name)
-            name += 1;
-        else
-            name = path;
-    }
-
-    pl = playlist_new(name);
-    if(!pl)
-        return NULL;
-    
-    err = playlist_add_media_from_file(pl, path);
-    if(err < 0) {
-        playlist_delete(pl);
-        return NULL;
-    }
-    
-    if(playlist_empty(pl)) {
-        playlist_delete(pl);
-        errno = EINVAL;
-        return NULL;
-    }
-    
-    return pl;
-}
-
 void playlist_delete(struct playlist *__restrict pl)
 {
     playlist_destroy(pl);
@@ -102,199 +59,75 @@ int playlist_init(struct playlist *__restrict pl, const char *__restrict name)
     int err;
     
     pl->name = strdup(name);
-    if(!pl->name) {
-        err = -errno;
-        goto out;
+    if(!pl->name)
+        return -errno;
+    
+    err = vector_init(&pl->vec_media, 32);
+    if(err < 0) {
+        free(pl->name);
+        return err;
     }
-        
-    err = map_init(&pl->map_path, 0, &media_compare, &hash_string);
-    if(err < 0)
-        goto cleanup1;
-    
-    map_set_data_delete(&pl->map_path, (void(*)(void*)) &media_delete);
-    
-    err = random_init(&pl->rand);
-    if(err < 0)
-        goto cleanup2;
-    
-    list_init(&pl->list);
-    list_init(&pl->list_rand);
-    list_init(&pl->list_done);
-    
-    pl->it = &pl->list;
-    
-    pl->rand_range = 0;
-    
-    pl->repeat  = false;
-    pl->shuffle = false;
     
     return 0;
-
-cleanup2:
-    map_destroy(&pl->map_path);
-cleanup1:
-    free(pl->name);
-out:
-    return err;
 }
 
 void playlist_destroy(struct playlist *__restrict pl)
 {
-    list_destroy(&pl->list_done, NULL);
-    list_destroy(&pl->list_rand, NULL);
-    list_destroy(&pl->list, NULL);
-    random_destroy(&pl->rand);
-    map_destroy(&pl->map_path);
+    vector_destroy(&pl->vec_media);
     free(pl->name);
 }
 
 void playlist_clear(struct playlist *__restrict pl)
 {
-    list_clear(&pl->list_done, NULL);
-    list_clear(&pl->list_rand, NULL);
-    list_clear(&pl->list, NULL);
-    map_clear(&pl->map_path);
-    
-    pl->it = &pl->list;
-    
-    pl->rand_range = 0;
+    vector_clear(&pl->vec_media); 
 }
 
-int playlist_insert_media(struct playlist *__restrict pl, struct media *m)
+int playlist_insert_front(struct playlist *__restrict pl, struct media *m)
 {
-    int err;
-
-    err = map_insert(&pl->map_path, m->path, m);
-    if(err < 0)
-        return err;
-    
-    list_insert_back(&pl->list, &m->link);
-    list_insert_back(&pl->list_rand, &m->link_rand);
-    
-    pl->rand_range += 1;
-    
-    return 0;
+    return vector_insert_front(&pl->vec_media, m);
 }
+
+int playlist_insert_at(struct playlist *__restrict pl, 
+                       unsigned int i, 
+                       struct media *m)
+{
+    assert(i < playlist_size(pl) && "Invalid playlist index");
+    
+    return vector_insert_at(&pl->vec_media, i, m);
+}
+
+int playlist_insert_back(struct playlist *__restrict pl, struct media *m)
+{
+    return vector_insert_back(&pl->vec_media, m);
+}
+
 
 void playlist_take_media(struct playlist *__restrict pl, struct media* m)
 {
-    m = map_take(&pl->map_path, m->path);
-
-    if(pl->it == &m->link)
-        pl->it = pl->it->prev;
-    
-    list_take(&m->link);
-    list_take(&m->link_rand);
-    
-    pl->rand_range -= 1;
-}
-
-void playlist_delete_media(struct playlist *__restrict pl, struct media *m)
-{
-    playlist_take_media(pl, m);
-    media_delete(m);
+    vector_take(&pl->vec_media, m);
 }
 
 bool playlist_contains_media(const struct playlist *__restrict pl,
                              const struct media *m)
 {
-    return map_contains(&pl->map_path, m->path);
-}
-
-bool playlist_contains(const struct playlist *__restrict pl, const char *path)
-{
-    return map_contains(&pl->map_path, path);
-}
-
-int playlist_insert_path(struct playlist *__restrict pl, 
-                         const char *__restrict path)
-{
-    struct media *m;
+    struct media **media;
     
-    m = media_creator_new_media(path);
-    if(!m)
-        return -errno;
-    
-    return playlist_insert_media(pl, m);
-}
-
-struct media *playlist_retrieve_path(struct playlist *__restrict pl, 
-                                const char *__restrict path)
-{
-    return map_retrieve(&pl->map_path, path);
-}
-
-void playlist_delete_path(struct playlist *__restrict pl, 
-                          const char *__restrict path)
-{
-    struct media *m;
-    
-    m = map_retrieve(&pl->map_path, path);
-    if(!m)
-        return;
-    
-    playlist_delete_media(pl, m);
-}
-
-int playlist_merge(struct playlist *__restrict pl1, struct playlist *pl2)
-{
-    struct link *link;
-    struct media *m;
-    int err;
-    
-    list_for_each(&pl2->list, link) {
-        m = container_of(link, struct media, link);
-        
-        err = map_insert(&pl1->map_path, m->path, m);
-        if(err < 0)
-            goto out;
-        
+    playlist_for_each(pl, media) {
+        if(*media == m)
+            return true;
     }
     
-    list_merge(&pl1->list, &pl2->list);
-    list_merge(&pl1->list_rand, &pl2->list_rand);
-    list_merge(&pl1->list_done, &pl2->list_done);
-    
-    pl1->rand_range += pl2->rand_range;
-    
-    playlist_clear(pl2);
-    
-    return 0;
-
-out:
-    list_for_each(&pl2->list, link) {
-        m = container_of(link, struct media, link);
-        
-        if(!map_take(&pl1->map_path, m->path))
-            break;
-    }
-    
-    return err;
+    return false;
 }
 
 bool playlist_empty(const struct playlist *__restrict pl)
 {
-    return map_empty(&pl->map_path);
+    return vector_empty(&pl->vec_media);
 }
 
-void playlist_set_shuffle(struct playlist *__restrict pl, bool shuffle)
+unsigned int playlist_size(const struct playlist *__restrict pl)
 {
-    pl->shuffle = shuffle;
-}
-
-bool playlist_shuffle(const struct playlist *__restrict pl)
-{
-    return pl->shuffle;
-}
-
-void playlist_set_repeat(struct playlist *__restrict pl, bool repeat)
-{
-    pl->repeat = repeat;
-}
-
-bool playlist_repeat(const struct playlist *__restrict pl)
-{
-    return pl->repeat;
+    return vector_size(&pl->vec_media);
 }
 
 const char *playlist_name(const struct playlist *__restrict pl)
@@ -302,202 +135,52 @@ const char *playlist_name(const struct playlist *__restrict pl)
     return pl->name;
 }
 
-const struct media *playlist_next(struct playlist *__restrict pl)
+struct media *playlist_front(struct playlist *__restrict pl)
 {
-    struct link *link;
-    struct media *m;
-    unsigned int index;
-    
-    if(playlist_empty(pl))
-        return NULL;
-    
-    if(pl->shuffle) {
-        if(list_empty(&pl->list_rand)) {
-            list_merge(&pl->list_rand, &pl->list_done);
-            
-            pl->rand_range = map_size(&pl->map_path);
-            
-            if(!pl->repeat)
-                return NULL;
-        }
-        
-        pl->rand_range -= 1;
-        
-        index = random_uint_range(&pl->rand, 0, pl->rand_range);
-        
-        link = list_at(&pl->list_rand, index);
-        
-        list_take(link);
-        list_insert_front(&pl->list_done, link);
-        
-        m = container_of(link, struct media, link_rand);
-        
-        pl->it = &m->link;
-        
-        return m;
-    }
-
-    pl->it = pl->it->next;
-    
-    if(pl->it == &pl->list) {
-        if(!pl->repeat)
-            return NULL;
-        
-        pl->it = pl->it->next;
-    }
-    
-    return container_of(pl->it, struct media, link);
-}
-
-const struct media *playlist_previous(struct playlist *__restrict pl)
-{
-    struct media *m;
-    struct link *link;
-    
-    if(pl->shuffle) {
-        if(list_empty(&pl->list_done))
-            return NULL;
-        
-        link = list_front(&pl->list_done);
-        
-        list_take(link);
-        
-        list_insert_back(&pl->list_done, link);
-        
-        m = container_of(link, struct media, link_rand);
-        
-        pl->it = &m->link;
-        
-        return m;
-    }
-    
-    pl->it = pl->it->prev;
-    
-    if(pl->it == &pl->list) {
-        if(!pl->repeat)
-            return NULL;
-        
-        pl->it = pl->it->prev;
-    }
-    
-    return container_of(pl->it, struct media, link);
-}
-
-const struct media *playlist_current(const struct playlist *__restrict pl)
-{
-    if(pl->it == &pl->list)
-        return NULL;
-
-    return container_of(pl->it, struct media, link);
-}
-
-int playlist_set_current(struct playlist *__restrict pl, struct media *m)
-{
-    int err;
-    
-    if(!playlist_contains_media(pl, m)) {
-        err = map_insert(&pl->map_path, m->path, m);
-        if(err < 0)
-            return err;
-        
-        list_insert(pl->it, &m->link);
-        list_insert_front(&pl->list_done, &m->link_rand);
-    }
-    
-    pl->it = &m->link;
-    
-    return 0;
+    return *vector_front(&pl->vec_media);
 }
 
 struct media *playlist_at(struct playlist *__restrict pl, unsigned int i)
 {
-    return container_of(list_at(&pl->list, i), struct media, link);
+    assert(i < playlist_size(pl) && "Invalid playlist index");
+    
+    return *vector_at(&pl->vec_media, i);
 }
 
-int playlist_index_of(const struct playlist *__restrict pl, 
-                      const struct media *m)
+struct media *playlist_back(struct playlist *__restrict pl)
 {
-    const struct link *link;
-    int index;
+    return *vector_back(&pl->vec_media);
+}
+
+struct media *playlist_take_front(struct playlist *__restrict pl)
+{
+    return vector_take_front(&pl->vec_media);
+}
+
+struct media *playlist_take_at(struct playlist *__restrict pl, unsigned int i)
+{
+    assert(i < playlist_size(pl) && "Invalid playlist index");
     
-    if(!playlist_contains_media(pl, m))
-        return -1;
+    return vector_take_at(&pl->vec_media, i);
+}
+
+struct media *playlist_take_back(struct playlist *__restrict pl)
+{
+    return vector_take_back(&pl->vec_media);
+}
+
+int playlist_index_of(struct playlist *__restrict pl, 
+                      struct media *m)
+{
+    unsigned int size;
+    int i;
     
-    link  = &m->link;
-    index = 0;
+    size = vector_size(&pl->vec_media);
     
-    while(link != &pl->list) {
-        link = link->prev;
-        index += 1;
+    for(i = 0; i < size; ++i) {
+        if(*vector_at(&pl->vec_media, i) == m)
+            return i;
     }
     
-    return index;
-}
-
-unsigned int playlist_size(const struct playlist *__restrict pl)
-{
-    return map_size(&pl->map_path);
-}
-
-int playlist_save_to_file(const struct playlist *__restrict pl, 
-                          const char *__restrict path,
-                          const char *__restrict mode)
-{
-    FILE *file;
-    const struct link *link;
-    const struct media *m;
-    
-    file = fopen(path, mode);
-    if(!file)
-        return -errno;
-    
-    playlist_for_each(pl, link) {
-        m = container_of(link, struct media, link);
-        
-        fprintf(file, "%s\n", m->path);
-    }
-    
-    fclose(file);
-    
-    return 0;
-}
-
-int playlist_add_media_from_file(struct playlist *__restrict pl, 
-                                 const char *path)
-{
-    FILE *file;
-    char *buf;
-    size_t size;
-    ssize_t n;
-    int err;
-    
-    file = fopen(path, "r");
-    if(!file)
-        return -errno;
-    
-    buf  = NULL;
-    size = 0;
-    
-    while(1) {
-        n = getline(&buf, &size, file);
-        if(n < 0)
-            break;
-        
-        if(n == 0)
-            continue;
-        
-        buf[n - 1] = '\0';
-        
-        if(buf[0] != '/')
-            continue;
-        
-        err = playlist_insert_path(pl, buf);
-        if(err < 0)
-            continue;
-    }
-    
-    free(buf);
-    fclose(file);
-    
-    return 0;
+    return -1;
 }

@@ -18,38 +18,23 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef _MEDIA_H_
-#define _MEDIA_H_
+#ifndef _CLIMPD_LOG_H_
+#define _CLIMPD_LOG_H_
 
-#include <stdbool.h>
+int climpd_log_init(void);
 
-#include <libvci/link.h>
+void climpd_log_destroy(void);
 
-#define MEDIA_META_ELEMENT_SIZE  64
+void climpd_log_d(const char *__restrict tag, const char *fmt, ...)
+                                            __attribute__((format(printf,2,3)));
 
-struct media_info {
-    char title[MEDIA_META_ELEMENT_SIZE];
-    char artist[MEDIA_META_ELEMENT_SIZE];
-    char album[MEDIA_META_ELEMENT_SIZE];
-    unsigned int track; 
-    unsigned int duration;
-    bool seekable;
-};
+void climpd_log_i(const char *__restrict tag, const char *fmt, ...)
+                                            __attribute__((format(printf,2,3)));
 
-struct media {
-    struct media_info info;
-    struct link link;
-    struct link link_rand;
-    
-    char *uri;
-    char *path;
-    char *name;
-};
+void climpd_log_w(const char *__restrict tag, const char *fmt, ...)
+                                            __attribute__((format(printf,2,3)));
 
-struct media *media_new(const char *path);
+void climpd_log_e(const char *__restrict tag, const char *fmt, ...)
+                                            __attribute__((format(printf,2,3)));
 
-void media_delete(struct media *__restrict media);
-
-const struct media_info *media_info(const struct media *__restrict media);
-
-#endif /* _MEDIA_H_ */
+#endif /* _CLIMPD_LOG_H_ */

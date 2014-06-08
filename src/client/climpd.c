@@ -54,6 +54,8 @@ static struct command_handle {
     { "play",            IPC_MESSAGE_PLAY,              false,  false   },
     { "stop",            IPC_MESSAGE_STOP,              false,  false   },
     
+    { "shutdown",        IPC_MESSAGE_SHUTDOWN,          false,  false   },
+    
     { "get-colors",      IPC_MESSAGE_GET_COLORS,        false,  false   },
     { "get-config",      IPC_MESSAGE_GET_CONFIG,        false,  false   },
     { "get-files",       IPC_MESSAGE_GET_FILES,         false,  false   },

@@ -21,37 +21,17 @@
 #ifndef _PLAYLIST_H_
 #define _PLAYLIST_H_
 
-#include <libvci/link.h>
-#include <libvci/list.h>
-#include <libvci/map.h>
-#include <libvci/random.h>
+#include <libvci/vector.h>
+#include <libvci/macro.h>
 
-#include "../media-objects/media.h"
+#include "core/media.h"
 
 struct playlist {
-    struct map map_path;
-    
-    /* standard order */
-    struct link list;
-    struct link *it;
-    
-    /* random order */
-    struct link list_rand;
-    struct link list_done;
-    struct random rand;
-
+    struct vector vec_media;
     char *name;
-    
-    unsigned int rand_range;
-    
-    bool shuffle;
-    bool repeat;
 };
 
 struct playlist *playlist_new(const char *name);
-
-struct playlist *playlist_new_file(const char *__restrict name, 
-                                   const char *path);
 
 void playlist_delete(struct playlist *__restrict pl);
 
@@ -61,66 +41,42 @@ void playlist_destroy(struct playlist *__restrict pl);
 
 void playlist_clear(struct playlist *__restrict pl);
 
-int playlist_insert_media(struct playlist *__restrict pl, struct media *m);
+int playlist_insert_front(struct playlist *__restrict pl, struct media *m);
+
+int playlist_insert_at(struct playlist *__restrict pl, 
+                       unsigned int i, 
+                       struct media *m);
+
+int playlist_insert_back(struct playlist *__restrict pl, struct media *m);
 
 void playlist_take_media(struct playlist *__restrict pl, struct media *m);
-
-void playlist_delete_media(struct playlist *__restrict pl, struct media *m);
 
 bool playlist_contains_media(const struct playlist *__restrict pl,
                              const struct media *m);
 
-bool playlist_contains(const struct playlist *__restrict pl, const char *path);
-
-int playlist_insert_path(struct playlist *__restrict pl, 
-                         const char *__restrict path);
-
-struct media *playlist_retrieve_path(struct playlist *__restrict pl, 
-                                     const char *__restrict path);
-
-void playlist_delete_path(struct playlist *__restrict pl,
-                          const char *__restrict path);
-
-int playlist_merge(struct playlist *__restrict pl1, struct playlist *pl2);
-
 bool playlist_empty(const struct playlist *__restrict pl);
-
-void playlist_set_shuffle(struct playlist *__restrict pl, bool shuffle);
-
-bool playlist_shuffle(const struct playlist *__restrict pl);
-
-void playlist_set_repeat(struct playlist *__restrict pl, bool repeat);
-
-bool playlist_repeat(const struct playlist *__restrict pl);
-
-const char *playlist_name(const struct playlist *__restrict pl);
-
-const struct media *playlist_next(struct playlist *__restrict pl);
-
-const struct media *playlist_previous(struct playlist *__restrict pl);
-
-const struct media *playlist_current(const struct playlist *__restrict pl);
-
-int playlist_set_current(struct playlist *__restrict pl, struct media *m);
-
-struct media *playlist_at(struct playlist *__restrict pl, unsigned int i);
-
-int playlist_index_of(const struct playlist *__restrict pl, 
-                      const struct media *m);
 
 unsigned int playlist_size(const struct playlist *__restrict pl);
 
-int playlist_save_to_file(const struct playlist *__restrict pl, 
-                          const char *__restrict path,
-                          const char *__restrict mode);
+const char *playlist_name(const struct playlist *__restrict pl);
 
-int playlist_add_media_from_file(struct playlist *__restrict pl, 
-                                 const char *path);
+struct media *playlist_front(struct playlist *__restrict pl);
 
-#define playlist_for_each(playlist, link)                                      \
-    list_for_each(&(playlist)->list, (link))
+struct media *playlist_at(struct playlist *__restrict pl, unsigned int i);
 
-#define playlist_for_each_safe(playlist, link, safe)                           \
-    list_for_each_safe(&(playlist)->list, (link), (safe))
+struct media *playlist_back(struct playlist *__restrict pl);
+
+struct media *playlist_take_front(struct playlist *__restrict pl);
+
+struct media *playlist_take_at(struct playlist *__restrict pl, unsigned int i);
+
+struct media *playlist_take_back(struct playlist *__restrict pl);
+
+int playlist_index_of(struct playlist *__restrict pl, 
+                      struct media *m);
+
+#define playlist_for_each(playlist, data)                                      \
+    vector_for_each(&(playlist)->vec_media, (data))
+
 
 #endif /* _PLAYLIST_H_ */

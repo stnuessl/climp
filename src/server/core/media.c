@@ -28,19 +28,13 @@
 #define MEDIA_FILE_PREFIX        "file://"
 #define MEDIA_META_ELEMENT_SIZE  64
 
-
 struct media *media_new(const char *path)
 {
     struct media *media;
-    
-    if(path[0] != '/') {
-        errno = EINVAL;
-        return NULL;
-    }
 
     media = malloc(sizeof(*media));
     if(!media)
-        goto out;
+        return NULL;
     
     media->uri = malloc(sizeof(MEDIA_FILE_PREFIX) + strlen(path));
     if(!media->uri)
@@ -54,19 +48,19 @@ struct media *media_new(const char *path)
     media->name = strrchr(media->path, '/');
     media->name = (media->name) ? media->name + 1 : media->path;
     
-    strncpy(media->info.title, "Not parsed yet", MEDIA_META_ELEMENT_SIZE);
-    strncpy(media->info.artist, "Not parsed yet", MEDIA_META_ELEMENT_SIZE);
-    strncpy(media->info.album, "Not parsed yet", MEDIA_META_ELEMENT_SIZE);
+    strncpy(media->info.title, "not initialized", MEDIA_META_ELEMENT_SIZE);
+    strncpy(media->info.artist, "not initialized", MEDIA_META_ELEMENT_SIZE);
+    strncpy(media->info.album, "not initialized", MEDIA_META_ELEMENT_SIZE);
     
     media->info.track = 0;
     media->info.duration = 0;
     media->info.seekable = false;
-    
+
     return media;
 
 cleanup1:
     free(media);
-out:
+    
     return NULL;
 }
 
@@ -79,4 +73,24 @@ void media_delete(struct media *__restrict media)
 const struct media_info *media_info(const struct media *__restrict media)
 {
     return &media->info;
+}
+
+const char *media_uri(const struct media *__restrict media)
+{
+    return media->uri;
+}
+
+const char *media_path(const struct media *__restrict media)
+{
+    return media->path;
+}
+
+const char *media_name(const struct media *__restrict media)
+{
+    return media->name;
+}
+
+bool media_is_parsed(const struct media *__restrict media)
+{
+    return media->parsed;
 }

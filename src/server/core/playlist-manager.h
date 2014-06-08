@@ -23,6 +23,8 @@
 
 #include "playlist.h"
 
+#define CLIMPD_DEFAULT_PLAYLIST "climpd default playlist"
+
 int playlist_manager_init(void);
 
 void playlist_manager_destroy(void);

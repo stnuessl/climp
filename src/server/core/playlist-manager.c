@@ -21,6 +21,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <string.h>
 #include <fcntl.h>
 #include <errno.h>
 #include <sys/stat.h>
@@ -36,9 +37,112 @@
 #include "playlist.h"
 #include "climpd-log.h"
 #include "playlist-manager.h"
+#include "media-manager.h"
 
 static const char *tag = "playlist-manager";
 static struct map playlist_map;
+
+static int load_files_from_file(struct playlist *__restrict pl, 
+                                const char *path)
+{
+    struct media *m;
+    struct stat st;
+    FILE *file;
+    char *line;
+    size_t size;
+    ssize_t n;
+    int err;
+    
+    file = fopen(path, "r");
+    if(!file) {
+        err = -errno;
+        climpd_log_e(tag, "fopen() - %s\n", errstr);
+        return err;
+    }
+    
+    line  = NULL;
+    size = 0;
+    
+    while(1) {
+        n = getline(&line, &size, file);
+        if(n < 0)
+            break;
+        
+        if(n == 0)
+            continue;
+        
+        if(line[0] == '#' || line[0] == ';')
+            continue;
+        
+        line[n - 1] = '\0';
+        
+        if(line[0] != '/') {
+            climpd_log_w(tag, "skipping %s - no absolute path\n", line);
+            continue;
+        }
+        
+        err = stat(line, &st);
+        if(err < 0) {
+            climpd_log_w(tag, "stat(): %s - %s\n", line, errstr);
+            continue;
+        }
+        
+        if(!S_ISREG(st.st_mode)) {
+            climpd_log_w(tag, "%s is no regular file\n", line);
+            continue;
+        }
+        
+        m = media_manager_retrieve(line);
+        if(!m) {
+            climpd_log_w(tag, "skipping %s - failed to retrieve media\n", line);
+            continue;
+        }
+        
+        err = playlist_insert_back(pl, m);
+        if(err < 0) {
+            climpd_log_w(tag, "failed to add %s to playlist\n", line);
+            media_manager_delete_media(path);
+            continue;
+        }
+    }
+    
+    free(line);
+    fclose(file);
+    
+    if(playlist_empty(pl)) {
+        climpd_log_e(tag, "loaded empty playlist\n");
+        return -ENOENT;
+    }
+    
+    return 0;
+}
+
+static struct playlist *
+playlist_manager_playlist_from_file(const char *__restrict path)
+{
+    struct playlist *pl;
+    const char *name;
+    int err;
+    
+    name = strrchr(path, '/');
+    name = (name) ? name + 1: path;
+    
+    climpd_log_i(tag, "loading playlist %s from %s\n", name, path);
+    
+    pl = playlist_new(name);
+    if(!pl) {
+        climpd_log_e(tag, "playlist_new() - %s\n", errstr);
+        return NULL;
+    }
+    
+    err = load_files_from_file(pl, path);
+    if(err < 0) {
+        playlist_delete(pl);
+        return NULL;
+    }
+    
+    return pl;
+}
 
 int playlist_manager_init(void)
 {
@@ -47,27 +151,27 @@ int playlist_manager_init(void)
     
     err = map_init(&playlist_map, 0, &compare_string, &hash_string);
     if(err < 0)
-        goto out;
+        return err;
     
     map_set_data_delete(&playlist_map, (void(*)(void *)) &playlist_delete);
     
-    pl = playlist_new(CLIMPD_PLAYER_DEFAULT_PLAYLIST);
+    pl = playlist_new(CLIMPD_DEFAULT_PLAYLIST);
     if(!pl) {
         err = -errno;
         goto cleanup1;
     }
     
-    err = playlist_manager_insert(pl);
+    err = map_insert(&playlist_map, playlist_name(pl), pl);
     if(err < 0)
         goto cleanup2;
     
     return 0;
-
+    
 cleanup2:
-    playlist_delete(pl);
-cleanup1:
     map_destroy(&playlist_map);
-out:
+cleanup1:
+    playlist_delete(pl);
+    
     return err;
 }
 
@@ -79,6 +183,7 @@ void playlist_manager_destroy(void)
 int playlist_manager_load_from_file(const char *__restrict path)
 {
     FILE *f;
+    struct stat st;
     struct playlist *pl;
     const char *msg;
     char *line;
@@ -101,6 +206,9 @@ int playlist_manager_load_from_file(const char *__restrict path)
         if(n == 0)
             continue;
         
+        if(line[0] == '#' || line[0] == ';')
+            continue;
+        
         line[n - 1] = '\0';
         
         if(line[0] != '/') {
@@ -108,10 +216,21 @@ int playlist_manager_load_from_file(const char *__restrict path)
             continue;
         }
         
-        pl = playlist_new_file(NULL, line);
+        err = stat(line, &st);
+        if(err < 0) {
+            climpd_log_w(tag, "stat(): %s - %s\n", line, errstr);
+            continue;
+        }
+        
+        if(!S_ISREG(st.st_mode)) {
+            climpd_log_w(tag, "%s is no regular file\n", line);
+            continue;
+        }
+        
+        pl = playlist_manager_playlist_from_file(line);
         if(!pl) {
             msg = strerr(errno);
-            climpd_log_w(tag, "playlist_new_file(): %s: %s\n", line, msg);
+            climpd_log_w(tag, "%s: %s\n", line, msg);
             continue;
         }
         
@@ -120,11 +239,10 @@ int playlist_manager_load_from_file(const char *__restrict path)
             climpd_log_w(tag, "failed to add %s: %s\n", line, strerr(-err));
             continue;
         }
-        
-        climpd_log_i(tag, "added %s as %s\n", line, playlist_name(pl));
     }
     
     free(line);
+    fclose(f);
     
     return 0;
 }

@@ -18,17 +18,19 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef _MEDIA_CREATOR_H_
-#define _MEDIA_CREATOR_H_
+#ifndef _MEDIA_MANAGER_H_
+#define _MEDIA_MANAGER_H_
 
-#include "../media-objects/media.h"
+#include "core/media.h"
 
-int media_creator_init(void);
+int media_manager_init(void);
 
-void media_creator_destroy(void);
+void media_manager_destroy(void);
 
-struct media *media_creator_new_media(const char *path);
+struct media *media_manager_retrieve(const char *__restrict path);
 
-void media_creator_delete_media(struct media *m);
+void media_manager_delete_media(const char *__restrict path);
 
-#endif /* _MEDIA_CREATOR_H_ */
+int media_manager_parse_media(struct media *__restrict media);
+
+#endif /* _MEDIA_MANAGER_H_ */

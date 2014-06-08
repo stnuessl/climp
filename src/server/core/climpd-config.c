@@ -130,7 +130,7 @@ static void set_default_playlist(const char *key, const char *val, void *arg)
         return;
     }
     
-    conf.default_playlist = val;
+    conf.default_playlist = (val[0] != '/') ? val : strrchr(val, '/') + 1;
 }
 
 static void set_media_meta_length(const char *key, const char *val, void *arg)
@@ -289,9 +289,6 @@ int climpd_config_init(void)
     int i, fd, err;
     
     /* Init some path variables */
-    
-    climpd_log_i(tag, "starting initialization...\n");
-
     home = getenv("HOME");
     if(!home) {
         err = -ENOENT;
@@ -301,7 +298,7 @@ int climpd_config_init(void)
     
     home_len = strlen(home);
     
-    config_dir = malloc(home_len + strlen(dir));
+    config_dir = malloc(home_len + strlen(dir) + 1);
     if(!config_dir) {
         climpd_log_e(tag, "malloc(): %s\n", errstr);
         goto out;
@@ -310,7 +307,7 @@ int climpd_config_init(void)
     config_dir = strcpy(config_dir, home);
     config_dir = strcat(config_dir, dir);
     
-    config_path = malloc(home_len + strlen(path));
+    config_path = malloc(home_len + strlen(path) + 1);
     if(!config_path) {
         climpd_log_e(tag, "malloc(): %s\n", errstr);
         goto cleanup1;
@@ -362,7 +359,7 @@ int climpd_config_init(void)
     free(config_path);
     free(config_dir);
     
-    climpd_log_i(tag, "initialization successful\n");
+    climpd_log_i(tag, "initialized\n");
     
     return 0;
 

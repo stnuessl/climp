@@ -27,11 +27,13 @@
 
 #include <gst/gst.h>
 
+#include <libvci/clock.h>
 #include <libvci/error.h>
 
-#include "climpd-config.h"
-#include "climpd-player.h"
 #include "climpd-log.h"
+#include "climpd-config.h"
+#include "media-manager.h"
+#include "climpd-player.h"
 #include "../util/terminal-color-map.h"
 #include "playlist-manager.h"
 #include "../util/bool-map.h"
@@ -46,6 +48,7 @@ static int fd_stderr;
 static struct message msg_in;
 static struct message msg_out;
 static gboolean socket_handler_run;
+static struct clock cl;
 
 extern GMainLoop *main_loop;
 extern struct climpd_config conf;
@@ -237,11 +240,11 @@ static int set_playlist(void)
         return 0;
     }
     
-    pl =  playlist_new_file(NULL, arg);
-    if(!pl) {
-        error("set-playlist: %s - %s\n", arg, errstr);
-        return -errno;
-    }
+//     pl = playlist_new_file(NULL, arg);
+//     if(!pl) {
+//         error("set-playlist: %s - %s\n", arg, errstr);
+//         return -errno;
+//     }
     
     return 0;
 }
@@ -310,6 +313,7 @@ static int set_volume(void)
 static int play_file(void)
 {
     struct stat s;
+    struct media *m;
     const char *arg;
     int err;
     
@@ -326,7 +330,14 @@ static int play_file(void)
         return -EINVAL;
     }
     
-    err = climpd_player_play_file(arg);
+    m = media_manager_retrieve(arg);
+    if(!m) {
+        err = -errno;
+        error("failed to create media for %s - %s\n", arg, strerr(errno));
+        return err;
+    }
+    
+    err = climpd_player_play_media(m);
     if(err < 0) {
         error("failed to play file %s - %s\n", arg, strerr(-err));
         return -err;
@@ -417,6 +428,7 @@ static int load_config(void)
 
 static int load_media(void)
 {
+    struct media *m;
     struct stat s;
     const char *arg;
     int err;
@@ -434,7 +446,14 @@ static int load_media(void)
         return -EINVAL;
     }
     
-    err = climpd_player_add_file(arg);
+    m = media_manager_retrieve(arg);
+    if(err < 0) {
+        err = -errno;
+        error("load-media %s - %s\n", arg, strerr(-errno));
+        return err;
+    }
+    
+    err = climpd_player_add_media(m);
     if(err < 0) {
         error("load-media: %s - %s\n", arg, strerr(-err));
         return err;
@@ -473,11 +492,18 @@ static int load_playlist(void)
 
 static int remove_media(void)
 {
+    struct media *m;
     const char *arg;
 
     arg = ipc_message_arg(&msg_in);
     
-    climpd_player_delete_file(arg);
+    m = media_manager_retrieve(arg);
+    if(!m)
+        return 0;
+    
+    climpd_player_take_media(m);
+    
+    media_manager_delete_media(arg);
     
     return 0;
 }
@@ -534,8 +560,10 @@ static gboolean socket_handler(GIOChannel *src, GIOCondition cond, void *data)
 {
     enum message_id id;
     const char *msg_id_str;
+    unsigned long elapsed;
     int err;
     
+    clock_reset(&cl);
     ipc_message_clear(&msg_in);
     
     err = ipc_recv_message(fd_socket, &msg_in);
@@ -556,17 +584,28 @@ static gboolean socket_handler(GIOChannel *src, GIOCondition cond, void *data)
     }
     
     err = msg_handler[id]();
+    
+    elapsed = clock_elapsed_ms(&cl);
+    
     if(err < 0)
-        climpd_log_w(tag, "Message '%s' - %s\n", msg_id_str, strerr(-err));
+        climpd_log_e(tag, "Message '%s' - %s\n", msg_id_str, strerr(-err));
     else
-        climpd_log_i(tag, "handled '%s' successful\n", msg_id_str);
+        climpd_log_i(tag, "handled '%s' in %lu ms\n", msg_id_str, elapsed);
     
     return socket_handler_run;
 }
 
 int message_handler_init(void)
 {
-    climpd_log_i(tag, "starting initialization\n");
+    int err;
+    
+    err = clock_init(&cl, CLOCK_MONOTONIC);
+    if(err < 0) {
+        climpd_log_e(tag, "failed to initialize clock\n");
+        return err;
+    }
+    
+    clock_start(&cl);
     
     ipc_message_init(&msg_in);
     ipc_message_init(&msg_out);
@@ -574,7 +613,7 @@ int message_handler_init(void)
     io = NULL;
     fd_socket = -1;
     
-    climpd_log_i(tag, "initialization successful\n");
+    climpd_log_i(tag, "initialized\n");
     
     return 0;
 }
@@ -589,6 +628,8 @@ void message_handler_destroy(void)
     
     ipc_message_destroy(&msg_out);
     ipc_message_destroy(&msg_in);
+    
+    clock_destroy(&cl);
     
     climpd_log_i(tag, "destroyed\n");
 }

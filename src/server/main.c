@@ -42,15 +42,15 @@
 #include "util/bool-map.h"
 #include "util/terminal-color-map.h"
 
-#include "core/media-creator.h"
 #include "core/climpd-log.h"
 #include "core/climpd-player.h"
 #include "core/climpd-config.h"
+#include "core/media-manager.h"
 #include "core/playlist-manager.h"
 #include "core/message-handler.h"
 #include "core/playlist.h"
+#include "core/media.h"
 
-#include "media-objects/media.h"
 
 extern struct climpd_config conf;
 
@@ -124,7 +124,6 @@ static gboolean handle_server_fd(GIOChannel *src, GIOCondition cond, void *data)
         goto out;
     }
 
-    
     return true;
     
 out:
@@ -207,15 +206,63 @@ static void destroy_server_fd(void)
     unlink(IPC_SOCKET_PATH);
 }
 
+struct module {
+    char *name;
+    int (*init)(void);
+    void (*destroy)(void);
+};
+
+ 
+static void noop_destroy(void)
+{
+
+}
+
+
+static struct module modules[] = {
+      
+    { "close-std-streams",
+      &close_std_streams,
+      &noop_destroy },
+    
+    { "terminal-color-map", 
+      &terminal_color_map_init, 
+      &terminal_color_map_destroy },
+        
+    { "bool-map",
+      &bool_map_init,
+      &bool_map_destroy },
+        
+    { "climpd-config",
+      &climpd_config_init,
+      &climpd_config_destroy },
+        
+    { "media-manager",
+      &media_manager_init,
+      &media_manager_destroy },
+        
+    { "playlist-manager",
+      &playlist_manager_init,
+      &playlist_manager_destroy },
+        
+    { "server-socket",
+      &init_server_fd,
+      &destroy_server_fd },
+        
+    { "message-handler",
+      &message_handler_init,
+      &message_handler_destroy },
+};
+
 static int init(void)
 {
     struct playlist *pl;
     pid_t sid, pid;
-    int err;
+    int i, err;
 
     err = climpd_log_init();
     if(err < 0)
-        goto out;
+        return err;
     
     climpd_log_i(tag, "starting initialization...\n");
 #if 0
@@ -252,144 +299,57 @@ static int init(void)
     if(pid > 0)
         _exit(EXIT_SUCCESS);
     
-    
 #endif
-    err = close_std_streams();
-    if(err < 0) {
-        climpd_log_e(tag, "close_std_streams(): %s\n", strerr(-err));
-        goto cleanup1;
-    }
-    
-    err = terminal_color_map_init();
-    if(err < 0) {
-        climpd_log_e(tag, "terminal_color_map_init(): %s\n", strerr(-err));
-        goto cleanup1;
-    }
-    
-    err = bool_map_init();
-    if(err < 0) {
-        climpd_log_e(tag, "bool_map_init(): %s\n", strerr(-err));
-        goto cleanup2;
-    }
-    
-    err = climpd_config_init();
-    if(err < 0) {
-        climpd_log_e(tag, "climpd_config_init(): %s\n", strerr(-err));
-        goto cleanup3;
-    }
-    
-    err = media_creator_init();
-    if(err < 0) {
-        climpd_log_e(tag, "media_creator_init(): %s\n", strerr(-err));
-        goto cleanup4;
-    }
-    
-    err = playlist_manager_init();
-    if(err < 0) {
-        climpd_log_e(tag, "playlist_manager_init(): %s\n", strerr(-err));
-        goto cleanup5;
+    for(i = 0; i < ARRAY_SIZE(modules); ++i) {
+        err = modules[i].init();
+        if(err < 0)
+            goto cleanup1;
     }
     
     if(conf.playlist_file) {
         err = playlist_manager_load_from_file(conf.playlist_file);
         if(err < 0)
-            goto cleanup6;
+            goto cleanup1;
     }
     
-    main_loop = g_main_loop_new(NULL, false);
-    if(!main_loop) {
-        climpd_log_e(tag, "g_main_loop_new()\n");
-        goto cleanup6;
-    }
-    
-    err = init_server_fd();
-    if(err < 0) {
-        climpd_log_e(tag, "init_server_fd(): %s\n", strerr(-err));
-        goto cleanup7;
-    }
-    
-    if(conf.default_playlist) {
+    if(conf.default_playlist)
         pl = playlist_manager_retrieve(conf.default_playlist);
-        if(!pl) {
-            pl = playlist_new_file(NULL, conf.default_playlist);
-            if(!pl) {
-                err = -errno;
-                climpd_log_e(tag, 
-                             "playlist_new_file(): %s: %s\n", 
-                             conf.default_playlist,
-                             strerr(-err));
-                goto cleanup8;
-            }
-            
-            err = playlist_manager_insert(pl);
-            if(err < 0) {
-                climpd_log_e(tag,
-                             "playlist_manager_insert(): %s: %s\n",
-                             playlist_name(pl), strerr(-err));
-                
-                playlist_delete(pl);
-                goto cleanup8;
-            }
-        }
-    } else {
-        pl = playlist_manager_retrieve(CLIMPD_PLAYER_DEFAULT_PLAYLIST);
-    }
+    else
+        pl = playlist_manager_retrieve(CLIMPD_DEFAULT_PLAYLIST);
     
     err = climpd_player_init(pl, conf.repeat, conf.shuffle);
-    if(err < 0) {
-        climpd_log_e(tag, "climp_player_init(): %s\n", strerr(-err));
-        goto cleanup8;
-    }
-
-    climpd_player_set_volume(conf.volume);
+    if(err < 0)
+        goto cleanup1;
     
-    /* TODO: handle bus errors */
-//     climp_player_on_bus_error(player, &media_player_handle_bus_error);
-
-    err = message_handler_init();
-    if(err < 0) {
-        climpd_log_e(tag, "message_handler_init(): %s\n", strerr(-err));
-        goto cleanup9;
-    }
+    main_loop = g_main_loop_new(NULL, false);
+    if(!main_loop)
+        goto cleanup2;
     
     climpd_log_i(tag, "initialization successful\n");
     
     return 0;
 
-cleanup9:
-    climpd_player_destroy();
-cleanup8:
-    destroy_server_fd();
-cleanup7:
-    g_main_loop_unref(main_loop);
-cleanup6:
-    playlist_manager_destroy();
-cleanup5:
-    media_creator_destroy();
-cleanup4:
-    climpd_config_destroy();
-cleanup3:
-    bool_map_destroy();
 cleanup2:
-    terminal_color_map_destroy();
+    climpd_player_destroy();
 cleanup1:
+    while(i--)
+        modules[i].destroy();
+
     climpd_log_i(tag, "initialization failed\n");
-    climpd_log_destroy();
-out:
     return err;
 }
 
 static void destroy(void)
 {
-    message_handler_destroy();
-    climpd_player_destroy();
-    destroy_server_fd();
+    int i;
+    
     g_main_loop_unref(main_loop);
-    playlist_manager_destroy();
-    media_creator_destroy();
-    climpd_config_destroy();
-    bool_map_destroy();
-    terminal_color_map_destroy();
+    
+    climpd_player_destroy();
+    
+    for(i = 0; i < ARRAY_SIZE(modules); ++i)
+        modules[i].destroy();
+    
     climpd_log_destroy();
 }
 

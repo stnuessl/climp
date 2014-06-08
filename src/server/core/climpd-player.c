@@ -25,49 +25,117 @@
 #include <errno.h>
 #include <stdbool.h>
 
+#include <gst/gst.h>
+
+#include <libvci/vector.h>
+#include <libvci/random.h>
 #include <libvci/macro.h>
 #include <libvci/error.h>
 
-#include "../media-objects/media-player.h"
+#include "util/climpd-log.h"
+#include "util/terminal-color-map.h"
 
-#include "../util/terminal-color-map.h"
-
-#include "media-creator.h"
-#include "playlist.h"
-#include "climpd-config.h"
-#include "climpd-log.h"
-#include "climpd-player.h"
+#include "core/playlist.h"
+#include "core/climpd-config.h"
+#include "core/media-scheduler.h"
+#include "core/media-manager.h"
+#include "core/climpd-player.h"
 
 static const char *tag = "climpd-player";
-static struct media_player media_player;
+static GstElement *playbin2;
+static struct media_scheduler *sched;
 static struct playlist *playlist;
+static GstState state;
+static unsigned int volume;
+static bool muted;
+static void (*on_bus_error)(GstMessage *);
 
 extern struct climpd_config conf;
 
-static void on_end_of_stream(struct media_player *mp)
+static void climpd_player_play_uri(const char *uri)
+{
+    climpd_player_stop();
+    
+    g_object_set(playbin2, "uri", uri, NULL);
+    
+    state = GST_STATE_PLAYING;
+    
+    gst_element_set_state(playbin2, state);
+}
+
+static void on_end_of_stream(void)
 {
     const struct media *m;
-    const struct media_info *i;
     
-    i = media_info(playlist_current(playlist));
+    m = media_scheduler_running(sched);
+    if(m)
+        climpd_log_i(tag, "finished playing '%s'\n", media_info(m)->title);
     
-    climpd_log_i(tag, "finished playing '%s'\n", i->title);
-
-    m = playlist_next(playlist);
-    if(!m) {
+    m = media_scheduler_next(sched);
+        if(!m) {
         climpd_log_i(tag, "finished playlist\n");
         return;
     }
     
-    media_player_play_media(mp, m);
+    climpd_player_play_uri(media_uri(m));
 }
+
+static gboolean bus_watcher(GstBus *bus, GstMessage *msg, gpointer data)
+{
+    switch (GST_MESSAGE_TYPE(msg)) {
+        case GST_MESSAGE_ERROR:
+            if(on_bus_error)
+                on_bus_error(msg);
+            break;
+        case GST_MESSAGE_EOS:
+            on_end_of_stream();
+            break;
+        case GST_MESSAGE_STATE_CHANGED:
+        case GST_MESSAGE_TAG:
+        case GST_MESSAGE_WARNING:
+        case GST_MESSAGE_INFO:
+        case GST_MESSAGE_BUFFERING:
+        case GST_MESSAGE_STEP_DONE:
+        case GST_MESSAGE_CLOCK_PROVIDE:
+        case GST_MESSAGE_CLOCK_LOST:
+        case GST_MESSAGE_NEW_CLOCK:
+        case GST_MESSAGE_STRUCTURE_CHANGE:
+        case GST_MESSAGE_STREAM_STATUS:
+        case GST_MESSAGE_APPLICATION:
+        case GST_MESSAGE_ELEMENT:
+        case GST_MESSAGE_SEGMENT_START:
+        case GST_MESSAGE_SEGMENT_DONE:
+        case GST_MESSAGE_LATENCY:
+        case GST_MESSAGE_ASYNC_START:
+        case GST_MESSAGE_ASYNC_DONE:
+        case GST_MESSAGE_REQUEST_STATE:
+        case GST_MESSAGE_STEP_START:
+        case GST_MESSAGE_QOS:
+        case GST_MESSAGE_PROGRESS:
+        default:
+            break;
+    }
+    
+    return TRUE;
+}
+
+
 
 static void print_media(int fd, 
                         unsigned int index, 
-                        const struct media *__restrict m,
-                        const char *color)
+                        struct media *__restrict m,
+                        const char *__restrict color)
 {
     const struct media_info *i;
+    int err;
+    
+    if(!media_is_parsed(m)) {
+        err = media_manager_parse_media(m);
+        if(err < 0) {
+            dprintf(fd, "climpd: failed to parse %s\n", media_path(m));
+            return;
+        }
+    }
     
     i = media_info(m);
     
@@ -80,63 +148,62 @@ static void print_media(int fd,
 
 int climpd_player_init(struct playlist *pl, bool repeat, bool shuffle)
 {
+    GstBus *bus;
     int err;
     
-    err = media_player_init(&media_player);
-    if(err < 0) {
-        climpd_log_e(tag, "media_player_init(): %s\n", strerr(-err));
-        return err;
+    playbin2 = gst_element_factory_make("playbin2", NULL);
+    if(!playbin2)
+        return -ENOMEM;
+    
+    bus = gst_element_get_bus(playbin2);
+    
+    gst_bus_add_watch(bus, &bus_watcher, NULL);
+    
+    state  = GST_STATE_NULL;
+    volume = 100;
+    muted  = false;
+    
+    g_object_set(playbin2, "volume", (double) volume / 100.0f, NULL);
+
+    sched = media_scheduler_new(pl);
+    if(!sched) {
+        err = -errno;
+        goto cleanup1;
     }
     
-    media_player_on_end_of_stream(&media_player, &on_end_of_stream);
+    media_scheduler_set_repeat(sched, repeat);
+    media_scheduler_set_shuffle(sched, shuffle);
+    
     
     playlist = pl;
-    
-    playlist_set_repeat(playlist, repeat);
-    playlist_set_shuffle(playlist, shuffle);
-    
+
     climpd_log_i(tag, "initialization complete\n");
     
     return 0;
+
+cleanup1:
+    gst_object_unref(playbin2);
+    
+    return err;
 }
 
 void climpd_player_destroy(void)
 {
-    media_player_delete(&media_player);
+    media_scheduler_delete(sched);
+    gst_object_unref(playbin2);
     
     climpd_log_i(tag, "destroyed\n");
-}
-
-int climpd_player_play_file(const char *__restrict path)
-{
-    struct media *m;
-    int err;
-    
-    m = playlist_retrieve_path(playlist, path);
-    if(!m) {
-        m = media_creator_new_media(path);
-        if(!m)
-            return -errno;
-        
-        err = climpd_player_play_media(m);
-        if(err < 0) {
-            media_creator_delete_media(m);
-            return err;
-        }
-    }
-    
-    return climpd_player_play_media(m);
 }
 
 int climpd_player_play_media(struct media *m)
 {
     int err;
     
-    err = playlist_set_current(playlist, m);
+    err = media_scheduler_set_running_media(sched, m);
     if(err < 0)
         return err;
     
-    media_player_play_media(&media_player, m);
+    climpd_player_play_uri(media_uri(m));
     
     return 0;
 }
@@ -146,36 +213,56 @@ int climpd_player_play_track(unsigned int index)
     struct media *m;
     int err;
     
+    index -= 1;
+    
     if(index >= playlist_size(playlist))
         return -EINVAL;
     
-    m = playlist_at(playlist, index - 1);
-    
-    err = playlist_set_current(playlist, m);
+    err = media_scheduler_set_running_track(sched, index);
     if(err < 0)
         return err;
     
-    media_player_play_media(&media_player, m);
+    m = playlist_at(playlist, index);
     
+    climpd_player_play_uri(media_uri(m));
+
     return 0;
 }
 
 int climpd_player_play(void)
 {
-    if(media_player_playing(&media_player))
+    struct media *m;
+    
+    if(climpd_player_playing())
         return 0;
     
-    return climpd_player_next();
+    m = media_scheduler_next(sched);
+    if(!m)
+        return -ENOENT;
+    
+    climpd_player_play_uri(media_uri(m));
+    
+    return 0;
 }
 
 void climpd_player_pause(void)
 {
-    media_player_pause(&media_player);
+    if(state == GST_STATE_PAUSED)
+        return;
+    
+    state = GST_STATE_PAUSED;
+    
+    gst_element_set_state(playbin2, state);
 }
 
 void climpd_player_stop(void)
 {
-    media_player_stop(&media_player);
+    if(state == GST_STATE_NULL)
+        return;
+    
+    state = GST_STATE_NULL;
+    
+    gst_element_set_state(playbin2, state);
 }
 
 int climpd_player_next(void)
@@ -185,13 +272,13 @@ int climpd_player_next(void)
     if(playlist_empty(playlist))
         return -ENOENT;
     
-    m = playlist_next(playlist);
+    m = media_scheduler_next(sched);
     if(!m) {
         climpd_player_stop();
         return 0;
     }
     
-    media_player_play_media(&media_player, m);
+    climpd_player_play_uri(media_uri(m));
     
     return 0;
 }
@@ -203,147 +290,137 @@ int climpd_player_previous(void)
     if(playlist_empty(playlist))
         return -ENOENT;
     
-    m = playlist_previous(playlist);
+    m = media_scheduler_previous(sched);
     if(!m) {
         climpd_player_stop();
         return 0;
     }
     
-    media_player_play_media(&media_player, m);
+    climpd_player_play_uri(media_uri(m));
     
     return 0;
 }
 
-int climpd_player_add_file(const char *path)
-{
-    return playlist_insert_path(playlist, path);
-}
-
 int climpd_player_add_media(struct media *m)
 {
-    return playlist_insert_media(playlist, m);
-}
-
-void climpd_player_delete_file(const char *path)
-{
-    playlist_delete_path(playlist, path);
-}
-
-void climpd_player_delete_media(struct media *m)
-{
-    playlist_delete_media(playlist, m);
+    return media_scheduler_insert_media(sched, m);
 }
 
 void climpd_player_take_media(struct media *m)
 {
-    playlist_take_media(playlist, m);
+    media_scheduler_take_media(sched, m);
 }
 
-void climpd_player_set_volume(unsigned int volume)
+void climpd_player_set_volume(unsigned int vol)
 {
-    volume = max(volume, 0);
-    volume = min(volume, 120);
+    vol = max(vol, 0);
+    vol = min(vol, 120);
     
-    media_player_set_volume(&media_player, volume);
+    volume = vol;
+    
+    g_object_set(playbin2, "volume", (double) volume / 100.0f, NULL);
 }
 
 unsigned int climpd_player_volume(void)
 {
-    return media_player_volume(&media_player);
+    return volume;
 }
 
-void climpd_player_set_muted(bool muted)
+void climpd_player_set_muted(bool m)
 {
-    media_player_set_muted(&media_player, muted);
+    muted = m;
 }
 
 bool climpd_player_muted(void)
 {
-    return media_player_muted(&media_player);
+    return muted;
 }
 
 void climpd_player_set_repeat(bool repeat)
 {
-    playlist_set_repeat(playlist, repeat);
+    media_scheduler_set_repeat(sched, repeat);
 }
 
 bool climpd_player_repeat(void)
 {
-    return playlist_repeat(playlist);
+    return media_scheduler_repeat(sched);
 }
 
 void climpd_player_set_shuffle(bool shuffle)
 {
-    playlist_set_shuffle(playlist, shuffle);
+    media_scheduler_set_shuffle(sched, shuffle);
 }
 
 bool climpd_player_shuffle(void)
 {
-    return playlist_shuffle(playlist);
+    return media_scheduler_shuffle(sched);
 }
 
 bool climpd_player_playing(void)
 {
-    return media_player_playing(&media_player);
+    return state == GST_STATE_PLAYING;
 }
 
 bool climpd_player_paused(void)
 {
-    return media_player_paused(&media_player);
+    return state == GST_STATE_PAUSED;
 }
 
 bool climpd_player_stopped(void)
 {
-    return media_player_stopped(&media_player);
+    return state == GST_STATE_NULL;
 }
 
-const struct media *climpd_player_current(void)
+const struct media *climpd_player_running(void)
 {
-    return playlist_current(playlist);
+    return media_scheduler_running(sched);
 }
 
-void climpd_player_set_playlist(struct playlist *pl)
+int climpd_player_set_playlist(struct playlist *pl)
 {
-    playlist_set_repeat(pl, playlist_repeat(playlist));
-    playlist_set_shuffle(pl, playlist_shuffle(playlist));
+    int err;
+    
+    err = media_scheduler_set_playlist(sched, pl);
+    if(err < 0)
+        return err;
     
     playlist = pl;
+    
+    return 0;
 }
 
 void climpd_player_print_playlist(int fd)
 {
-    const struct link *link;
-    const struct media *m, *current;
+    struct media **m, *current;
     unsigned int index;
     
-    current = playlist_current(playlist);
+    current = media_scheduler_running(sched);
     index   = 0;
     
-    playlist_for_each(playlist, link) {
+    playlist_for_each(playlist, m) {
         index += 1;
-        m = container_of(link, struct media, link);
         
-        if(m == current)
-            print_media(fd, index, m, conf.media_active_color);
+        if(*m == current)
+            print_media(fd, index, *m, conf.media_active_color);
         else
-            print_media(fd, index, m, conf.media_passive_color);
+            print_media(fd, index, *m, conf.media_passive_color);
     }
 }
 
 void climpd_player_print_files(int fd)
 {
-    struct link *link;
+    const struct media **m;
     
-    playlist_for_each(playlist, link)
-        dprintf(fd, "%s\n", container_of(link, struct media, link)->path);
+    playlist_for_each(playlist, m)
+        dprintf(fd, "%s\n", (*m)->path);
 }
 
 void climpd_player_print_current_track(int fd)
 {
-    const struct media *m;
+    struct media *m;
     unsigned int index;
     
-    m = playlist_current(playlist);
+    m =  media_scheduler_running(sched);
     if(!m) {
         dprintf(fd, "No current track available\n");
         return;
@@ -353,25 +430,28 @@ void climpd_player_print_current_track(int fd)
     if(index < 0)
         climpd_log_w("Current track %s not in playlist\n", m->path);
     
+    /* silly humans begin to count with '1' */
+    index += 1;
+    
     print_media(fd, index, m, conf.media_active_color);
 }
 
 void climpd_player_print_volume(int fd)
 {
-    dprintf(fd, " Volume: %u\n", media_player_volume(&media_player));
+    dprintf(fd, " Volume: %u\n", volume);
 }
 
 void climpd_player_print_state(int fd)
 {
     const struct media *m;
     
-    m = playlist_current(playlist);
+    m = media_scheduler_running(sched);
     
-    if(media_player_playing(&media_player))
+    if(climpd_player_playing())
         dprintf(fd, " climpd-player playing\t~ %s ~\n", m->path);
-    else if(media_player_paused(&media_player))
+    else if(climpd_player_paused())
         dprintf(fd, " climpd-player is paused on\t~ %s ~\n", m->path);
-    else if(media_player_stopped(&media_player))
+    else if(climpd_player_stopped())
         dprintf(fd, " climpd-player is stopped\n");
     else
         dprintf(fd, " climpd-player state is unknown\n");

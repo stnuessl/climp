@@ -23,14 +23,12 @@
 
 #include <stdbool.h>
 
-#include "../media-objects/media.h"
-#include "playlist.h"
+#include "core/media.h"
+#include "core/playlist.h"
 
 int climpd_player_init(struct playlist *pl, bool repeat, bool shuffle);
 
 void climpd_player_destroy(void);
-
-int climpd_player_play_file(const char *__restrict path);
 
 int climpd_player_play_media(struct media *m);
 
@@ -46,13 +44,7 @@ int climpd_player_next(void);
 
 int climpd_player_previous(void);
 
-int climpd_player_add_file(const char *path);
-
 int climpd_player_add_media(struct media *m);
-
-void climpd_player_delete_file(const char *path);
-
-void climpd_player_delete_media(struct media *m);
 
 void climpd_player_take_media(struct media *m);
 
@@ -78,9 +70,9 @@ bool climpd_player_paused(void);
 
 bool climpd_player_stopped(void);
 
-const struct media *climpd_player_current(void);
+const struct media *climpd_player_running(void);
 
-void climpd_player_set_playlist(struct playlist *pl);
+int climpd_player_set_playlist(struct playlist *pl);
 
 void climpd_player_print_playlist(int fd);
 
