@@ -28,6 +28,7 @@
 #include <fcntl.h>
 #include <stdint.h>
 #include <limits.h>
+#include <locale.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 
@@ -361,6 +362,8 @@ int main(int argc, char *argv[])
     if(getuid() == 0)
         exit(EXIT_FAILURE);
     
+    setlocale(LC_ALL, "");
+    
     gst_init(NULL, NULL);
     
     err = init();
@@ -370,6 +373,8 @@ int main(int argc, char *argv[])
     g_main_loop_run(main_loop);
 
     destroy();
+    
+    gst_deinit();
     
     return EXIT_SUCCESS;
 }

@@ -127,6 +127,7 @@ static void print_media(int fd,
                         const char *__restrict color)
 {
     const struct media_info *i;
+    unsigned int min, sec;
     int err;
     
     if(!media_is_parsed(m)) {
@@ -139,8 +140,12 @@ static void print_media(int fd,
     
     i = media_info(m);
     
-    dprintf(fd, "%s ( %3u )\t%-*.*s %-*.*s %-*.*s\n" COLOR_CODE_DEFAULT,
-            color, index, 
+    min = i->duration / 60;
+    sec = i->duration % 60;
+    
+    dprintf(fd, "%s ( %3u )    %2u:%02u   %-*.*s %-*.*s %-*.*s\n" 
+            COLOR_CODE_DEFAULT, 
+            color, index, min, sec,
             conf.media_meta_length, conf.media_meta_length, i->title, 
             conf.media_meta_length, conf.media_meta_length, i->artist, 
             conf.media_meta_length, conf.media_meta_length, i->album);

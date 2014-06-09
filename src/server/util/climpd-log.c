@@ -19,12 +19,15 @@
  */
 
 #include <stdlib.h>
+#include <unistd.h>
+#include <stdio.h>
 #include <fcntl.h>
 #include <errno.h>
 #include <stdarg.h>
 #include <sys/stat.h>
 
 #include <libvci/log.h>
+#include <libvci/error.h>
 
 #include "climpd-log.h"
 
@@ -91,4 +94,9 @@ void climpd_log_e(const char *__restrict tag, const char *fmt, ...)
     log_vprintf(log, LOG_ERROR, tag, fmt, vargs);
     
     va_end(vargs);
+}
+
+void climpd_log_print(int fd)
+{
+    log_print(log, fd);
 }

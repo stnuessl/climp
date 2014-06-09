@@ -30,13 +30,13 @@
 #include <libvci/clock.h>
 #include <libvci/error.h>
 
-#include "climpd-log.h"
-#include "climpd-config.h"
-#include "media-manager.h"
-#include "climpd-player.h"
-#include "../util/terminal-color-map.h"
-#include "playlist-manager.h"
-#include "../util/bool-map.h"
+#include "util/climpd-log.h"
+#include "util/bool-map.h"
+#include "util/terminal-color-map.h"
+#include "core/climpd-config.h"
+#include "core/media-manager.h"
+#include "core/climpd-player.h"
+#include "core/playlist-manager.h"
 
 #include "../../shared/ipc.h"
 
@@ -227,6 +227,14 @@ static int get_volume(void)
     
     return 0;
 }
+
+static int get_log(void)
+{
+    climpd_log_print(fd_stdout);
+    
+    return 0;
+}
+
 static int set_playlist(void)
 {
     struct playlist *pl;
@@ -537,6 +545,7 @@ static int (*msg_handler[])(void) = {
     [IPC_MESSAGE_GET_STATE]             = &get_state,
     [IPC_MESSAGE_GET_TITLES]            = &get_titles,
     [IPC_MESSAGE_GET_VOLUME]            = &get_volume,
+    [IPC_MESSAGE_GET_LOG]               = &get_log,
         
     [IPC_MESSAGE_SET_PLAYLIST]          = &set_playlist,
     [IPC_MESSAGE_SET_REPEAT]            = &set_repeat,
