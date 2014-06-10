@@ -203,10 +203,8 @@ int media_scheduler_set_running_media(struct media_scheduler *__restrict ms,
     ms->running += 1;
     
     if(ms->shuffle)
-        vector_take_sorted(ms->random_ready, (void *)(long) index);
-    
-    ms->running = index;
-    
+        vector_take_sorted(ms->random_ready, (void *)(long) ms->running);
+
     return 0;
     
 cleanup2:

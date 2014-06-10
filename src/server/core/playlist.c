@@ -91,7 +91,7 @@ int playlist_insert_at(struct playlist *__restrict pl,
                        unsigned int i, 
                        struct media *m)
 {
-    assert(i < playlist_size(pl) && "Invalid playlist index");
+    assert(i <= playlist_size(pl) && "Invalid playlist index");
     
     return vector_insert_at(&pl->vec_media, i, m);
 }
