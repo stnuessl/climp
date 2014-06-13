@@ -40,6 +40,14 @@ struct media *media_new(const char *path)
     if(!media->uri)
         goto cleanup1;
     
+    strncpy(media->info.title, "not initialized", MEDIA_META_ELEMENT_SIZE);
+    strncpy(media->info.artist, "not initialized", MEDIA_META_ELEMENT_SIZE);
+    strncpy(media->info.album, "not initialized", MEDIA_META_ELEMENT_SIZE);
+    
+    media->info.track = 0;
+    media->info.duration = 0;
+    media->info.seekable = false;
+    
     media->uri = strcpy(media->uri, MEDIA_FILE_PREFIX);
     media->uri = strcat(media->uri, path);
     
@@ -48,13 +56,7 @@ struct media *media_new(const char *path)
     media->name = strrchr(media->path, '/');
     media->name = (media->name) ? media->name + 1 : media->path;
     
-    strncpy(media->info.title, "not initialized", MEDIA_META_ELEMENT_SIZE);
-    strncpy(media->info.artist, "not initialized", MEDIA_META_ELEMENT_SIZE);
-    strncpy(media->info.album, "not initialized", MEDIA_META_ELEMENT_SIZE);
-    
-    media->info.track = 0;
-    media->info.duration = 0;
-    media->info.seekable = false;
+    media->parsed = false;
 
     return media;
 

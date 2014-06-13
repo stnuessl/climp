@@ -171,11 +171,14 @@ struct media *media_scheduler_previous(struct media_scheduler *__restrict ms)
 
 struct media *media_scheduler_running(struct media_scheduler *__restrict ms)
 {
-    return (ms->running != -1) ? playlist_at(ms->playlist, ms->running) : NULL;
+    if(ms->running != (unsigned int) -1)
+        return playlist_at(ms->playlist, ms->running);
+    else
+        return NULL;
 }
 
 int media_scheduler_set_running_media(struct media_scheduler *__restrict ms, 
-                                struct media *m)
+                                      struct media *m)
 {
     unsigned int size;
     int index, err;
@@ -266,7 +269,12 @@ struct media *media_scheduler_take_media(struct media_scheduler *__restrict ms,
     if(index == -1)
         return NULL;
     
-    vector_take_sorted(ms->random_ready, (void *)(long) index);
+    if(ms->running != (unsigned int) -1) {
+        if(index <= ms->running)
+            ms->running -= 1;
+    }
+    
+    vector_take_back(ms->random_ready);
     vector_take_all(ms->history, (void *)(long) index);
     
     return playlist_take_at(ms->playlist, index);

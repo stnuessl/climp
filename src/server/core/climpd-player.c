@@ -119,8 +119,6 @@ static gboolean bus_watcher(GstBus *bus, GstMessage *msg, gpointer data)
     return TRUE;
 }
 
-
-
 static void print_media(int fd, 
                         unsigned int index, 
                         struct media *__restrict m,
@@ -313,6 +311,17 @@ int climpd_player_add_media(struct media *m)
 
 void climpd_player_take_media(struct media *m)
 {
+    struct media *next;
+    
+    if(m == media_scheduler_running(sched)) {
+        next = media_scheduler_next(sched);
+        
+        if(next)
+            climpd_player_play_uri(media_uri(next));
+        else
+            climpd_player_stop();
+    }
+    
     media_scheduler_take_media(sched, m);
 }
 

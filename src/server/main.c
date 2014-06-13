@@ -322,6 +322,8 @@ static int init(void)
     if(err < 0)
         goto cleanup1;
     
+    climpd_player_set_volume(conf.volume);
+    
     main_loop = g_main_loop_new(NULL, false);
     if(!main_loop)
         goto cleanup2;

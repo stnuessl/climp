@@ -75,7 +75,7 @@ void media_scheduler_set_repeat(struct media_scheduler *__restrict ms,
 bool media_scheduler_repeat(const struct media_scheduler *__restrict ms);
 
 void media_scheduler_set_shuffle(struct media_scheduler *__restrict ms, 
-                                bool shuffle);
+                                 bool shuffle);
 
 bool media_scheduler_shuffle(const struct media_scheduler *__restrict ms);
 

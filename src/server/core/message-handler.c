@@ -510,7 +510,7 @@ static int remove_media(void)
         return 0;
     
     climpd_player_take_media(m);
-    
+
     media_manager_delete_media(arg);
     
     return 0;
