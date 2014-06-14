@@ -239,20 +239,19 @@ static int set_playlist(void)
 {
     struct playlist *pl;
     const char *arg;
+    int err;
     
     arg = ipc_message_arg(&msg_in);
     
     pl = playlist_manager_retrieve(arg);
-    if(pl) {
-        climpd_player_set_playlist(pl);
-        return 0;
+    if(!pl) {
+        err = -errno;
+        error("climpd: creating playlist '%s' failed - ", arg);
+        error("view the log for details (climp get-log)\n");
+        return -err;
     }
     
-//     pl = playlist_new_file(NULL, arg);
-//     if(!pl) {
-//         error("set-playlist: %s - %s\n", arg, errstr);
-//         return -errno;
-//     }
+    climpd_player_set_playlist(pl);
     
     return 0;
 }
@@ -461,7 +460,7 @@ static int load_media(void)
         return err;
     }
     
-    err = climpd_player_add_media(m);
+    err = climpd_player_insert_media(m);
     if(err < 0) {
         error("load-media: %s - %s\n", arg, strerr(-err));
         return err;
@@ -472,27 +471,16 @@ static int load_media(void)
 
 static int load_playlist(void)
 {
-    struct stat s;
+    struct playlist *pl;
     const char *arg;
-    int err;
     
     arg = ipc_message_arg(&msg_in);
     
-    err = stat(arg, &s);
-    if(err < 0) {
-        error("load-playlist: %s - %s\n", arg, errstr);
+    pl = playlist_manager_retrieve(arg);
+    if(!pl) {
+        error("climpd: creating playlist '%s' failed - ", arg);
+        error("view the log for details (climp get-log)\n");
         return -errno;
-    }
-    
-    if(!S_ISREG(s.st_mode)) {
-        error("load-playlist: %s is not a file\n", arg);
-        return -EINVAL;
-    }
-    
-    err = playlist_manager_load_from_file(arg);
-    if(err < 0) {
-        error("load-playlist: %s - %s\n", arg, strerr(-err));
-        return err;
     }
     
     return 0;

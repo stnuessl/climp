@@ -33,11 +33,7 @@ int playlist_manager_load_from_file(const char *__restrict path);
 
 int playlist_manager_save_to_file(const char *__restrict path);
 
-int playlist_manager_insert(struct playlist *__restrict pl);
-
-struct playlist *playlist_manager_retrieve(const char *__restrict name);
-
-struct playlist *playlist_manager_take(const char *__restrict name);
+struct playlist *playlist_manager_retrieve(const char *name);
 
 void playlist_manager_delete_playlist(const char *__restrict name);
 

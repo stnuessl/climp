@@ -44,7 +44,7 @@ int climpd_player_next(void);
 
 int climpd_player_previous(void);
 
-int climpd_player_add_media(struct media *m);
+int climpd_player_insert_media(struct media *m);
 
 void climpd_player_take_media(struct media *m);
 

@@ -44,7 +44,6 @@
 static const char *tag = "climpd-player";
 static GstElement *playbin2;
 static struct media_scheduler *sched;
-static struct playlist *playlist;
 static GstState state;
 static unsigned int volume;
 static bool muted;
@@ -176,11 +175,8 @@ int climpd_player_init(struct playlist *pl, bool repeat, bool shuffle)
     
     media_scheduler_set_repeat(sched, repeat);
     media_scheduler_set_shuffle(sched, shuffle);
-    
-    
-    playlist = pl;
 
-    climpd_log_i(tag, "initialization complete\n");
+    climpd_log_i(tag, "initialized\n");
     
     return 0;
 
@@ -213,19 +209,22 @@ int climpd_player_play_media(struct media *m)
 
 int climpd_player_play_track(unsigned int index)
 {
+    struct playlist *pl;
     struct media *m;
     int err;
     
     index -= 1;
     
-    if(index >= playlist_size(playlist))
+    pl = media_scheduler_playlist(sched);
+    
+    if(index >= playlist_size(pl))
         return -EINVAL;
     
     err = media_scheduler_set_running_track(sched, index);
     if(err < 0)
         return err;
     
-    m = playlist_at(playlist, index);
+    m = playlist_at(pl, index);
     
     climpd_player_play_uri(media_uri(m));
 
@@ -270,9 +269,12 @@ void climpd_player_stop(void)
 
 int climpd_player_next(void)
 {
+    struct playlist *pl;
     const struct media *m;
     
-    if(playlist_empty(playlist))
+    pl = media_scheduler_playlist(sched);
+    
+    if(playlist_empty(pl))
         return -ENOENT;
     
     m = media_scheduler_next(sched);
@@ -288,9 +290,12 @@ int climpd_player_next(void)
 
 int climpd_player_previous(void)
 {
+    struct playlist *pl;
     const struct media *m;
+    
+    pl = media_scheduler_playlist(sched);
 
-    if(playlist_empty(playlist))
+    if(playlist_empty(pl))
         return -ENOENT;
     
     m = media_scheduler_previous(sched);
@@ -304,18 +309,29 @@ int climpd_player_previous(void)
     return 0;
 }
 
-int climpd_player_add_media(struct media *m)
+int climpd_player_insert_media(struct media *m)
 {
     return media_scheduler_insert_media(sched, m);
 }
 
 void climpd_player_take_media(struct media *m)
 {
+    struct playlist *pl;
     struct media *next;
     
+    pl = media_scheduler_playlist(sched);
+    
     if(m == media_scheduler_running(sched)) {
-        next = media_scheduler_next(sched);
-        
+        if(playlist_size(pl) == 1) {
+            climpd_player_stop();
+            media_scheduler_take_media(sched, m);
+            return;
+        }
+
+        do {
+            next = media_scheduler_next(sched);
+        } while(next == m);
+
         if(next)
             climpd_player_play_uri(media_uri(next));
         else
@@ -394,24 +410,33 @@ int climpd_player_set_playlist(struct playlist *pl)
 {
     int err;
     
+    if(media_scheduler_playlist(sched) == pl)
+        return 0;
+    
     err = media_scheduler_set_playlist(sched, pl);
     if(err < 0)
         return err;
     
-    playlist = pl;
+    if(climpd_player_playing()) {
+        climpd_player_stop();
+        
+        return climpd_player_play();
+    }
     
     return 0;
 }
 
 void climpd_player_print_playlist(int fd)
 {
+    struct playlist *pl;
     struct media **m, *current;
     unsigned int index;
     
+    pl = media_scheduler_playlist(sched);
     current = media_scheduler_running(sched);
     index   = 0;
     
-    playlist_for_each(playlist, m) {
+    playlist_for_each(pl, m) {
         index += 1;
         
         if(*m == current)
@@ -423,24 +448,29 @@ void climpd_player_print_playlist(int fd)
 
 void climpd_player_print_files(int fd)
 {
+    struct playlist *pl;
     const struct media **m;
     
-    playlist_for_each(playlist, m)
+    pl = media_scheduler_playlist(sched);
+    
+    playlist_for_each(pl, m)
         dprintf(fd, "%s\n", (*m)->path);
 }
 
 void climpd_player_print_current_track(int fd)
 {
+    struct playlist *pl;
     struct media *m;
     unsigned int index;
     
+    pl = media_scheduler_playlist(sched);
     m =  media_scheduler_running(sched);
     if(!m) {
         dprintf(fd, "No current track available\n");
         return;
     }
     
-    index = playlist_index_of(playlist, m);
+    index = playlist_index_of(pl, m);
     if(index < 0)
         climpd_log_w("Current track %s not in playlist\n", m->path);
     

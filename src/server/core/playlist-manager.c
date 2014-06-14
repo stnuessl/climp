@@ -118,7 +118,7 @@ static int load_files_from_file(struct playlist *__restrict pl,
 }
 
 static struct playlist *
-playlist_manager_playlist_from_file(const char *__restrict path)
+new_playlist_from_file(const char *__restrict path)
 {
     struct playlist *pl;
     const char *name;
@@ -127,21 +127,40 @@ playlist_manager_playlist_from_file(const char *__restrict path)
     name = strrchr(path, '/');
     name = (name) ? name + 1: path;
     
-    climpd_log_i(tag, "loading playlist %s from %s\n", name, path);
-    
     pl = playlist_new(name);
     if(!pl) {
-        climpd_log_e(tag, "playlist_new() - %s\n", errstr);
-        return NULL;
+        err = -errno;
+        goto out;
     }
     
     err = load_files_from_file(pl, path);
     if(err < 0) {
         playlist_delete(pl);
-        return NULL;
+        goto out;
     }
     
+    climpd_log_i(tag, "created playlist '%s' from '%s'\n", name, path);
+    
     return pl;
+
+out:
+    climpd_log_e(tag, "failed to create playlist '%s' from '%s'", name, path);
+    climpd_log_append(" - %s\n", strerr(-err));
+    errno = -err;
+    return 0;
+}
+
+static int playlist_manager_insert(struct playlist *__restrict pl)
+{
+    return map_insert(&playlist_map, playlist_name(pl), pl);
+}
+
+static struct playlist *playlist_manager_take(const char *__restrict name)
+{
+    if(name[0] == '/')
+        name = strrchr(name, '/') + 1;
+    
+    return map_take(&playlist_map, name);
 }
 
 int playlist_manager_init(void)
@@ -161,9 +180,11 @@ int playlist_manager_init(void)
         goto cleanup1;
     }
     
-    err = map_insert(&playlist_map, playlist_name(pl), pl);
+    err = playlist_manager_insert(pl);
     if(err < 0)
         goto cleanup2;
+    
+    climpd_log_i(tag, "initialized\n");
     
     return 0;
     
@@ -178,6 +199,7 @@ cleanup1:
 void playlist_manager_destroy(void)
 {
     map_destroy(&playlist_map);
+    climpd_log_i(tag, "destroyed\n");
 }
 
 int playlist_manager_load_from_file(const char *__restrict path)
@@ -227,7 +249,7 @@ int playlist_manager_load_from_file(const char *__restrict path)
             continue;
         }
         
-        pl = playlist_manager_playlist_from_file(line);
+        pl = new_playlist_from_file(line);
         if(!pl) {
             msg = strerr(errno);
             climpd_log_w(tag, "%s: %s\n", line, msg);
@@ -266,25 +288,36 @@ int playlist_manager_save_to_file(const char *__restrict path)
     return 0;
 }
 
-int playlist_manager_insert(struct playlist *__restrict pl)
+struct playlist *playlist_manager_retrieve(const char *name)
 {
-    return map_insert(&playlist_map, playlist_name(pl), pl);
-}
-
-struct playlist *playlist_manager_retrieve(const char *__restrict name)
-{
-    return map_retrieve(&playlist_map, name);
-}
-
-struct playlist *playlist_manager_take(const char *__restrict name)
-{
-    return map_take(&playlist_map, name);
+    static const char *err_msg = "cannot create playlist '%s' - 's'\n";
+    struct playlist *pl;
+    const char *key;
+    int err;
+    
+    key = (name[0] == '/') ? strrchr(name, '/') + 1 : name;
+    
+    pl = map_retrieve(&playlist_map, key);
+    if(!pl) {
+        pl = new_playlist_from_file(name);
+        if(!pl)
+            return NULL;
+        
+        err = map_insert(&playlist_map, key, pl);
+        if(err < 0) {
+            climpd_log_e(tag, err_msg, name, strerr(-err));
+            playlist_delete(pl);
+            return NULL;
+        }
+    }
+    
+    return pl;
 }
 
 void playlist_manager_delete_playlist(const char *__restrict name)
 {
     struct playlist *pl;
-    
+
     pl = playlist_manager_take(name);
     if(!pl)
         return;

@@ -79,4 +79,7 @@ void media_scheduler_set_shuffle(struct media_scheduler *__restrict ms,
 
 bool media_scheduler_shuffle(const struct media_scheduler *__restrict ms);
 
+struct playlist *
+media_scheduler_playlist(struct media_scheduler *__restrict ms);
+
 #endif /* _MEDIA_SCHEDULER_H_ */

@@ -374,6 +374,14 @@ out:
     return err;
 }
 
+
+void climpd_config_destroy(void)
+{
+    config_delete(config);
+    climpd_log_i(tag, "destroyed\n");
+}
+
+
 int climpd_config_reload(void)
 {
     int err;
@@ -400,9 +408,4 @@ void climpd_config_print(int fd)
     }
     
     dprintf(fd, "\n");
-}
-
-void climpd_config_destroy(void)
-{
-    config_delete(config);
 }

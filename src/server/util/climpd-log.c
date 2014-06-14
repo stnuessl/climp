@@ -100,3 +100,14 @@ void climpd_log_print(int fd)
 {
     log_print(log, fd);
 }
+
+void climpd_log_append(const char *fmt, ...)
+{
+    va_list vargs;
+    
+    va_start(vargs, fmt);
+    
+    log_append(log, fmt, vargs);
+    
+    va_end(vargs);
+}

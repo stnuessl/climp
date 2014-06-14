@@ -287,6 +287,9 @@ int media_scheduler_set_playlist(struct media_scheduler *__restrict ms,
     unsigned int i, size;
     int err;
     
+    if(ms->playlist == pl)
+        return 0;
+    
     size = playlist_size(pl);
     
     if(size < playlist_size(ms->playlist)) {
@@ -294,6 +297,8 @@ int media_scheduler_set_playlist(struct media_scheduler *__restrict ms,
         
         media_scheduler_reset_random_ready(ms);
         vector_clear(ms->history);
+        
+        ms->running      = (unsigned int) -1;
         
         return 0;
     }
@@ -343,4 +348,9 @@ void media_scheduler_set_shuffle(struct media_scheduler *__restrict ms,
 bool media_scheduler_shuffle(const struct media_scheduler *__restrict ms)
 {
     return ms->shuffle;
+}
+
+struct playlist *media_scheduler_playlist(struct media_scheduler *__restrict ms)
+{
+    return ms->playlist;
 }

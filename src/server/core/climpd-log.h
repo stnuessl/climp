@@ -37,4 +37,7 @@ void climpd_log_w(const char *__restrict tag, const char *fmt, ...)
 void climpd_log_e(const char *__restrict tag, const char *fmt, ...)
                                             __attribute__((format(printf,2,3)));
 
+void climpd_log_append(const char *fmt, ...) 
+                                            __attribute__((format(printf,1,2)));
+
 #endif /* _CLIMPD_LOG_H_ */

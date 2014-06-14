@@ -65,7 +65,7 @@ static struct command_handle {
     { "get-volume",      IPC_MESSAGE_GET_VOLUME,        false,  false   },
     { "get-log",         IPC_MESSAGE_GET_LOG,           false,  false   },
     
-    { "set-playlist",    IPC_MESSAGE_SET_PLAYLIST,      true,   true    },
+    { "set-playlist",    IPC_MESSAGE_SET_PLAYLIST,      true,   false   },
     { "set-volume",      IPC_MESSAGE_SET_VOLUME,        true,   false   },
     { "set-repeat",      IPC_MESSAGE_SET_REPEAT,        true,   false   },
     { "set-shuffle",     IPC_MESSAGE_SET_SHUFFLE,       true,   false   },
