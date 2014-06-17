@@ -298,7 +298,7 @@ int media_scheduler_set_playlist(struct media_scheduler *__restrict ms,
         media_scheduler_reset_random_ready(ms);
         vector_clear(ms->history);
         
-        ms->running      = (unsigned int) -1;
+        ms->running = (unsigned int) -1;
         
         return 0;
     }

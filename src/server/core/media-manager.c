@@ -1,6 +1,10 @@
+#include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
+#include <dirent.h>
+#include <sys/types.h>
 
 #include <gst/gst.h>
 #include <gst/pbutils/pbutils.h>
@@ -216,6 +220,37 @@ void media_manager_delete_media(const char *__restrict path)
     media_delete(m);
 }
 
+static bool is_playable(const char *__restrict uri)
+{
+    GstDiscovererResult result;
+    GstDiscovererInfo *info;
+    GstDiscovererStreamInfo *s_info, *s_info_next;
+    GError *err;
+    
+    info = gst_discoverer_discover_uri(sync_disc, uri, &err);
+    if(!info)
+        return false;
+    
+    result = gst_discoverer_info_get_result(info);
+    
+    if(result != GST_DISCOVERER_OK)
+        return false;
+    
+    s_info = gst_discoverer_info_get_stream_info(info);
+    
+    while(s_info) {
+        if(GST_IS_DISCOVERER_VIDEO_INFO(s_info))
+            return false;
+        
+        s_info_next = gst_discoverer_stream_info_get_next(s_info);
+        
+        gst_discoverer_stream_info_unref(s_info);
+        s_info = s_info_next;
+    }
+    
+    return true;
+}
+
 int media_manager_parse_media(struct media *__restrict media)
 {
     GstDiscovererInfo *info;
@@ -231,8 +266,66 @@ int media_manager_parse_media(struct media *__restrict media)
     }
     
     on_discovered(sync_disc, info, err, media);
-
+    
     gst_discoverer_info_unref(info);
     
     return 0;
+}
+
+void media_manager_discover_folder(const char *__restrict path, int fd)
+{
+    static const char err_msg[] = "%s: unable to %s directory %s - %s\n";
+    DIR *dir;
+    struct dirent buf, *ent;
+    size_t len_path, len;
+    char *uri;
+    int err;
+    
+    dir = opendir(path);
+    if(!dir) {
+        dprintf(fd, err_msg, tag, "open", path, errstr);
+        return;
+    }
+    
+    dprintf(fd, "# Playable files in directory %s\n", path);
+    
+    while(1) {
+        err = readdir_r(dir, &buf, &ent);
+        if(err) {
+            dprintf(fd, err_msg, tag, "read", path, strerr(err));
+            break;
+        }
+        
+        if(!ent)
+            break;
+        
+        if(ent->d_type != DT_REG)
+            continue;
+        
+        /* the joys of c strings */
+        len_path = strlen(path);
+        len      = sizeof("file://") + len_path + 1 + strlen(ent->d_name);
+        
+        uri = malloc(len);
+        if(!uri) {
+            dprintf(fd, "%s: stopping discovering - %s\n", tag, errstr);
+            break;
+        }
+        
+        uri = strcpy(uri, "file://");
+        uri = strcat(uri, path);
+        
+        if(path[len_path] != '/')
+            uri = strcat(uri, "/");
+        
+        uri = strcat(uri, ent->d_name);
+        
+        if(is_playable(uri))
+            dprintf(fd, "%s\n", uri + sizeof("file://") - 1);
+            
+        free(uri);
+    }
+    
+    closedir(dir);
+    return;
 }

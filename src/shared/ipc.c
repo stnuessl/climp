@@ -55,6 +55,7 @@ const char *ipc_message_id_string(enum message_id id)
         [IPC_MESSAGE_GET_TITLES]        = "IPC_MESSAGE_GET_TITLES",
         [IPC_MESSAGE_GET_VOLUME]        = "IPC_MESSAGE_GET_VOLUME",
         [IPC_MESSAGE_GET_LOG]           = "IPC_MESSAGE_GET_LOG",
+        [IPC_MESSAGE_GET_PLAYABLES]     = "IPC_MESSAGE_GET_PLAYABLES",
         
         [IPC_MESSAGE_SET_PLAYLIST]      = "IPC_MESSAGE_SET_PLAYLIST",
         [IPC_MESSAGE_SET_REPEAT]        = "IPC_MESSAGE_SET_REPEAT",

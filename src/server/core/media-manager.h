@@ -33,4 +33,6 @@ void media_manager_delete_media(const char *__restrict path);
 
 int media_manager_parse_media(struct media *__restrict media);
 
+void media_manager_discover_folder(const char *__restrict path, int fd);
+
 #endif /* _MEDIA_MANAGER_H_ */

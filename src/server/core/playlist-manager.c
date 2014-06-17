@@ -124,8 +124,7 @@ new_playlist_from_file(const char *__restrict path)
     const char *name;
     int err;
     
-    name = strrchr(path, '/');
-    name = (name) ? name + 1: path;
+    name = (path[0] == '/') ? strrchr(path, '/') + 1 : path;
     
     pl = playlist_new(name);
     if(!pl) {
@@ -157,8 +156,7 @@ static int playlist_manager_insert(struct playlist *__restrict pl)
 
 static struct playlist *playlist_manager_take(const char *__restrict name)
 {
-    if(name[0] == '/')
-        name = strrchr(name, '/') + 1;
+    name = (name[0] == '/') ? strrchr(name, '/') + 1 : name;
     
     return map_take(&playlist_map, name);
 }
@@ -300,8 +298,10 @@ struct playlist *playlist_manager_retrieve(const char *name)
     pl = map_retrieve(&playlist_map, key);
     if(!pl) {
         pl = new_playlist_from_file(name);
-        if(!pl)
+        if(!pl) {
+            climpd_log_e(tag, err_msg, name, errstr);
             return NULL;
+        }
         
         err = map_insert(&playlist_map, key, pl);
         if(err < 0) {

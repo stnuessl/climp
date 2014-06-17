@@ -515,6 +515,17 @@ static int remove_playlist(void)
     return 0;
 }
 
+static int get_playables(void) 
+{
+    const char *arg;
+    
+    arg = ipc_message_arg(&msg_in);
+    
+    media_manager_discover_folder(arg, fd_stdout);
+    
+    return 0;
+}
+
 static int (*msg_handler[])(void) = {
     [IPC_MESSAGE_HELLO]                 = &hello,
     [IPC_MESSAGE_GOODBYE]               = &goodbye,
@@ -534,6 +545,7 @@ static int (*msg_handler[])(void) = {
     [IPC_MESSAGE_GET_TITLES]            = &get_titles,
     [IPC_MESSAGE_GET_VOLUME]            = &get_volume,
     [IPC_MESSAGE_GET_LOG]               = &get_log,
+    [IPC_MESSAGE_GET_PLAYABLES]         = &get_playables,
         
     [IPC_MESSAGE_SET_PLAYLIST]          = &set_playlist,
     [IPC_MESSAGE_SET_REPEAT]            = &set_repeat,
