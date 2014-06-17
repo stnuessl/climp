@@ -5,10 +5,12 @@ This project is incomplete. You should not use it.
 
 Dependencies
 ------------
-    Linux, epoll, timerfd, eventfd interfaces..
-    Libraries:
-        -> libvlc
         -> libvci (https://github.com/stnuessl/libvci)
+Arch Linux:
+	-> gstreamer0.10
+Debian:
+	-> libgstreamer0.10-dev
+	-> libgstreamer-plugins-base0.10-dev
 
 Installation
 ------------

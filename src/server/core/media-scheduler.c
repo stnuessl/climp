@@ -35,12 +35,10 @@ media_scheduler_reset_random_ready(struct media_scheduler *__restrict ms)
 {
     unsigned int i, size;
     
-    vector_clear(ms->random_ready);
-    
     size = playlist_size(ms->playlist);
     
     for(i = 0; i < size; i++)
-        vector_insert_back(ms->random_ready, (void *)(long) i);
+        *vector_at(ms->random_ready, i) = (void *)(long) i;
 }
 
 struct media_scheduler *media_scheduler_new(struct playlist *pl)
@@ -135,8 +133,10 @@ struct media *media_scheduler_next(struct media_scheduler *__restrict ms)
         if(vector_empty(ms->random_ready)) {
             media_scheduler_reset_random_ready(ms);
             
-            if(!ms->repeat)
+            if(!ms->repeat) {
+                ms->running = (unsigned int) -1;
                 return NULL;
+            }
         }
         
         size = vector_size(ms->random_ready);
@@ -204,7 +204,7 @@ int media_scheduler_set_running_media(struct media_scheduler *__restrict ms,
         goto cleanup2;
     
     ms->running += 1;
-    
+
     if(ms->shuffle)
         vector_take_sorted(ms->random_ready, (void *)(long) ms->running);
 
