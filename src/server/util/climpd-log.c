@@ -96,11 +96,6 @@ void climpd_log_e(const char *__restrict tag, const char *fmt, ...)
     va_end(vargs);
 }
 
-void climpd_log_print(int fd)
-{
-    log_print(log, fd);
-}
-
 void climpd_log_append(const char *fmt, ...)
 {
     va_list vargs;
@@ -110,4 +105,9 @@ void climpd_log_append(const char *fmt, ...)
     log_append(log, fmt, vargs);
     
     va_end(vargs);
+}
+
+void climpd_log_print(int fd)
+{
+    log_print(log, fd);
 }

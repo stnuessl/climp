@@ -42,49 +42,117 @@
 #include "core/climpd-player.h"
 
 static const char *tag = "climpd-player";
-static GstElement *playbin2;
+static GstElement *gst_pipeline;
+static GstElement *gst_source;
+static GstElement *gst_convert;
+static GstElement *gst_volume;
+static GstElement *gst_sink;
 static struct media_scheduler *sched;
 static GstState state;
 static unsigned int volume;
 static bool muted;
-static void (*on_bus_error)(GstMessage *);
 
 extern struct climpd_config conf;
 
-static void climpd_player_play_uri(const char *uri)
+static int climpd_player_play_uri(const char *uri)
 {
+    GstStateChangeReturn ret;
+    
     climpd_player_stop();
     
-    g_object_set(playbin2, "uri", uri, NULL);
+    g_object_set(gst_source, "uri", uri, NULL);
     
     state = GST_STATE_PLAYING;
     
-    gst_element_set_state(playbin2, state);
+    ret = gst_element_set_state(gst_pipeline, state);
+    if(ret == GST_STATE_CHANGE_FAILURE) {
+        climpd_log_e(tag, "unable to play '%s'\n", uri);
+        return -EINVAL;
+    }
+    
+    return 0;
+}
+
+static void on_pad_added(GstElement *src, GstPad *new_pad, void *data) {
+    GstPad *sink_pad;
+    GstPadLinkReturn ret;
+    GstCaps *new_pad_caps;
+    GstStructure *new_pad_struct;
+    const gchar *new_pad_type;
+    
+    sink_pad = gst_element_get_static_pad(gst_convert, "sink");
+    
+    /* If our converter is already linked, we have nothing to do here */
+    if(gst_pad_is_linked(sink_pad))
+        goto cleanup1;
+    
+    /* Check the new pad's type */
+    new_pad_caps   = gst_pad_get_caps(new_pad);
+    new_pad_struct = gst_caps_get_structure(new_pad_caps, 0);
+    new_pad_type   = gst_structure_get_name(new_pad_struct);
+    
+    if(!g_str_has_prefix(new_pad_type, "audio/x-raw")) {
+        climpd_log_w(tag, "new pad is no raw audio pad ( %s ) ", new_pad_type);
+        climpd_log_append("- ignoring\n");
+        goto cleanup2;
+    }
+    
+    ret = gst_pad_link(new_pad, sink_pad);
+    
+    if(GST_PAD_LINK_FAILED(ret))
+        climpd_log_e(tag, "linking new pad %s failed\n", new_pad_type);
+    
+cleanup2:
+    gst_caps_unref(new_pad_caps);
+cleanup1:
+    gst_object_unref(sink_pad);
 }
 
 static void on_end_of_stream(void)
 {
     const struct media *m;
+    int err;
     
     m = media_scheduler_running(sched);
     if(m)
         climpd_log_i(tag, "finished playing '%s'\n", media_info(m)->title);
     
     m = media_scheduler_next(sched);
-        if(!m) {
+    if(!m) {
         climpd_log_i(tag, "finished playlist\n");
         return;
     }
     
-    climpd_player_play_uri(media_uri(m));
+    err = climpd_player_play_uri(media_uri(m));
+    if(err < 0)
+        climpd_log_e(tag, "encountered an error - stopping playback\n");
+}
+
+static void handle_bus_error(GstMessage *msg)
+{
+    GError *err;
+    gchar *debug_info;
+    const char *name;
+    
+    gst_message_parse_error(msg, &err, &debug_info);
+    
+    name = GST_OBJECT_NAME(msg->src);
+    
+    climpd_log_e("Error received from element %s: %s\n", name, err->message);
+    
+    if(debug_info) {
+        climpd_log_i("Debugging information: %s\n", debug_info);
+        g_free(debug_info);
+    }
+
+    g_clear_error(&err);
 }
 
 static gboolean bus_watcher(GstBus *bus, GstMessage *msg, gpointer data)
 {
     switch (GST_MESSAGE_TYPE(msg)) {
         case GST_MESSAGE_ERROR:
-            if(on_bus_error)
-                on_bus_error(msg);
+            handle_bus_error(msg);
             break;
         case GST_MESSAGE_EOS:
             on_end_of_stream();
@@ -150,27 +218,72 @@ static void print_media(int fd,
 
 int climpd_player_init(struct playlist *pl, bool repeat, bool shuffle)
 {
+    static const char *elements[] = {
+        "uridecodebin",         "gst_source",
+        "audioconvert",         "gst_convert",
+        "volume",               "gst_volume",
+        "autoaudiosink",        "gst_sink",
+    };
+    GstElement *ele;
     GstBus *bus;
-    int err;
+    bool ok;
+    int i, err;
     
-    playbin2 = gst_element_factory_make("playbin2", NULL);
-    if(!playbin2)
+    gst_pipeline = gst_pipeline_new(NULL);
+    if(!gst_pipeline) {
+        climpd_log_e(tag, "creating gstreamer pipeline failed\n");
         return -ENOMEM;
+    }
     
-    bus = gst_element_get_bus(playbin2);
+    for(i = 0; i < ARRAY_SIZE(elements); i += 2) {
+        ele = gst_element_factory_make(elements[i], elements[i + 1]);
+        if(!ele) {
+            climpd_log_e(tag, "creating \"%s\" element failed\n", elements[i]);
+            goto cleanup1;
+        }
+        
+        ok = gst_bin_add(GST_BIN(gst_pipeline), ele);
+        if(!ok) {
+            climpd_log_e(tag, "adding \"%s\" element failed\n", elements[i]);
+            gst_object_unref(ele);
+            goto cleanup1;
+        }
+    }
     
+    gst_source  = gst_bin_get_by_name(GST_BIN(gst_pipeline), "gst_source");
+    gst_convert = gst_bin_get_by_name(GST_BIN(gst_pipeline), "gst_convert");
+    gst_volume  = gst_bin_get_by_name(GST_BIN(gst_pipeline), "gst_volume");
+    gst_sink    = gst_bin_get_by_name(GST_BIN(gst_pipeline), "gst_sink");
+    
+    g_signal_connect(gst_source, "pad-added", G_CALLBACK(&on_pad_added), NULL);
+    
+    ok = gst_element_link(gst_convert, gst_volume);
+    if(!ok) {
+        climpd_log_e(tag, "linking gst_convert and gst_volume failed\n");
+        goto cleanup2;
+    }
+    
+    ok = gst_element_link(gst_volume, gst_sink);
+    if(!ok) {
+        climpd_log_e(tag, "lining gst_volume and gst_sink failed\n");
+        goto cleanup2;
+    }
+    
+    /* init bus */
+    bus = gst_element_get_bus(gst_pipeline);
     gst_bus_add_watch(bus, &bus_watcher, NULL);
+    gst_object_unref(bus);
     
     state  = GST_STATE_NULL;
     volume = 100;
     muted  = false;
     
-    g_object_set(playbin2, "volume", (double) volume / 100.0f, NULL);
+    climpd_player_set_volume(volume);
 
     sched = media_scheduler_new(pl);
     if(!sched) {
         err = -errno;
-        goto cleanup1;
+        goto cleanup2;
     }
     
     media_scheduler_set_repeat(sched, repeat);
@@ -180,16 +293,27 @@ int climpd_player_init(struct playlist *pl, bool repeat, bool shuffle)
     
     return 0;
 
+cleanup2:
+    gst_object_unref(gst_sink);
+    gst_object_unref(gst_volume);
+    gst_object_unref(gst_convert);
+    gst_object_unref(gst_source);
 cleanup1:
-    gst_object_unref(playbin2);
+    gst_object_unref(gst_pipeline);
     
     return err;
 }
 
 void climpd_player_destroy(void)
 {
+    climpd_player_stop();
+    
     media_scheduler_delete(sched);
-    gst_object_unref(playbin2);
+    gst_object_unref(gst_sink);
+    gst_object_unref(gst_volume);
+    gst_object_unref(gst_convert);
+    gst_object_unref(gst_source);
+    gst_object_unref(gst_pipeline);
     
     climpd_log_i(tag, "destroyed\n");
 }
@@ -202,9 +326,7 @@ int climpd_player_play_media(struct media *m)
     if(err < 0)
         return err;
     
-    climpd_player_play_uri(media_uri(m));
-    
-    return 0;
+    return climpd_player_play_uri(media_uri(m));
 }
 
 int climpd_player_play_track(unsigned int index)
@@ -226,25 +348,21 @@ int climpd_player_play_track(unsigned int index)
     
     m = playlist_at(pl, index);
     
-    climpd_player_play_uri(media_uri(m));
-
-    return 0;
+    return climpd_player_play_uri(media_uri(m));
 }
 
 int climpd_player_play(void)
 {
     struct media *m;
-    
+
     if(climpd_player_playing())
         return 0;
-    
+
     m = media_scheduler_next(sched);
     if(!m)
         return -ENOENT;
     
-    climpd_player_play_uri(media_uri(m));
-    
-    return 0;
+    return climpd_player_play_uri(media_uri(m));
 }
 
 void climpd_player_pause(void)
@@ -254,7 +372,7 @@ void climpd_player_pause(void)
     
     state = GST_STATE_PAUSED;
     
-    gst_element_set_state(playbin2, state);
+    gst_element_set_state(gst_pipeline, state);
 }
 
 void climpd_player_stop(void)
@@ -264,7 +382,7 @@ void climpd_player_stop(void)
     
     state = GST_STATE_NULL;
     
-    gst_element_set_state(playbin2, state);
+    gst_element_set_state(gst_pipeline, state);
 }
 
 int climpd_player_next(void)
@@ -283,9 +401,7 @@ int climpd_player_next(void)
         return 0;
     }
     
-    climpd_player_play_uri(media_uri(m));
-    
-    return 0;
+    return climpd_player_play_uri(media_uri(m));
 }
 
 int climpd_player_previous(void)
@@ -304,9 +420,7 @@ int climpd_player_previous(void)
         return 0;
     }
     
-    climpd_player_play_uri(media_uri(m));
-    
-    return 0;
+    return climpd_player_play_uri(media_uri(m));
 }
 
 int climpd_player_insert_media(struct media *m)
@@ -328,6 +442,12 @@ void climpd_player_take_media(struct media *m)
             return;
         }
 
+        /* 
+         * In shuffle mode it is possible at the end of the playlist 
+         * to get the same media twice in a row, we must avoid this 
+         * since we cannot remove the running media from the
+         * scheduler.
+         */
         do {
             next = media_scheduler_next(sched);
         } while(next == m);
@@ -342,13 +462,13 @@ void climpd_player_take_media(struct media *m)
 }
 
 void climpd_player_set_volume(unsigned int vol)
-{
+{;
     vol = max(vol, 0);
-    vol = min(vol, 120);
+    vol = min(vol, 100);
     
     volume = vol;
     
-    g_object_set(playbin2, "volume", (double) volume / 100.0f, NULL);
+    g_object_set(gst_volume, "volume", (double) volume / 100.0f, NULL);
 }
 
 unsigned int climpd_player_volume(void)
@@ -359,6 +479,8 @@ unsigned int climpd_player_volume(void)
 void climpd_player_set_muted(bool m)
 {
     muted = m;
+    
+    g_object_set(gst_volume, "mute", muted, NULL);
 }
 
 bool climpd_player_muted(void)

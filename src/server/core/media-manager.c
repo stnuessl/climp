@@ -14,7 +14,8 @@
 #include <libvci/hash.h>
 #include <libvci/error.h>
 
-#include "core/climpd-log.h"
+#include "util/climpd-log.h"
+
 #include "core/media-manager.h"
 #include "core/media.h"
 

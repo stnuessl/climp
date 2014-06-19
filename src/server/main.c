@@ -40,10 +40,10 @@
 #include "../shared/ipc.h"
 #include "../shared/constants.h"
 
+#include "util/climpd-log.h"
 #include "util/bool-map.h"
 #include "util/terminal-color-map.h"
 
-#include "core/climpd-log.h"
 #include "core/climpd-player.h"
 #include "core/climpd-config.h"
 #include "core/media-manager.h"
@@ -61,27 +61,6 @@ static const char *tag = "main";
 static int server_fd;
 static GIOChannel *io_server;
 
-/* TODO: handle bus error */
-// static void media_player_handle_bus_error(struct media_player *mp,
-//                                           GstMessage *msg)
-// {
-//     GError *err;
-//     gchar *debug_info;
-//     const char *name;
-//     
-//     gst_message_parse_error(msg, &err, &debug_info);
-//     
-//     name = GST_OBJECT_NAME(msg->src);
-//     
-//     log_e("Error received from element %s: %s\n", name, err->message);
-//     
-//     if(debug_info) {
-//         log_i("Debugging information: %s\n", debug_info);
-//         g_free(debug_info);
-//     }
-// 
-//     g_clear_error(&err);
-// }
 
 static gboolean handle_server_fd(GIOChannel *src, GIOCondition cond, void *data)
 {
@@ -105,9 +84,8 @@ static gboolean handle_server_fd(GIOChannel *src, GIOCondition cond, void *data)
     }
     
     if(creds.uid != getuid()) {
-        climpd_log_w(tag, 
-                     "non-authorized user %d connected -> closing connection\n", 
-                     creds.uid);
+        climpd_log_w(tag, "non-authorized user %d connected -> ", creds.uid);
+        climpd_log_append("closing connection\n"); 
         err = -EPERM;
         goto out;
     }
@@ -221,7 +199,7 @@ static void noop_destroy(void)
 
 
 static struct module modules[] = {
-      
+    
     { "close-std-streams",
       &close_std_streams,
       &noop_destroy },
@@ -363,7 +341,7 @@ int main(int argc, char *argv[])
     
     if(getuid() == 0)
         exit(EXIT_FAILURE);
-    
+
     setlocale(LC_ALL, "");
     
     gst_init(NULL, NULL);

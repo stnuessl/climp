@@ -34,10 +34,11 @@
 #include "../../shared/constants.h"
 #include "../../shared/util.h"
 
-#include "playlist.h"
-#include "climpd-log.h"
-#include "playlist-manager.h"
-#include "media-manager.h"
+#include "util/climpd-log.h"
+
+#include "core/playlist.h"
+#include "core/media-manager.h"
+#include "core/playlist-manager.h"
 
 static const char *tag = "playlist-manager";
 static struct map playlist_map;

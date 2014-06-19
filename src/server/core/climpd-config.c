@@ -31,11 +31,11 @@
 #include <libvci/macro.h>
 #include <libvci/error.h>
 
-#include "climpd-log.h"
-#include "climpd-config.h"
+#include "util/climpd-log.h"
+#include "util/terminal-color-map.h"
+#include "util/bool-map.h"
 
-#include "../util/terminal-color-map.h"
-#include "../util/bool-map.h"
+#include "core/climpd-config.h"
 
 #include "../../shared/util.h"
 #include "../../shared/constants.h"

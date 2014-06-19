@@ -37,8 +37,14 @@ media_scheduler_reset_random_ready(struct media_scheduler *__restrict ms)
     
     size = playlist_size(ms->playlist);
     
-    for(i = 0; i < size; i++)
-        *vector_at(ms->random_ready, i) = (void *)(long) i;
+    vector_clear(ms->random_ready);
+    
+    /* 
+     * Do not use vector_at()! Right after initialization 'size' will be zero.
+     * This will cause a floating point exception in 'random_uint_range()'
+     */
+    for(i = 0; i < size; ++i)
+        vector_insert_back(ms->random_ready, (void *)(long) i);
 }
 
 struct media_scheduler *media_scheduler_new(struct playlist *pl)
@@ -120,10 +126,13 @@ struct media *media_scheduler_next(struct media_scheduler *__restrict ms)
     unsigned int size, r;
     int err;
     
-    if(vector_size(ms->history) >= MEDIA_SCHEDULER_MAX_HISTORY_SIZE)
-        vector_take_front(ms->history);
+    if(playlist_empty(ms->playlist))
+        return NULL;
     
     if(ms->running != (unsigned int) -1) {
+        if(vector_size(ms->history) >= MEDIA_SCHEDULER_MAX_HISTORY_SIZE)
+            vector_take_front(ms->history);
+        
         err = vector_insert_back(ms->history, (void *)(long) ms->running);
         if(err < 0)
             return NULL;
