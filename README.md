@@ -9,6 +9,7 @@ Dependencies
 Arch Linux:
 	-> gstreamer0.10
 Debian:
+        -> gstreamer0.10
 	-> libgstreamer0.10-dev
 	-> libgstreamer-plugins-base0.10-dev
 

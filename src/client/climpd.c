@@ -67,7 +67,7 @@ static struct command_handle {
     { "get-volume",      IPC_MESSAGE_GET_VOLUME,        false,  false   },
     { "get-log",         IPC_MESSAGE_GET_LOG,           false,  false   },
     
-    { "set-playlist",    IPC_MESSAGE_SET_PLAYLIST,      true,   false   },
+    { "set-playlist",    IPC_MESSAGE_SET_PLAYLIST,      true,   true    },
     { "set-volume",      IPC_MESSAGE_SET_VOLUME,        true,   false   },
     { "set-repeat",      IPC_MESSAGE_SET_REPEAT,        true,   false   },
     { "set-shuffle",     IPC_MESSAGE_SET_SHUFFLE,       true,   false   },
@@ -112,7 +112,6 @@ static int climpd_connect(void)
     ipc_message_clear(msg);
     ipc_message_set_id(msg, IPC_MESSAGE_HELLO);
     ipc_message_set_fds(msg, STDOUT_FILENO, STDERR_FILENO);
-    ipc_message_set_arg(msg, NULL);
     
     err = ipc_send_message(fd, msg);
     if(err < 0) {
