@@ -13,6 +13,7 @@
 #include <libvci/compare.h>
 #include <libvci/hash.h>
 #include <libvci/error.h>
+#include <libvci/vector.h>
 
 #include "util/climpd-log.h"
 
@@ -229,25 +230,38 @@ static bool is_playable(const char *__restrict uri)
     GError *err;
     
     info = gst_discoverer_discover_uri(sync_disc, uri, &err);
+    
+    if(err)
+        g_error_free(err);
+    
     if(!info)
         return false;
     
     result = gst_discoverer_info_get_result(info);
     
-    if(result != GST_DISCOVERER_OK)
+    if(result != GST_DISCOVERER_OK) {
+        gst_discoverer_info_unref(info);
         return false;
+    } 
     
     s_info = gst_discoverer_info_get_stream_info(info);
     
     while(s_info) {
-        if(GST_IS_DISCOVERER_VIDEO_INFO(s_info))
+        if(GST_IS_DISCOVERER_VIDEO_INFO(s_info)) {
+            gst_discoverer_stream_info_unref(s_info);
+            gst_discoverer_info_unref(info);
             return false;
+        }
         
         s_info_next = gst_discoverer_stream_info_get_next(s_info);
         
         gst_discoverer_stream_info_unref(s_info);
+        
         s_info = s_info_next;
     }
+    
+    gst_discoverer_stream_info_unref(s_info);
+    gst_discoverer_info_unref(info);
     
     return true;
 }
@@ -273,60 +287,153 @@ int media_manager_parse_media(struct media *__restrict media)
     return 0;
 }
 
-void media_manager_discover_folder(const char *__restrict path, int fd)
+struct discoverer {
+    struct vector *dir_vec;
+    int fd;
+};
+
+static int discoverer_init(struct discoverer *__restrict d,
+                           const char *path,
+                           int fd)
 {
-    static const char err_msg[] = "%s: unable to %s directory %s - %s\n";
-    DIR *dir;
-    struct dirent buf, *ent;
-    size_t len_path, len;
-    char *uri;
+    char *path_dup;
+    size_t len;
     int err;
     
-    dir = opendir(path);
-    if(!dir) {
-        dprintf(fd, err_msg, tag, "open", path, errstr);
+    d->dir_vec = vector_new(64);
+    if(!d->dir_vec)
+        return -errno;
+    
+    vector_set_data_delete(d->dir_vec, &free);
+    
+    len = strlen(path);
+    
+    path_dup = malloc(len + 1 + 1);
+    if(!path_dup)
+        goto cleanup1;
+    
+    path_dup = strcpy(path_dup, path);
+    
+    if(path[len] != '/')
+        path_dup = strcat(path_dup, "/");
+    
+    err = vector_insert_back(d->dir_vec, path_dup);
+    if(err < 0)
+        goto cleanup2;
+    
+    d->fd = fd;
+    
+    return 0;
+
+cleanup2:
+    free(path_dup);
+cleanup1:
+    vector_delete(d->dir_vec);
+    
+    return err;
+}
+
+static void discoverer_destroy(struct discoverer *__restrict d)
+{
+    vector_delete(d->dir_vec);
+}
+
+static void discoverer_run(struct discoverer *__restrict d)
+{
+    DIR *dir;
+    struct dirent buf, *ent;
+    char *current_dir, *path, *uri;
+    size_t len, len_path;
+    unsigned int i;
+    int err;
+    
+    /* 
+     * Don't use 'vector_for_each()', the iterator pointer may become invalid
+     * if the vector gets resized during a insert-operation.
+     */
+    for(i = 0; i < vector_size(d->dir_vec); ++i) {
+        current_dir = *vector_at(d->dir_vec, i);
+        
+        len_path = strlen(current_dir);
+        
+        dir = opendir(current_dir);
+        if(!dir) {
+            climpd_log_w(tag, "failed to open directory");
+            climpd_log_append(" %s - %s\n", current_dir, errstr);
+            continue;
+        }
+        
+        while(1) {
+            err = readdir_r(dir, &buf, &ent);
+            if(err || !ent)
+                break;
+            
+            if(strcmp(ent->d_name, ".") == 0 || strcmp(ent->d_name, "..") == 0)
+                continue;
+            
+            if(ent->d_type == DT_DIR) {
+                path = malloc(len_path + strlen(ent->d_name) + 2);
+                if(!path) {
+                    err = -errno;
+                    climpd_log_w(tag, "failed to open directory ");
+                    climpd_log_append("%s - %s\n", ent->d_name, strerr(-err));
+                    continue;
+                }
+                
+                path = strcpy(path, current_dir);
+                path = strcat(path, ent->d_name);
+                path = strcat(path, "/");
+                                
+                err = vector_insert_back(d->dir_vec, path);
+                if(err < 0) {
+                   climpd_log_w(tag, "skipping directory ");
+                   climpd_log_append("%s - %s\n", path, strerr(-err));
+                   continue;
+                }
+                
+            } else if(ent->d_type == DT_REG) {
+                /* 
+                 * Add an additional byte if the trailing '/' 
+                 * is missing in 'd->path'
+                 */
+                len = sizeof("file://") + len_path + strlen(ent->d_name);
+                
+                uri = malloc(len);
+                if(!uri) {
+                    climpd_log_w(tag, "ignoring file");
+                    climpd_log_append("%s - %s\n", ent->d_name, strerr(ENOMEM));
+                    continue;
+                }
+                
+                uri = strcpy(uri, "file://");
+                uri = strcat(uri, current_dir);
+                uri = strcat(uri, ent->d_name);
+                
+                if(is_playable(uri))
+                    dprintf(d->fd, "%s\n", uri + sizeof("file://") - 1);
+                
+                free(uri);
+            }
+        }
+        
+        closedir(dir);
+        free(current_dir);
+        
+        *vector_at(d->dir_vec, i) = NULL;
+    }
+}
+
+void media_manager_discover_directory(const char *__restrict path, int fd)
+{
+    struct discoverer disc;
+    int err;
+    
+    err = discoverer_init(&disc, path, fd);
+    if(err < 0) {
+        dprintf(fd, "unable to discover %s - %s\n", path, strerr(-err));
         return;
     }
     
-    dprintf(fd, "# Playable files in directory %s\n", path);
-    
-    while(1) {
-        err = readdir_r(dir, &buf, &ent);
-        if(err) {
-            dprintf(fd, err_msg, tag, "read", path, strerr(err));
-            break;
-        }
-        
-        if(!ent)
-            break;
-        
-        if(ent->d_type != DT_REG)
-            continue;
-        
-        /* the joys of c strings */
-        len_path = strlen(path);
-        len      = sizeof("file://") + len_path + 1 + strlen(ent->d_name);
-        
-        uri = malloc(len);
-        if(!uri) {
-            dprintf(fd, "%s: stopping discovering - %s\n", tag, errstr);
-            break;
-        }
-        
-        uri = strcpy(uri, "file://");
-        uri = strcat(uri, path);
-        
-        if(path[len_path] != '/')
-            uri = strcat(uri, "/");
-        
-        uri = strcat(uri, ent->d_name);
-        
-        if(is_playable(uri))
-            dprintf(fd, "%s\n", uri + sizeof("file://") - 1);
-            
-        free(uri);
-    }
-    
-    closedir(dir);
-    return;
+    discoverer_run(&disc);
+    discoverer_destroy(&disc);
 }

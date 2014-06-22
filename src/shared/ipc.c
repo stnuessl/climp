@@ -42,6 +42,10 @@ const char *ipc_message_id_string(enum message_id id)
         [IPC_MESSAGE_OK]                = "IPC_MESSAGE_OK",
         [IPC_MESSAGE_NO]                = "IPC_MESSAGE_NO",
         
+        [IPC_MESSAGE_SHUTDOWN]          = "IPC_MESSAGE_SHUTDOWN",
+        
+        [IPC_MESSAGE_DISCOVER]          = "IPC_MESSAGE_DISCOVER",
+        
         [IPC_MESSAGE_MUTE]              = "IPC_MESSAGE_MUTE",
         [IPC_MESSAGE_PAUSE]             = "IPC_MESSAGE_PAUSE",
         [IPC_MESSAGE_PLAY]              = "IPC_MESSAGE_PLAY",
@@ -55,7 +59,6 @@ const char *ipc_message_id_string(enum message_id id)
         [IPC_MESSAGE_GET_TITLES]        = "IPC_MESSAGE_GET_TITLES",
         [IPC_MESSAGE_GET_VOLUME]        = "IPC_MESSAGE_GET_VOLUME",
         [IPC_MESSAGE_GET_LOG]           = "IPC_MESSAGE_GET_LOG",
-        [IPC_MESSAGE_GET_PLAYABLES]     = "IPC_MESSAGE_GET_PLAYABLES",
         
         [IPC_MESSAGE_SET_PLAYLIST]      = "IPC_MESSAGE_SET_PLAYLIST",
         [IPC_MESSAGE_SET_REPEAT]        = "IPC_MESSAGE_SET_REPEAT",
@@ -116,6 +119,8 @@ void ipc_message_clear(struct message *__restrict msg)
 void ipc_message_init(struct message *__restrict msg)
 {
     struct cmsghdr *cmsg;
+    
+    memset(msg->arg, 0, sizeof(msg->arg));
     
     msg->iovec[0].iov_base = &msg->id;
     msg->iovec[0].iov_len  = sizeof(msg->id);

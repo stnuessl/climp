@@ -44,10 +44,10 @@ struct climpd_config {
 
 int climpd_config_init(void);
 
+void climpd_config_destroy(void);
+
 int climpd_config_reload(void);
 
 void climpd_config_print(int fd);
-
-void climpd_config_destroy(void);
 
 #endif /* _CLIMPD_CONFIG_H_ */

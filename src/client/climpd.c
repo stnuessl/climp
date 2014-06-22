@@ -54,6 +54,8 @@ static struct command_handle {
     { "play",            IPC_MESSAGE_PLAY,              false,  false   },
     { "stop",            IPC_MESSAGE_STOP,              false,  false   },
     
+    { "discover",        IPC_MESSAGE_DISCOVER,          true,   true    },
+    
     { "shutdown",        IPC_MESSAGE_SHUTDOWN,          false,  false   },
     
     { "get-colors",      IPC_MESSAGE_GET_COLORS,        false,  false   },
@@ -64,7 +66,6 @@ static struct command_handle {
     { "get-titles",      IPC_MESSAGE_GET_TITLES,        false,  false   },
     { "get-volume",      IPC_MESSAGE_GET_VOLUME,        false,  false   },
     { "get-log",         IPC_MESSAGE_GET_LOG,           false,  false   },
-    { "get-playables",   IPC_MESSAGE_GET_PLAYABLES,     true,   true    },
     
     { "set-playlist",    IPC_MESSAGE_SET_PLAYLIST,      true,   false   },
     { "set-volume",      IPC_MESSAGE_SET_VOLUME,        true,   false   },
@@ -111,6 +112,7 @@ static int climpd_connect(void)
     ipc_message_clear(msg);
     ipc_message_set_id(msg, IPC_MESSAGE_HELLO);
     ipc_message_set_fds(msg, STDOUT_FILENO, STDERR_FILENO);
+    ipc_message_set_arg(msg, NULL);
     
     err = ipc_send_message(fd, msg);
     if(err < 0) {
