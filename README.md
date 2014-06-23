@@ -44,14 +44,12 @@ Second, make sure you installed the above mentioned dependencies...
 I never tried to compile climp with a different compiler (than gcc) and I do not know
 if this is possible.
 
-```bash
-   $ git clone https://github.com/stnuessl/climp
-   $ mkdir climp/build
-   $ cd climp/build
-   $ cmake ../
-   $ make
-   # make install
-```
+    $ git clone https://github.com/stnuessl/climp
+    $ mkdir climp/build
+    $ cd climp/build
+    $ cmake ../
+    $ make
+    # make install
 
 Notice that '# make install' requires root privileges.
 
@@ -108,4 +106,4 @@ e.g.:
 
     $ climp play-track 42
 
-### More to come!
+### More (documentation) to come! There are already more featues in climp!
