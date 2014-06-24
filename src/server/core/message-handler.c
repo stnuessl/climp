@@ -291,7 +291,7 @@ static int set_shuffle(void)
         return -EINVAL;
     }
     
-    climpd_player_set_repeat(*val);
+    climpd_player_set_shuffle(*val);
     
     return 0;
 }
