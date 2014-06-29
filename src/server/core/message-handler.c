@@ -88,6 +88,9 @@ static void message_handler_close_connection(void)
     fd_socket = -1;
     
     socket_handler_run = false;
+    
+    close(fd_stdout);
+    close(fd_stderr);
 }
 
 static int hello(void)
