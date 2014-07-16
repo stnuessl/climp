@@ -20,11 +20,13 @@
 
 #include <stdlib.h>
 #include <errno.h>
+#include <assert.h>
 
 #include <libvci/random.h>
 #include <libvci/vector.h>
 #include <libvci/compare.h>
 
+#include "core/climpd-config.h"
 #include "core/media-scheduler.h"
 #include "core/playlist.h"
 
@@ -47,7 +49,8 @@ media_scheduler_reset_random_ready(struct media_scheduler *__restrict ms)
         vector_insert_back(ms->random_ready, (void *)(long) i);
 }
 
-struct media_scheduler *media_scheduler_new(struct playlist *pl)
+struct media_scheduler *media_scheduler_new(struct climpd_config *config,
+                                            struct playlist *pl)
 {
     struct media_scheduler *ms;
     int err;
@@ -56,7 +59,7 @@ struct media_scheduler *media_scheduler_new(struct playlist *pl)
     if(!ms)
         return NULL;
     
-    err = media_scheduler_init(ms, pl);
+    err = media_scheduler_init(ms, config, pl);
     if(err < 0) {
         free(ms);
         return NULL;
@@ -71,11 +74,15 @@ void media_scheduler_delete(struct media_scheduler *__restrict ms)
     free(ms);
 }
 
-int media_scheduler_init(struct media_scheduler *__restrict ms, 
+int media_scheduler_init(struct media_scheduler *__restrict ms,
+                         struct climpd_config *config,
                          struct playlist *pl)
 {
     unsigned int size;
     int err;
+    
+    assert(config && "Invalid 'config' argument (null)");
+    assert(pl && "Invalid 'pl' argument (null)");
     
     err = random_init(&ms->random);
     if(err < 0)
@@ -97,10 +104,9 @@ int media_scheduler_init(struct media_scheduler *__restrict ms,
         goto cleanup2;
     }
     
+    ms->config   = config;
     ms->playlist = pl;
     ms->running  = (unsigned int) -1;
-    ms->repeat   = false;
-    ms->shuffle  = false;
     
     media_scheduler_reset_random_ready(ms);
     
@@ -138,11 +144,11 @@ struct media *media_scheduler_next(struct media_scheduler *__restrict ms)
             return NULL;
     }
     
-    if(ms->shuffle) {    
+    if(ms->config->shuffle) {    
         if(vector_empty(ms->random_ready)) {
             media_scheduler_reset_random_ready(ms);
             
-            if(!ms->repeat) {
+            if(!ms->config->repeat) {
                 ms->running = (unsigned int) -1;
                 return NULL;
             }
@@ -156,7 +162,7 @@ struct media *media_scheduler_next(struct media_scheduler *__restrict ms)
         ms->running += 1;
         
         if(ms->running >= playlist_size(ms->playlist)) {
-            if(!ms->repeat) {
+            if(!ms->config->repeat) {
                 ms->running = (unsigned int) -1;
                 return NULL;
             }
@@ -214,7 +220,7 @@ int media_scheduler_set_running_media(struct media_scheduler *__restrict ms,
     
     ms->running += 1;
 
-    if(ms->shuffle)
+    if(ms->config->shuffle)
         vector_take_sorted(ms->random_ready, (void *)(long) ms->running);
 
     return 0;
@@ -240,7 +246,7 @@ int media_scheduler_set_running_track(struct media_scheduler *__restrict ms,
             return err;
     }
     
-    if(ms->shuffle)
+    if(ms->config->shuffle)
         vector_take_sorted(ms->random_ready, (void *)(long) track);
     
     ms->running = track;
@@ -341,23 +347,23 @@ cleanup1:
 void media_scheduler_set_repeat(struct media_scheduler *__restrict ms, 
                                 bool repeat)
 {
-    ms->repeat = repeat;
+    ms->config->repeat = repeat;
 }
 
 bool media_scheduler_repeat(const struct media_scheduler *__restrict ms)
 {
-    return ms->repeat;
+    return ms->config->repeat;
 }
 
 void media_scheduler_set_shuffle(struct media_scheduler *__restrict ms, 
                                  bool shuffle)
 {
-    ms->shuffle = shuffle;
+    ms->config->shuffle = shuffle;
 }
 
 bool media_scheduler_shuffle(const struct media_scheduler *__restrict ms)
 {
-    return ms->shuffle;
+    return ms->config->shuffle;
 }
 
 struct playlist *media_scheduler_playlist(struct media_scheduler *__restrict ms)

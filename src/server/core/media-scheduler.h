@@ -24,26 +24,27 @@
 #include <libvci/vector.h>
 #include <libvci/random.h>
 
+#include "core/climpd-config.h"
 #include "core/playlist.h"
 
 struct media_scheduler {
     struct random random;
     
+    struct climpd_config *config;
     struct playlist *playlist;
     struct vector *random_ready;
     struct vector *history;
     
     unsigned int running;
-    
-    bool repeat;
-    bool shuffle;
 };
 
-struct media_scheduler *media_scheduler_new(struct playlist *pl);
+struct media_scheduler *media_scheduler_new(struct climpd_config *config,
+                                            struct playlist *pl);
 
 void media_scheduler_delete(struct media_scheduler *__restrict ms);
 
 int media_scheduler_init(struct media_scheduler *__restrict ms, 
+                         struct climpd_config *config,
                          struct playlist *pl);
 
 void media_scheduler_destroy(struct media_scheduler *__restrict ms);

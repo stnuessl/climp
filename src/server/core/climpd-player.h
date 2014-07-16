@@ -23,65 +23,102 @@
 
 #include <stdbool.h>
 
+#include <gst/gst.h>
+#include <gst/pbutils/pbutils.h>
+
+#include "core/climpd-config.h"
+#include "core/media-scheduler.h"
 #include "core/media.h"
 #include "core/playlist.h"
 
-int climpd_player_init(struct playlist *pl, bool repeat, bool shuffle);
+struct climpd_player {
+    struct climpd_config *config;
+    
+    GstElement *pipeline;
+    GstElement *source;
+    GstElement *convert;
+    GstElement *volume;
+    GstElement *sink;
+    
+    GstDiscoverer *discoverer;
+    
+    struct media_scheduler *media_scheduler;
+    
+    GstState state;
+};
 
-void climpd_player_destroy(void);
+struct climpd_player *climpd_player_new(struct climpd_config *__restrict config, 
+                                        struct playlist *__restrict pl);
 
-int climpd_player_play_media(struct media *m);
+void climpd_player_delete(struct climpd_player *__restrict cp);
 
-int climpd_player_play_track(unsigned int index);
+int climpd_player_init(struct climpd_player *__restrict cp,
+                       struct climpd_config *config,
+                       struct playlist *pl);
 
-int climpd_player_play(void);
+void climpd_player_destroy(struct climpd_player *__restrict cp);
 
-void climpd_player_pause(void);
+int climpd_player_play_media(struct climpd_player *__restrict cp,
+                             struct media *m);
 
-void climpd_player_stop(void);
+int climpd_player_play_track(struct climpd_player *__restrict cp, 
+                             unsigned int index);
 
-int climpd_player_next(void);
+int climpd_player_play(struct climpd_player *__restrict cp);
 
-int climpd_player_previous(void);
+void climpd_player_pause(struct climpd_player *__restrict cp);
 
-int climpd_player_insert_media(struct media *m);
+void climpd_player_stop(struct climpd_player *__restrict cp);
 
-void climpd_player_take_media(struct media *m);
+int climpd_player_next(struct climpd_player *__restrict cp);
 
-void climpd_player_set_volume(unsigned int volume);
+int climpd_player_previous(struct climpd_player *__restrict cp);
 
-unsigned int climpd_player_volume(void);
+int climpd_player_insert_media(struct climpd_player *__restrict cp, 
+                               struct media *m);
 
-void climpd_player_set_muted(bool muted);
+void climpd_player_take_media(struct climpd_player *__restrict cp, 
+                              struct media *m);
 
-bool climpd_player_muted(void);
+void climpd_player_set_volume(struct climpd_player *__restrict cp, 
+                              unsigned int vol);
 
-void climpd_player_set_repeat(bool repeat);
+unsigned int climpd_player_volume(const struct climpd_player *__restrict cp);
 
-bool climpd_player_repeat(void);
+void climpd_player_set_muted(struct climpd_player *__restrict cp, bool mute);
 
-void climpd_player_set_shuffle(bool shuffle);
+bool climpd_player_muted(const struct climpd_player *__restrict cp);
 
-bool climpd_player_shuffle(void);
+void climpd_player_set_repeat(struct climpd_player *__restrict cp, bool repeat);
 
-bool climpd_player_playing(void);
+bool climpd_player_repeat(const struct climpd_player *__restrict cp);
 
-bool climpd_player_paused(void);
+void climpd_player_set_shuffle(struct climpd_player *__restrict cp, 
+                               bool shuffle);
 
-bool climpd_player_stopped(void);
+bool climpd_player_shuffle(const struct climpd_player *__restrict cp);
 
-const struct media *climpd_player_running(void);
+bool climpd_player_playing(const struct climpd_player *__restrict cp);
 
-int climpd_player_set_playlist(struct playlist *pl);
+bool climpd_player_paused(const struct climpd_player *__restrict cp);
 
-void climpd_player_print_playlist(int fd);
+bool climpd_player_stopped(const struct climpd_player *__restrict cp);
 
-void climpd_player_print_files(int fd);
+struct media *climpd_player_running(const struct climpd_player *__restrict cp);
 
-void climpd_player_print_current_track(int fd);
+int climpd_player_set_playlist(struct climpd_player *__restrict cp,
+                               struct playlist *pl);
 
-void climpd_player_print_volume(int fd);
+void climpd_player_print_playlist(struct climpd_player *__restrict cp, int fd);
 
-void climpd_player_print_state(int fd);
+void climpd_player_print_files(struct climpd_player *__restrict cp, int fd);
+
+void climpd_player_print_running_track(struct climpd_player *__restrict cp, 
+                                       int fd);
+
+void climpd_player_print_volume(struct climpd_player *__restrict cp, int fd);
+
+void climpd_player_print_state(const struct climpd_player *__restrict cp, 
+                               int fd);
 
 #endif /* _CLIMPD_PLAYER_H_ */

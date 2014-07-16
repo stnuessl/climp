@@ -23,6 +23,7 @@ set(CLIMPD_LIBS
     gthread-2.0 
     glib-2.0 
     xml2
+    m
     )
     
 set(CLIMP_LIBS vci)
@@ -38,11 +39,9 @@ set(SOURCE_SERVER
     src/server/util/terminal-color-map.c
     src/server/util/bool-map.c
     src/server/util/climpd-log.c
-    src/server/core/playlist-manager.c
-    src/server/core/message-handler.c
+    src/server/core/climpd-control.c
     src/server/core/climpd-player.c
     src/server/core/climpd-config.c
-    src/server/core/media-manager.c
     src/server/core/media-scheduler.c
     src/server/core/playlist.c
     src/server/core/media.c

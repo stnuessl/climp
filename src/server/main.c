@@ -46,69 +46,15 @@
 
 #include "core/climpd-player.h"
 #include "core/climpd-config.h"
-#include "core/media-manager.h"
-#include "core/playlist-manager.h"
-#include "core/message-handler.h"
+#include "core/climpd-control.h"
 #include "core/playlist.h"
 #include "core/media.h"
 
-
-extern struct climpd_config conf;
-
-GMainLoop *main_loop;
-
 static const char *tag = "main";
+
+static struct climpd_control *cc;
+static struct climpd_config *conf;
 static int server_fd;
-static GIOChannel *io_server;
-
-
-static gboolean handle_server_fd(GIOChannel *src, GIOCondition cond, void *data)
-{
-    struct ucred creds;
-    socklen_t cred_len;
-    int fd, err;
-    
-    fd = accept(server_fd, NULL, NULL);
-    if(fd < 0) {
-        err = -errno;
-        goto out;
-    }
-    
-    cred_len = sizeof(creds);
-    
-    err = getsockopt(fd, SOL_SOCKET, SO_PEERCRED, &creds, &cred_len);
-    if(err < 0) {
-        err = -errno;
-        climpd_log_e(tag, "getsockopt(): %s\n", strerr(errno));
-        goto out;
-    }
-    
-    if(creds.uid != getuid()) {
-        climpd_log_w(tag, "non-authorized user %d connected -> ", creds.uid);
-        climpd_log_append("closing connection\n"); 
-        err = -EPERM;
-        goto out;
-    }
-    
-    climpd_log_i(tag, "user %d connected on socket %d\n", creds.uid, fd);
-    
-    if(!message_handler_ready()) {
-        climpd_log_w(tag, "message-handler not ready - %s\n", strerr(EBUSY));
-        goto out;
-    }
-    
-    err = message_handler_add_connection(fd);
-    if(err < 0) {
-        climpd_log_w(tag, "failed to add new connection - %s\n", strerr(-err));
-        goto out;
-    }
-
-    return true;
-    
-out:
-    close(fd);
-    return true;
-}
 
 static int close_std_streams(void)
 {
@@ -165,12 +111,7 @@ static int init_server_fd(void)
         err = -errno;
         goto cleanup1;
     }
-    
-    io_server = g_io_channel_unix_new(server_fd);
-    
-    g_io_add_watch(io_server, G_IO_IN, &handle_server_fd, NULL);
-    g_io_channel_set_close_on_unref(io_server, true);
-    
+
     return 0;
 
 cleanup1:
@@ -181,67 +122,26 @@ out:
 
 static void destroy_server_fd(void)
 {
-    g_io_channel_unref(io_server);
+    close(server_fd);
     unlink(IPC_SOCKET_PATH);
 }
 
-struct module {
-    char *name;
-    int (*init)(void);
-    void (*destroy)(void);
-};
-
- 
-static void noop_destroy(void)
-{
-
-}
-
-
-static struct module modules[] = {
-    
-    { "close-std-streams",
-      &close_std_streams,
-      &noop_destroy },
-    
-    { "terminal-color-map", 
-      &terminal_color_map_init, 
-      &terminal_color_map_destroy },
-        
-    { "bool-map",
-      &bool_map_init,
-      &bool_map_destroy },
-        
-    { "climpd-config",
-      &climpd_config_init,
-      &climpd_config_destroy },
-        
-    { "media-manager",
-      &media_manager_init,
-      &media_manager_destroy },
-        
-    { "playlist-manager",
-      &playlist_manager_init,
-      &playlist_manager_destroy },
-        
-    { "server-socket",
-      &init_server_fd,
-      &destroy_server_fd },
-        
-    { "message-handler",
-      &message_handler_init,
-      &message_handler_destroy },
-};
-
 static int init(void)
 {
-    struct playlist *pl;
     pid_t sid, pid;
-    int i, err;
+    int err;
 
     err = climpd_log_init();
     if(err < 0)
         return err;
+    
+    err = terminal_color_map_init();
+    if(err < 0)
+        goto cleanup1;
+    
+    err = bool_map_init();
+    if(err < 0)
+        goto cleanup2;
     
     climpd_log_i(tag, "starting initialization...\n");
 #if 0
@@ -279,58 +179,57 @@ static int init(void)
         _exit(EXIT_SUCCESS);
     
 #endif
-    for(i = 0; i < ARRAY_SIZE(modules); ++i) {
-        err = modules[i].init();
-        if(err < 0)
-            goto cleanup1;
+    conf = climpd_config_new(".config/climp/climpd.conf");
+    if(!conf) {
+        err = -errno;
+        climpd_log_e(tag, "climpd_config_new(): %s\n", strerr(-err));
+        goto cleanup3;
     }
     
-    if(conf.playlist_file) {
-        err = playlist_manager_load_from_file(conf.playlist_file);
-        if(err < 0)
-            goto cleanup1;
+    err = init_server_fd();
+    if(err < 0) {
+        climpd_log_e(tag, "init_server_fd(): %s\n", strerr(-err));
+        goto cleanup4;
     }
     
-    if(conf.default_playlist)
-        pl = playlist_manager_retrieve(conf.default_playlist);
-    else
-        pl = playlist_manager_retrieve(CLIMPD_DEFAULT_PLAYLIST);
-    
-    err = climpd_player_init(pl, conf.repeat, conf.shuffle);
-    if(err < 0)
-        goto cleanup1;
-    
-    climpd_player_set_volume(conf.volume);
-    
-    main_loop = g_main_loop_new(NULL, false);
-    if(!main_loop)
-        goto cleanup2;
+    cc = climpd_control_new(server_fd, conf);
+    if(!cc) {
+        err = -errno;
+        climpd_log_e(tag, "climpd_control_new(): %s\n", strerr(-err));
+        goto cleanup5;
+    }
     
     climpd_log_i(tag, "initialization successful\n");
     
     return 0;
 
+
+cleanup5:
+    destroy_server_fd();
+cleanup4:
+    climpd_config_delete(conf);
+cleanup3:
+    bool_map_destroy();
 cleanup2:
-    climpd_player_destroy();
+    terminal_color_map_destroy();
 cleanup1:
-    while(i--)
-        modules[i].destroy();
 
     climpd_log_i(tag, "initialization failed\n");
+    climpd_log_destroy();
+    
     return err;
 }
 
 static void destroy(void)
 {
-    int i;
+    climpd_control_delete(cc);
+    climpd_config_delete(conf);
+    destroy_server_fd();
     
-    g_main_loop_unref(main_loop);
+    bool_map_destroy();
+    terminal_color_map_destroy();
     
-    climpd_player_destroy();
-    
-    for(i = 0; i < ARRAY_SIZE(modules); ++i)
-        modules[i].destroy();
-    
+    climpd_log_i(tag, "destroyed\n");
     climpd_log_destroy();
 }
 
@@ -350,7 +249,7 @@ int main(int argc, char *argv[])
     if(err < 0)
         exit(EXIT_FAILURE);
 
-    g_main_loop_run(main_loop);
+    climpd_control_run(cc);
 
     destroy();
     

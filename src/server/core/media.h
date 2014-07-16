@@ -50,13 +50,15 @@ struct media *media_new(const char *path);
 
 void media_delete(struct media *__restrict media);
 
-const struct media_info *media_info(const struct media *__restrict media);
+struct media_info *media_info(struct media *__restrict media);
 
 const char *media_uri(const struct media *__restrict media);
 
 const char *media_path(const struct media *__restrict media);
 
 const char *media_name(const struct media *__restrict media);
+
+void media_set_parsed(struct media *__restrict media);
 
 bool media_is_parsed(const struct media *__restrict media);
 

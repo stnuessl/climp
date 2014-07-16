@@ -60,61 +60,23 @@
 #define DEFAULT_VAL_REPEAT              false
 #define DEFAULT_VAL_SHUFFLE             false
 
-struct climpd_config conf = {
-    .playlist_file       = DEFAULT_VAL_PLAYLIST_FILE,
-    .save_playlist_file  = DEFAULT_VAL_SAVE_PLAYLIST_FILE,
-    .default_playlist    = DEFAULT_VAL_DEFAULT_PLAYLIST,
-    .media_active_color  = DEFAULT_VAL_MEDIA_ACTIVE_COLOR,
-    .media_passive_color = DEFAULT_VAL_MEDIA_PASSIVE_COLOR,
-    .media_meta_length   = DEFAULT_VAL_MEDIA_META_LENGTH,
-    .volume              = DEFAULT_VAL_VOLUME,
-    .repeat              = DEFAULT_VAL_REPEAT,
-    .shuffle             = DEFAULT_VAL_SHUFFLE
+
+struct climpd_config_p {
+    struct config config;
+    struct climpd_config values;
 };
 
 static const char *tag = "climpd-config";
-static struct config *config;
-
-static void set_playlist_file(const char *key, const char *val, void *arg)
-{
-    struct stat st;
-    int err;
-    
-    (void) key;
-    (void) arg;
-    
-    err = stat(val, &st);
-    if(err < 0) {
-        climpd_log_w(tag, "%s: %s\n", val, strerr(errno));
-        return;
-    }
-    
-    conf.playlist_file = val;
-}
-
-static void set_save_playlist_file(const char *key, const char *val, void *arg)
-{
-    const bool *bval;
-    
-    (void) key;
-    (void) arg;
-    
-    bval = bool_map_value(val);
-    if(!bval) {
-        climpd_log_w(tag, "unkown boolean value '%s'\n", val);
-        return;
-    }
-    
-    conf.save_playlist_file = *bval;
-}
 
 static void set_default_playlist(const char *key, const char *val, void *arg)
 {
+    struct climpd_config *values;
     struct stat st;
     int err;
     
     (void) key;
-    (void) arg;
+    
+    values = arg;
     
     if(strcasecmp(val, DEFAULT_STR_DEFAULT_PLAYLIST) == 0)
         return;
@@ -130,15 +92,17 @@ static void set_default_playlist(const char *key, const char *val, void *arg)
         return;
     }
     
-    conf.default_playlist = (val[0] != '/') ? val : strrchr(val, '/') + 1;
+    values->default_playlist = val;
 }
 
 static void set_media_meta_length(const char *key, const char *val, void *arg)
 {
+    struct climpd_config *values;
     unsigned int num;
     
     (void) key;
-    (void) arg;
+    
+    values = arg;
     
     errno = 0;
     num = (unsigned int) strtol(val, NULL, 10);
@@ -149,15 +113,17 @@ static void set_media_meta_length(const char *key, const char *val, void *arg)
         return;
     }
     
-    conf.media_meta_length = num;
+    values->media_meta_length = num;
 }
 
 static void set_media_active_color(const char *key, const char *val, void *arg)
 {
+    struct climpd_config *values;
     const char *code;
     
     (void) key;
-    (void) arg;
+    
+    values = arg;
     
     code = terminal_color_map_color_code(val);
     if(!code) {
@@ -165,15 +131,17 @@ static void set_media_active_color(const char *key, const char *val, void *arg)
         code = DEFAULT_VAL_MEDIA_ACTIVE_COLOR;
     }
     
-    conf.media_active_color = code;
+    values->media_active_color = code;
 }
 
 static void set_media_passive_color(const char *key, const char *val, void *arg)
 {
+    struct climpd_config *values;
     const char *code;
     
     (void) key;
-    (void) arg;
+    
+    values = arg;
     
     code = terminal_color_map_color_code(val);
     if(!code) {
@@ -181,15 +149,17 @@ static void set_media_passive_color(const char *key, const char *val, void *arg)
         code = DEFAULT_VAL_MEDIA_PASSIVE_COLOR;
     }
     
-    conf.media_passive_color = code;
+    values->media_passive_color = code;
 }
 
 static void set_volume(const char *key, const char *val, void *arg)
 {
+    struct climpd_config *values;
     unsigned int num;
     
     (void) key;
-    (void) arg;
+    
+    values = arg;
     
     errno = 0;
     num = (unsigned int) strtol(val, NULL, 10);
@@ -199,46 +169,48 @@ static void set_volume(const char *key, const char *val, void *arg)
         num = DEFAULT_VAL_VOLUME;
     }
     
-    conf.volume = num;
+    values->volume = num;
 }
 
 static void set_repeat(const char *key, const char *val, void *arg)
 {
+    struct climpd_config *values;
     const bool *bval;
     
     (void) key;
-    (void) arg;
+    
+    values = arg;
     
     bval = bool_map_value(val);
     if(!bval) {
         climpd_log_w(tag, "invalid Repeat %s\n", val);
-        conf.repeat = DEFAULT_VAL_REPEAT;
+        values->repeat = DEFAULT_VAL_REPEAT;
         return;
     }
     
-    conf.repeat = *bval;
+    values->repeat = *bval;
 }
 
 static void set_shuffle(const char *key, const char *val, void *arg)
 {
+    struct climpd_config *values;
     const bool *bval;
     
     (void) key;
-    (void) arg;
+
+    values = arg;
     
     bval = bool_map_value(val);
     if(!bval) {
         climpd_log_w(tag, "invalid Shuffle %s\n", val);
-        conf.shuffle = DEFAULT_VAL_SHUFFLE;
+        values->shuffle = DEFAULT_VAL_SHUFFLE;
         return;
     }
     
-    conf.shuffle = *bval;
+    values->shuffle = *bval;
 }
 
 static struct config_handle handles[] = {
-    { &set_playlist_file,          "PlaylistFile",         NULL },
-    { &set_save_playlist_file,     "SavePlaylistFile",     NULL },
     { &set_default_playlist,       "DefaultPlaylist",      NULL },
     { &set_media_active_color,     "MediaActiveColor",     NULL },
     { &set_media_passive_color,    "MediaPassiveColor",    NULL },
@@ -249,13 +221,6 @@ static struct config_handle handles[] = {
 };
 
 static const char default_config_text[] = {
-    "\n"
-    "# Set automatically loaded playlists\n"
-    ";PlaylistFile = "DEFAULT_STR_PLAYLIST_FILE"\n"
-    "\n"
-    "# Save changes in playlist file?\n"
-    ";SavePlaylistFile = "DEFAULT_STR_SAVE_PLAYLIST_FILE"\n"
-    "\n"
     "# Set default played playlist\n"
     ";DefaultPlaylist = "DEFAULT_STR_DEFAULT_PLAYLIST"\n"
     "\n"
@@ -278,17 +243,13 @@ static const char default_config_text[] = {
     "Shuffle = "DEFAULT_STR_SHUFFLE"\n"
 };
 
-
-int climpd_config_init(void)
+struct climpd_config *climpd_config_new(const char *__restrict name)
 {
-    static const char *dir  = "/.config/climp/";
-    static const char *path = "/.config/climp/climpd.conf";
-    char *config_dir, *config_path;
-    char *home;
+    struct climpd_config_p *cc;
+    char *config_path, *home;
     size_t home_len;
     int i, fd, err;
     
-    /* Init some path variables */
     home = getenv("HOME");
     if(!home) {
         err = -ENOENT;
@@ -296,33 +257,34 @@ int climpd_config_init(void)
         goto out;
     }
     
-    home_len = strlen(home);
-    
-    config_dir = malloc(home_len + strlen(dir) + 1);
-    if(!config_dir) {
-        climpd_log_e(tag, "malloc(): %s\n", errstr);
+    cc = malloc(sizeof(*cc));
+    if(!cc) {
+        err = -errno;
+        climpd_log_e(tag, "malloc() - %s\n", errstr);
         goto out;
     }
+
+    /* Init some path variables */
+    home_len = strlen(home);
     
-    config_dir = strcpy(config_dir, home);
-    config_dir = strcat(config_dir, dir);
-    
-    config_path = malloc(home_len + strlen(path) + 1);
+    config_path = malloc(home_len + strlen(name) + 2);
     if(!config_path) {
-        climpd_log_e(tag, "malloc(): %s\n", errstr);
+        err = -errno;
+        climpd_log_e(tag, "malloc() - %s\n", errstr);
         goto cleanup1;
     }
     
     config_path = strcpy(config_path, home);
-    config_path = strcat(config_path, path);
-    err = create_leading_directories(config_dir, DEFAULT_DIR_MODE);
+    config_path = strcat(config_path, "/");
+    config_path = strcat(config_path, name);
+    
+    err = create_leading_directories(config_path, DEFAULT_DIR_MODE);
     if(err < 0) {
         climpd_log_e(tag, "create_leading_directories(): %s\n", strerr(-err));
         goto cleanup2;
     }
     
     /* Create and initialize file if necessary */
-
     fd = open(config_path, O_CREAT | O_EXCL | O_WRONLY,  DEFAULT_FILE_MODE);
     if(fd < 0) {
         if(errno != EEXIST) {
@@ -336,71 +298,87 @@ int climpd_config_init(void)
     }
     
     /* Read config file */
-    
-    config = config_new(config_path);
-    if(!config) {
-        err = -errno;
+    err = config_init(&cc->config, config_path);
+    if(err < 0) {
         climpd_log_e(tag, "config_new(): %s\n", strerr(errno));
         goto cleanup2;
     }
     
     for(i = 0; i < ARRAY_SIZE(handles); ++i) {
-        err = config_insert_handle(config, handles + i);
+        handles[i].arg = &cc->values;
+        err = config_insert_handle(&cc->config, handles + i);
         if(err < 0)
             goto cleanup3;
     }
-
-    err = climpd_config_reload();
+    
+    cc->values.default_playlist    = DEFAULT_VAL_DEFAULT_PLAYLIST;
+    cc->values.media_active_color  = DEFAULT_VAL_MEDIA_ACTIVE_COLOR;
+    cc->values.media_passive_color = DEFAULT_VAL_MEDIA_PASSIVE_COLOR;
+    cc->values.volume              = DEFAULT_VAL_VOLUME;
+    cc->values.repeat              = DEFAULT_VAL_REPEAT;
+    cc->values.shuffle             = DEFAULT_VAL_SHUFFLE;
+    
+    err = climpd_config_reload(&cc->values);
     if(err < 0) {
         climpd_log_e(tag, "loading config failed: %s\n", strerr(-err));
         goto cleanup3;
     }
     
     free(config_path);
-    free(config_dir);
     
     climpd_log_i(tag, "initialized\n");
     
-    return 0;
-
+    return &cc->values;
+    
 cleanup3:
-    config_delete(config);
+    config_destroy(&cc->config);
 cleanup2:
     free(config_path);
 cleanup1:
-    free(config_dir);
+    free(cc);
 out:
     climpd_log_e(tag, "initialization failed\n");
-    return err;
+    errno = -err;
+    return NULL;
 }
 
-
-void climpd_config_destroy(void)
+void climpd_config_delete(struct climpd_config *__restrict cc)
 {
-    config_delete(config);
+    struct climpd_config_p *cc_p;
+    
+    cc_p = container_of(cc, struct climpd_config_p, values);
+    
+    config_destroy(&cc_p->config);
+    free(cc_p);
+    
     climpd_log_i(tag, "destroyed\n");
 }
 
-
-int climpd_config_reload(void)
+int climpd_config_reload(struct climpd_config *__restrict cc)
 {
+    struct climpd_config_p *cc_p;
     int err;
     
-    err = config_parse(config);
+    cc_p = container_of(cc, struct climpd_config_p, values);
+    
+    err = config_parse(&cc_p->config);
     if(err < 0)
         return err;
     
     return 0;
 }
 
-void climpd_config_print(int fd)
+void climpd_config_print(const struct climpd_config *__restrict cc, int fd)
 {
+    struct climpd_config_p *cc_p;
     struct entry *e;
     const char *key, *val;
     
-    dprintf(fd, "\n climpd-config: %s\n", config_path(config));
+    cc_p = container_of(cc, struct climpd_config_p, values);
     
-    config_for_each(config, e) {
+    dprintf(fd, "\n climpd-config: %s\n", config_path(&cc_p->config));
+    
+    config_for_each(&cc_p->config, e) {
         key = entry_key(e);
         val = entry_data(e);
         

@@ -28,10 +28,12 @@
 
 struct playlist {
     struct vector vec_media;
-    char *name;
+    char *path;
 };
 
 struct playlist *playlist_new(const char *name);
+
+struct playlist *playlist_new_from_file(const char *__restrict path);
 
 void playlist_delete(struct playlist *__restrict pl);
 
@@ -72,8 +74,11 @@ struct media *playlist_take_at(struct playlist *__restrict pl, unsigned int i);
 
 struct media *playlist_take_back(struct playlist *__restrict pl);
 
-int playlist_index_of(struct playlist *__restrict pl, 
-                      struct media *m);
+unsigned int playlist_index_of(struct playlist *__restrict pl, 
+                               struct media *m);
+
+int playlist_load_from_file(struct playlist *__restrict pl, 
+                            const char *__restrict path);
 
 #define playlist_for_each(playlist, data)                                      \
     vector_for_each(&(playlist)->vec_media, (data))

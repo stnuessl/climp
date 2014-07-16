@@ -48,6 +48,24 @@ struct playlist *playlist_new(const char *__restrict name)
     return pl;
 }
 
+struct playlist *playlist_new_from_file(const char *__restrict path)
+{
+    struct playlist *pl;
+    int err;
+    
+    pl = playlist_new(path);
+    if(!pl)
+        return NULL;
+    
+    err = playlist_load_from_file(pl, path);
+    if(err < 0) {
+        playlist_delete(pl);
+        return NULL;
+    }
+    
+    return pl;
+}
+
 void playlist_delete(struct playlist *__restrict pl)
 {
     playlist_destroy(pl);
@@ -58,15 +76,17 @@ int playlist_init(struct playlist *__restrict pl, const char *__restrict name)
 {
     int err;
     
-    pl->name = strdup(name);
-    if(!pl->name)
+    pl->path = strdup(name);
+    if(!pl->path)
         return -errno;
     
     err = vector_init(&pl->vec_media, 32);
     if(err < 0) {
-        free(pl->name);
+        free(pl->path);
         return err;
     }
+    
+    vector_set_data_delete(&pl->vec_media, (void (*)(void *)) &media_delete);
     
     return 0;
 }
@@ -74,7 +94,7 @@ int playlist_init(struct playlist *__restrict pl, const char *__restrict name)
 void playlist_destroy(struct playlist *__restrict pl)
 {
     vector_destroy(&pl->vec_media);
-    free(pl->name);
+    free(pl->path);
 }
 
 void playlist_clear(struct playlist *__restrict pl)
@@ -110,14 +130,7 @@ void playlist_take_media(struct playlist *__restrict pl, struct media* m)
 bool playlist_contains_media(const struct playlist *__restrict pl,
                              const struct media *m)
 {
-    struct media **media;
-    
-    playlist_for_each(pl, media) {
-        if(*media == m)
-            return true;
-    }
-    
-    return false;
+    return vector_contains(&pl->vec_media, m);
 }
 
 bool playlist_empty(const struct playlist *__restrict pl)
@@ -132,7 +145,7 @@ unsigned int playlist_size(const struct playlist *__restrict pl)
 
 const char *playlist_name(const struct playlist *__restrict pl)
 {
-    return pl->name;
+    return pl->path;
 }
 
 struct media *playlist_front(struct playlist *__restrict pl)
@@ -169,18 +182,61 @@ struct media *playlist_take_back(struct playlist *__restrict pl)
     return vector_take_back(&pl->vec_media);
 }
 
-int playlist_index_of(struct playlist *__restrict pl, 
-                      struct media *m)
+unsigned int playlist_index_of(struct playlist *__restrict pl, 
+                               struct media *m)
 {
-    unsigned int size;
-    int i;
+    return vector_index_of(&pl->vec_media, m);
+}
+
+int playlist_load_from_file(struct playlist *__restrict pl, 
+                            const char *__restrict path)
+{
+    struct media *m;
+    FILE *file;
+    char *line;
+    size_t size;
+    ssize_t n;
+    int err;
     
-    size = vector_size(&pl->vec_media);
+    file = fopen(path, "r");
+    if(!file)
+        return -errno;
     
-    for(i = 0; i < size; ++i) {
-        if(*vector_at(&pl->vec_media, i) == m)
-            return i;
+    line  = NULL;
+    size = 0;
+    
+    while(1) {
+        n = getline(&line, &size, file);
+        if(n < 0)
+            break;
+        
+        if(n == 0)
+            continue;
+        
+        if(line[0] == '#' || line[0] == ';')
+            continue;
+        
+        line[n - 1] = '\0';
+        
+        if(line[0] != '/')
+            continue;
+        
+        m = media_new(line);
+        if(!m)
+            continue;
+        
+        err = playlist_insert_back(pl, m);
+        if(err < 0) {
+            media_delete(m);
+            continue;
+        }
     }
     
-    return -1;
+    free(line);
+    fclose(file);
+    
+    if(playlist_empty(pl))
+        return -ENOENT;
+    
+    return 0;
 }

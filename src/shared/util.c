@@ -42,8 +42,11 @@ int create_leading_directories(const char *path, mode_t mode)
     path_dup = strdup(path);
     if(!path_dup)
         return -errno;
+
+    p = path_dup;
     
-    p = (path_dup[0] == '/') ? path_dup + 1 : path_dup;
+    while(*p == '/')
+        p += 1;
     
     for(p = strchrnul(p, '/'); *p != '\0'; p = strchrnul(p + 1, '/')) {
         

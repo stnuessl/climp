@@ -22,6 +22,8 @@
 #include <string.h>
 #include <errno.h>
 #include <assert.h>
+#include <fcntl.h>
+#include <sys/stat.h>
 
 #include "media.h"
 
@@ -31,6 +33,17 @@
 struct media *media_new(const char *path)
 {
     struct media *media;
+    struct stat st;
+    int err;
+    
+    err = stat(path, &st);
+    if(err < 0)
+        return NULL;
+    
+    if(!S_ISREG(st.st_mode)) {
+        errno = EINVAL;
+        return NULL;
+    }
 
     media = malloc(sizeof(*media));
     if(!media)
@@ -72,7 +85,7 @@ void media_delete(struct media *__restrict media)
     free(media);
 }
 
-const struct media_info *media_info(const struct media *__restrict media)
+struct media_info *media_info(struct media *__restrict media)
 {
     return &media->info;
 }
@@ -90,6 +103,11 @@ const char *media_path(const struct media *__restrict media)
 const char *media_name(const struct media *__restrict media)
 {
     return media->name;
+}
+
+void media_set_parsed(struct media *__restrict media)
+{
+    media->parsed = true;
 }
 
 bool media_is_parsed(const struct media *__restrict media)

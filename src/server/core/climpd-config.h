@@ -23,12 +23,7 @@
 
 #include <stdbool.h>
 
-#define EVENT_CLIMPD_CONFIG_PARSED 1
-
 struct climpd_config {
-    const char *playlist_file;
-    bool save_playlist_file;
-    
     const char *default_playlist;
     
     /* output options */
@@ -42,12 +37,12 @@ struct climpd_config {
     bool shuffle;
 };
 
-int climpd_config_init(void);
+struct climpd_config *climpd_config_new(const char *__restrict name);
 
-void climpd_config_destroy(void);
+void climpd_config_delete(struct climpd_config *__restrict cc);
 
-int climpd_config_reload(void);
+int climpd_config_reload(struct climpd_config *__restrict cc);
 
-void climpd_config_print(int fd);
+void climpd_config_print(const struct climpd_config *__restrict cc, int fd);
 
 #endif /* _CLIMPD_CONFIG_H_ */

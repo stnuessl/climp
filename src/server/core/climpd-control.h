@@ -21,12 +21,40 @@
 #ifndef _MESSAGE_HANDLER_H_
 #define _MESSAGE_HANDLER_H_
 
-int message_handler_init(void);
+#include <libvci/clock.h>
 
-void message_handler_destroy(void);
+#include "core/climpd-player.h"
 
-bool message_handler_ready(void);
+#include "../../shared/ipc.h"
 
-int message_handler_add_connection(int fd);
+struct climpd_control {
+    struct climpd_player player;
+    struct message msg_in;
+    struct message msg_out;
+    struct clock cl;
+    struct climpd_config *conf;
+   
+    GIOChannel *io_server;
+    GIOChannel *io;
+    GMainLoop *main_loop;
+    
+    int fd_socket;
+    int fd_stdout;
+    int fd_stderr;
+
+    gboolean socket_handler_run;
+    
+};
+
+struct climpd_control *climpd_control_new(int sock, struct climpd_config *conf);
+
+void climpd_control_delete(struct climpd_control *__restrict cc);
+
+int climpd_control_init(struct climpd_control *__restrict cc, 
+                        int sock, struct climpd_config *conf);
+
+void climpd_control_destroy(struct climpd_control *__restrict cc);
+
+void climpd_control_run(struct climpd_control *__restrict cc);
 
 #endif /* _MESSAGE_HANDLER_H_ */

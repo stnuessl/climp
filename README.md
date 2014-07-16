@@ -103,7 +103,7 @@ For the second way you run:
 And pick the number of the song you want to hear. If the output is too long for your
 terminal window, notice that you can use _grep_ on the __get-titles__ command:
 
-    $ climp get-titles | grep <artist, album, title>
+    $ climp get-titles | grep { artist, album, title }
     
 Finally run __play-track__ with the corresponding track number given by __get-titles__,
 e.g.:
