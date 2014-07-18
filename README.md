@@ -23,7 +23,9 @@ package:
 
 * [gstreamer0.10](https://www.archlinux.org/packages/extra/x86_64/gstreamer0.10/)
     
-    # pacman -Syu gstreamer0.10
+```
+# pacman -Syu gstreamer0.10
+```
 
 ### Debian
 
@@ -33,8 +35,9 @@ To compile climp under Debian you will need the following packages:
 * [libgstreamer0.10-dev](https://packages.debian.org/de/jessie/libgstreamer0.10-dev)
 * gstreamer0.10
     
-    # apt-get install gstreamer0.10 libgstreamer0.10-dev libgstreamer-plugins-base0.10-dev
-
+```
+# apt-get install gstreamer0.10 libgstreamer0.10-dev libgstreamer-plugins-base0.10-dev
+```
 ## Installation
 
 First, make sure you got the following tools installed:
@@ -77,6 +80,16 @@ to your standard output. We pipe this into a file to create a playlist for climp
 Second, we load and set the playlist active with __set-playlist__. Finally, we start the
 climp music player with __play__.
 Notice, that you can also __pause__ and __stop__ the player.
+Alternativley, you don't have to use __discover__ to create a playlist.  
+A playlist is just a file where each line points (with an absolute path!) 
+to a file on your file system. The following command can also be used to
+create a playlist:
+
+    $ find /abs/path/to/music/folder -iname *.mp3 [-o -iname *.file-ending] > my_playlist.txt
+
+This command is also a lot faster than __discover__,
+however, there won't be any file checks from the climpd until it actually tries
+to play the returned files.
 
 ### Setting player options
 
@@ -98,12 +111,12 @@ For the first one you need to now the file. Run:
 
 For the second way you run:
 
-    $ climp get-titles
+    $ climp get-playlist
 
 And pick the number of the song you want to hear. If the output is too long for your
 terminal window, notice that you can use _grep_ on the __get-titles__ command:
 
-    $ climp get-titles | grep { artist, album, title }
+    $ climp get-playlist | grep { artist, album, title }
     
 Finally run __play-track__ with the corresponding track number given by __get-titles__,
 e.g.:

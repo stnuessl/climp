@@ -26,9 +26,13 @@
 
 #include <libvci/vector.h>
 #include <libvci/macro.h>
+#include <libvci/error.h>
 
+#include "util/climpd-log.h"
 #include "core/playlist.h"
 #include "core/media.h"
+
+static const char *tag = "playlist";
 
 struct playlist *playlist_new(const char *__restrict name)
 {
@@ -59,9 +63,13 @@ struct playlist *playlist_new_from_file(const char *__restrict path)
     
     err = playlist_load_from_file(pl, path);
     if(err < 0) {
+        climpd_log_e(tag, "loading playlist \"%s\" failed - %s\n", path, 
+                     strerr(-err));
         playlist_delete(pl);
         return NULL;
     }
+    
+    climpd_log_i(tag, "loaded playlist \"%s\"\n", path);
     
     return pl;
 }
@@ -218,15 +226,23 @@ int playlist_load_from_file(struct playlist *__restrict pl,
         
         line[n - 1] = '\0';
         
-        if(line[0] != '/')
+        if(line[0] != '/') {
+            climpd_log_w(tag, "skipping %s - no absolute path\n", line);
             continue;
+        }
         
         m = media_new(line);
-        if(!m)
+        if(!m) {
+            err = -errno;
+            climpd_log_w(tag, "creating media object for %s failed - %s\n",
+                        line, strerr(-err));
             continue;
+        }
         
         err = playlist_insert_back(pl, m);
         if(err < 0) {
+            climpd_log_w(tag, "adding %s to playlist failed - %s\n", line,
+                         strerr(-err));
             media_delete(m);
             continue;
         }
@@ -235,8 +251,10 @@ int playlist_load_from_file(struct playlist *__restrict pl,
     free(line);
     fclose(file);
     
-    if(playlist_empty(pl))
+    if(playlist_empty(pl)) {
+        climpd_log_w(tag, "playlist \"%s\" has no valid entries\n", path);
         return -ENOENT;
+    }
     
     return 0;
 }

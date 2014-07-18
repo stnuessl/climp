@@ -42,6 +42,7 @@ set(SOURCE_SERVER
     src/server/core/climpd-control.c
     src/server/core/climpd-player.c
     src/server/core/climpd-config.c
+    src/server/core/media-discoverer.c
     src/server/core/media-scheduler.c
     src/server/core/playlist.c
     src/server/core/media.c

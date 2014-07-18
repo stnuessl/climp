@@ -228,7 +228,7 @@ static void destroy(void)
     
     bool_map_destroy();
     terminal_color_map_destroy();
-    
+     
     climpd_log_i(tag, "destroyed\n");
     climpd_log_destroy();
 }

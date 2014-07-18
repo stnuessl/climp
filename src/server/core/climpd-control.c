@@ -36,6 +36,7 @@
 #include "core/climpd-config.h"
 #include "core/climpd-player.h"
 #include "core/climpd-control.h"
+#include "core/media-discoverer.h"
 
 #include "../../shared/ipc.h"
 
@@ -175,7 +176,7 @@ static int get_state(struct climpd_control *cc)
     return 0;
 }
 
-static int get_titles(struct climpd_control *cc)
+static int get_playlist(struct climpd_control *cc)
 {
     climpd_player_print_playlist(&cc->player, cc->fd_stdout);
     
@@ -324,7 +325,7 @@ static int play_file(struct climpd_control *cc)
     return err;
 }
 
-static int play_next(struct climpd_control *cc)
+static int next(struct climpd_control *cc)
 {
     int err;
     
@@ -342,7 +343,7 @@ static int play_next(struct climpd_control *cc)
     return 0;
 }
 
-static int play_previous(struct climpd_control *cc)
+static int previous(struct climpd_control *cc)
 {
     int err;
     
@@ -464,11 +465,20 @@ static int remove_playlist(struct climpd_control *cc)
 
 static int discover(struct climpd_control *cc) 
 {
-//     const char *arg;
-//     
-//     arg = ipc_message_arg(&cc->msg_in);
+    struct media_discoverer md;
+    const char *arg;
+    int err;
     
-    // media_manager_discover_directory(arg, fd_stdout);
+    arg = ipc_message_arg(&cc->msg_in);
+
+    err = media_discoverer_init(&md, arg, cc->fd_stdout);
+    if(err < 0) {
+        dprintf(cc->fd_stderr, "discover: %s\n", strerr(-err));
+        return err;
+    }
+    
+    media_discoverer_scan(&md);
+    media_discoverer_destroy(&md);
     
     return 0;
 }
@@ -482,15 +492,17 @@ static int (*msg_handler[])(struct climpd_control *cc) = {
     [IPC_MESSAGE_DISCOVER]              = &discover,
     
     [IPC_MESSAGE_MUTE]                  = &mute,
+    [IPC_MESSAGE_NEXT]                  = &next,
     [IPC_MESSAGE_PAUSE]                 = &do_pause,
     [IPC_MESSAGE_PLAY]                  = &play,
+    [IPC_MESSAGE_PREVIOUS]              = &previous,
     [IPC_MESSAGE_STOP]                  = &stop,
     
     [IPC_MESSAGE_GET_COLORS]            = &get_colors,
     [IPC_MESSAGE_GET_CONFIG]            = &get_config,
     [IPC_MESSAGE_GET_FILES]             = &get_files,
+    [IPC_MESSAGE_GET_PLAYLIST]          = &get_playlist,
     [IPC_MESSAGE_GET_STATE]             = &get_state,
-    [IPC_MESSAGE_GET_TITLES]            = &get_titles,
     [IPC_MESSAGE_GET_VOLUME]            = &get_volume,
     [IPC_MESSAGE_GET_LOG]               = &get_log,
         
@@ -500,8 +512,6 @@ static int (*msg_handler[])(struct climpd_control *cc) = {
     [IPC_MESSAGE_SET_VOLUME]            = &set_volume,
     
     [IPC_MESSAGE_PLAY_FILE]             = &play_file,
-    [IPC_MESSAGE_PLAY_NEXT]             = &play_next,
-    [IPC_MESSAGE_PLAY_PREVIOUS]         = &play_previous,
     [IPC_MESSAGE_PLAY_TRACK]            = &play_track,
     
     [IPC_MESSAGE_LOAD_CONFIG]           = &load_config,
@@ -672,6 +682,8 @@ int climpd_control_init(struct climpd_control *__restrict cc,
     err = clock_init(&cc->cl, CLOCK_MONOTONIC);
     if(err < 0)
         goto cleanup2;
+    
+    clock_start(&cc->cl);
     
     cc->io_server = g_io_channel_unix_new(sock);
     if(!cc->io_server) {

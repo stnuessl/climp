@@ -47,16 +47,17 @@ const char *ipc_message_id_string(enum message_id id)
         [IPC_MESSAGE_DISCOVER]          = "IPC_MESSAGE_DISCOVER",
         
         [IPC_MESSAGE_MUTE]              = "IPC_MESSAGE_MUTE",
+        [IPC_MESSAGE_NEXT]              = "IPC_MESSAGE_NEXT",
         [IPC_MESSAGE_PAUSE]             = "IPC_MESSAGE_PAUSE",
         [IPC_MESSAGE_PLAY]              = "IPC_MESSAGE_PLAY",
+        [IPC_MESSAGE_PREVIOUS]          = "IPC_MESSAGE_PREVIOUS",
         [IPC_MESSAGE_STOP]              = "IPC_MESSAGE_STOP",
         
         [IPC_MESSAGE_GET_COLORS]        = "IPC_MESSAGE_GET_COLORS",
         [IPC_MESSAGE_GET_CONFIG]        = "IPC_MESSAGE_GET_CONFIG",
         [IPC_MESSAGE_GET_FILES]         = "IPC_MESSAGE_GET_FILES",
-        [IPC_MESSAGE_GET_PLAYLISTS]     = "IPC_MESSAGE_GET_PLAYLISTS",
+        [IPC_MESSAGE_GET_PLAYLIST]      = "IPC_MESSAGE_GET_PLAYLIST",
         [IPC_MESSAGE_GET_STATE]         = "IPC_MESSAGE_GET_STATE",
-        [IPC_MESSAGE_GET_TITLES]        = "IPC_MESSAGE_GET_TITLES",
         [IPC_MESSAGE_GET_VOLUME]        = "IPC_MESSAGE_GET_VOLUME",
         [IPC_MESSAGE_GET_LOG]           = "IPC_MESSAGE_GET_LOG",
         
@@ -65,14 +66,12 @@ const char *ipc_message_id_string(enum message_id id)
         [IPC_MESSAGE_SET_SHUFFLE]       = "IPC_MESSAGE_SET_SHUFFLE",
         [IPC_MESSAGE_SET_VOLUME]        = "IPC_MESSAGE_SET_VOLUME",
         
-        [IPC_MESSAGE_PLAY_NEXT]         = "IPC_MESSAGE_PLAY_NEXT",
-        [IPC_MESSAGE_PLAY_PREVIOUS]     = "IPC_MESSAGE_PLAY_PREVIOUS",
+
         [IPC_MESSAGE_PLAY_FILE]         = "IPC_MESSAGE_PLAY_FILE",
         [IPC_MESSAGE_PLAY_TRACK]        = "IPC_MESSAGE_PLAY_TRACK",
         
         [IPC_MESSAGE_LOAD_CONFIG]       = "IPC_MESSAGE_LOAD_CONFIG",
         [IPC_MESSAGE_LOAD_MEDIA]        = "IPC_MESSAGE_LOAD_MEDIA",
-        [IPC_MESSAGE_LOAD_PLAYLIST]     = "IPC_MESSAGE_LOAD_PLAYLIST",
         
         [IPC_MESSAGE_REMOVE_MEDIA]      = "IPC_MESSAGE_REMOVE_MEDIA",
         [IPC_MESSAGE_REMOVE_PLAYLIST]   = "IPC_MESSAGE_REMOVE_PLAYLIST"

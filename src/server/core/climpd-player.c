@@ -28,6 +28,7 @@
 #include <assert.h>
 
 #include <gst/gst.h>
+#include <gst/pbutils/pbutils.h>
 
 #include <libvci/vector.h>
 #include <libvci/random.h>

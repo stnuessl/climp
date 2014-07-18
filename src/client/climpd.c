@@ -53,6 +53,8 @@ static struct command_handle {
     { "pause",           IPC_MESSAGE_PAUSE,             false,  false   },
     { "play",            IPC_MESSAGE_PLAY,              false,  false   },
     { "stop",            IPC_MESSAGE_STOP,              false,  false   },
+    { "next",            IPC_MESSAGE_NEXT,              false,  false   },
+    { "previous",        IPC_MESSAGE_PREVIOUS,          false,  false   },
     
     { "discover",        IPC_MESSAGE_DISCOVER,          true,   true    },
     
@@ -61,9 +63,8 @@ static struct command_handle {
     { "get-colors",      IPC_MESSAGE_GET_COLORS,        false,  false   },
     { "get-config",      IPC_MESSAGE_GET_CONFIG,        false,  false   },
     { "get-files",       IPC_MESSAGE_GET_FILES,         false,  false   },
-    { "get-playlists",   IPC_MESSAGE_GET_PLAYLISTS,     false,  false   },
+    { "get-playlist",    IPC_MESSAGE_GET_PLAYLIST,      false,  false   },
     { "get-state",       IPC_MESSAGE_GET_STATE,         false,  false   },
-    { "get-titles",      IPC_MESSAGE_GET_TITLES,        false,  false   },
     { "get-volume",      IPC_MESSAGE_GET_VOLUME,        false,  false   },
     { "get-log",         IPC_MESSAGE_GET_LOG,           false,  false   },
     
@@ -73,13 +74,11 @@ static struct command_handle {
     { "set-shuffle",     IPC_MESSAGE_SET_SHUFFLE,       true,   false   },
     
     { "play-file",       IPC_MESSAGE_PLAY_FILE,         true,   true    },
-    { "play-next",       IPC_MESSAGE_PLAY_NEXT,         false,  false   },
-    { "play-previous",   IPC_MESSAGE_PLAY_PREVIOUS,     false,  false   },
+
     { "play-track",      IPC_MESSAGE_PLAY_TRACK,        true,   false   },
     
     { "load-config",     IPC_MESSAGE_LOAD_CONFIG,       true,   false   },
     { "load-media",      IPC_MESSAGE_LOAD_MEDIA,        true,   true    },
-    { "load-playlist",   IPC_MESSAGE_LOAD_PLAYLIST,     true,   true    },
     
     { "remove-media",    IPC_MESSAGE_REMOVE_MEDIA,      true,   true    },
     { "remove-playlist", IPC_MESSAGE_REMOVE_PLAYLIST,   true,   false   },
