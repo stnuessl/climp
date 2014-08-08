@@ -275,14 +275,10 @@ int media_scheduler_insert_media(struct media_scheduler *__restrict ms,
     return 0;
 }
 
-struct media *media_scheduler_take_media(struct media_scheduler *__restrict ms,
-                                         struct media *m)
+struct media *media_scheduler_take_index(struct media_scheduler *__restrict ms,
+                                         unsigned int index)
 {
-    int index;
-    
-    index = playlist_index_of(ms->playlist, m);
-    if(index == -1)
-        return NULL;
+    assert(index < playlist_size(ms->playlist) && "INVALID INDEX");
     
     if(ms->running != (unsigned int) -1) {
         if(index <= ms->running)

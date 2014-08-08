@@ -73,7 +73,7 @@ const char *ipc_message_id_string(enum message_id id)
         [IPC_MESSAGE_LOAD_CONFIG]       = "IPC_MESSAGE_LOAD_CONFIG",
         [IPC_MESSAGE_LOAD_MEDIA]        = "IPC_MESSAGE_LOAD_MEDIA",
         
-        [IPC_MESSAGE_REMOVE_MEDIA]      = "IPC_MESSAGE_REMOVE_MEDIA",
+        [IPC_MESSAGE_REMOVE_TRACK]      = "IPC_MESSAGE_REMOVE_TRACK",
         [IPC_MESSAGE_REMOVE_PLAYLIST]   = "IPC_MESSAGE_REMOVE_PLAYLIST"
     };
     

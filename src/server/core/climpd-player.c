@@ -608,19 +608,25 @@ int climpd_player_insert_media(struct climpd_player *__restrict cp,
     return media_scheduler_insert_media(cp->media_scheduler, m);
 }
 
-void climpd_player_take_media(struct climpd_player *__restrict cp, 
-                              struct media *m)
+struct media *climpd_player_take_index(struct climpd_player *__restrict cp, 
+                                       unsigned int index)
 {
     struct playlist *pl;
-    struct media *next;
+    struct media *m, *next;
     
     pl = media_scheduler_playlist(cp->media_scheduler);
+    
+    if(index >= playlist_size(pl)) {
+        errno = EINVAL;
+        return NULL;
+    }
+    
+    m = playlist_at(pl, index);
     
     if(m == media_scheduler_running(cp->media_scheduler)) {
         if(playlist_size(pl) == 1) {
             climpd_player_stop(cp);
-            media_scheduler_take_media(cp->media_scheduler, m);
-            return;
+            return media_scheduler_take_index(cp->media_scheduler, index);
         }
 
         /* 
@@ -639,7 +645,7 @@ void climpd_player_take_media(struct climpd_player *__restrict cp,
             climpd_player_stop(cp);
     }
     
-    media_scheduler_take_media(cp->media_scheduler, m);
+    return media_scheduler_take_index(cp->media_scheduler, index);
 }
 
 void climpd_player_set_volume(struct climpd_player *__restrict cp, 
@@ -756,7 +762,7 @@ void climpd_player_print_playlist(struct climpd_player *__restrict cp, int fd)
     playlist_for_each(pl, m) {
         index += 1;
     
-        print_media(cp, *m, fd, index);
+        print_media(cp, *m, index, fd);
     }
 }
 
@@ -792,7 +798,7 @@ void climpd_player_print_running_track(struct climpd_player *__restrict cp,
     /* silly humans begin to count with '1' */
     index += 1;
     
-    print_media(cp, m, fd, index);
+    print_media(cp, m, index, fd);
 }
 
 void climpd_player_print_volume(struct climpd_player *__restrict cp, int fd)

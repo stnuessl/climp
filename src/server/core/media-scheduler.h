@@ -64,8 +64,8 @@ int media_scheduler_set_running_track(struct media_scheduler *__restrict ms,
 int media_scheduler_insert_media(struct media_scheduler *__restrict ms,
                                  struct media *m);
 
-struct media *media_scheduler_take_media(struct media_scheduler *__restrict ms,
-                                         struct media *m);
+struct media *media_scheduler_take_index(struct media_scheduler *__restrict ms,
+                                         unsigned int index);
 
 int media_scheduler_set_playlist(struct media_scheduler *__restrict ms, 
                                  struct playlist *pl);

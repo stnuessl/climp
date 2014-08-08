@@ -428,16 +428,28 @@ static int load_media(struct climpd_control *cc)
     return 0;
 }
 
-static int remove_media(struct climpd_control *cc)
+static int remove_track(struct climpd_control *cc)
 {
-//     struct media *m;
-//     const char *arg;
-// 
-//     arg = ipc_message_arg(&cc->msg_in);
-// 
-//     climpd_player_take_media(&cc->player, m);
-// 
-//     media_delete(m);
+    struct media *m;
+    const char *arg;
+    unsigned int index;
+    int err;
+
+    arg = ipc_message_arg(&cc->msg_in);
+    
+    errno = 0;
+    index = (unsigned int) strtol(arg, NULL, 10);
+    if(errno != 0) {
+        err = -EINVAL;
+        dprintf(cc->fd_stderr, "remove-track: %s - %s\n", arg, strerr(-err));
+        return err;
+    }
+    
+    index -= 1;
+
+    m = climpd_player_take_index(&cc->player, index);
+    if(m)
+        media_delete(m);
     
     return 0;
 }
@@ -517,7 +529,7 @@ static int (*msg_handler[])(struct climpd_control *cc) = {
     [IPC_MESSAGE_LOAD_CONFIG]           = &load_config,
     [IPC_MESSAGE_LOAD_MEDIA]            = &load_media,
     
-    [IPC_MESSAGE_REMOVE_MEDIA]          = &remove_media,
+    [IPC_MESSAGE_REMOVE_TRACK]          = &remove_track,
     [IPC_MESSAGE_REMOVE_PLAYLIST]       = &remove_playlist,
 };
 

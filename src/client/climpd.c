@@ -80,7 +80,7 @@ static struct command_handle {
     { "load-config",     IPC_MESSAGE_LOAD_CONFIG,       true,   false   },
     { "load-media",      IPC_MESSAGE_LOAD_MEDIA,        true,   true    },
     
-    { "remove-media",    IPC_MESSAGE_REMOVE_MEDIA,      true,   true    },
+    { "remove-track",    IPC_MESSAGE_REMOVE_TRACK,      true,   false   },
     { "remove-playlist", IPC_MESSAGE_REMOVE_PLAYLIST,   true,   false   },
 };
 

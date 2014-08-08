@@ -77,8 +77,8 @@ int climpd_player_previous(struct climpd_player *__restrict cp);
 int climpd_player_insert_media(struct climpd_player *__restrict cp, 
                                struct media *m);
 
-void climpd_player_take_media(struct climpd_player *__restrict cp, 
-                              struct media *m);
+struct media *climpd_player_take_index(struct climpd_player *__restrict cp, 
+                                       unsigned int index);
 
 void climpd_player_set_volume(struct climpd_player *__restrict cp, 
                               unsigned int vol);
