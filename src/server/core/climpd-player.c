@@ -62,6 +62,8 @@ static int climpd_player_play_uri(struct climpd_player *__restrict cp,
     
     cp->state = GST_STATE_PLAYING;
     
+    climpd_log_i(tag, "now playling '%s'\n", uri);
+    
     return 0;
 }
 
@@ -145,7 +147,7 @@ static void handle_end_of_stream(struct climpd_player *__restrict cp)
     
     m = media_scheduler_running(cp->media_scheduler);
     if(m)
-        climpd_log_i(tag, "finished playing '%s'\n", media_info(m)->title);
+        climpd_log_i(tag, "finished '%s'\n", media_uri(m));
     
     m = media_scheduler_next(cp->media_scheduler);
     if(!m) {
