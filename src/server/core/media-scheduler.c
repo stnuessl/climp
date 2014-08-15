@@ -240,6 +240,9 @@ int media_scheduler_set_running_track(struct media_scheduler *__restrict ms,
     if(track >= playlist_size(ms->playlist))
         return -EINVAL;
     
+    if(ms->running == track)
+        return 0;
+    
     if(ms->running != (unsigned int) - 1) {
         err = vector_insert_back(ms->history, (void *)(long) ms->running);
         if(err < 0)

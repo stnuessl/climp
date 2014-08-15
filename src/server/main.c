@@ -77,6 +77,58 @@ static int close_std_streams(void)
     return 0;
 }
 
+static int setup_signal_handlers(void)
+{
+    return 0;
+}
+
+static int daemonize(void)
+{
+    int err;
+    pid_t pid, sid;
+    
+    pid = fork();
+    if(pid < 0)
+        return -errno;
+    
+    if(pid > 0)
+        _exit(EXIT_SUCCESS);
+    
+    /*
+     * We don't want to get closed when our tty is closed.
+     * Creating our own session will prevent this.
+     */
+    sid = setsid();
+    if(sid < 0)
+        return -errno;
+    
+    /* 
+     * Exit session leading process:
+     * Only a session leading process is able to acquire
+     * a controlling terminal
+     */
+    pid = fork();
+    if(pid < 0)
+        return -errno;
+    
+    if(pid > 0)
+        _exit(EXIT_SUCCESS);
+    
+    err = chdir("/");
+    if(err < 0)
+        return -errno;
+    
+    err = setup_signal_handlers();
+    if(err < 0)
+        return err;
+    
+    err = close_std_streams();
+    if(err < 0)
+        return err;
+    
+    return 0;
+}
+
 static int init_server_fd(void)
 {
     struct sockaddr_un addr;
@@ -128,57 +180,34 @@ static void destroy_server_fd(void)
 
 static int init(void)
 {
-    pid_t sid, pid;
     int err;
 
     err = climpd_log_init();
     if(err < 0)
         return err;
     
-    err = terminal_color_map_init();
-    if(err < 0)
+    climpd_log_i(tag, "starting initialization...\n");
+
+#ifdef NDEBUG
+    err = daemonize();
+    if(err < 0) {
+        climpd_log_e(tag, "daemonize() - %s\n", strerr(-err));
         goto cleanup1;
+    }
+#endif
+        
+    err = terminal_color_map_init();
+    if(err < 0) {
+        climpd_log_e(tag, "terminal_color_map_init() - %s\n", strerr(-err));
+        goto cleanup1;
+    }
     
     err = bool_map_init();
-    if(err < 0)
+    if(err < 0) {
+        climpd_log_e(tag, "bool_map_init() - %s\n", strerr(-err));
         goto cleanup2;
-    
-    climpd_log_i(tag, "starting initialization...\n");
-#if 0
-    pid = fork();
-    if(pid < 0) {
-        err = -errno;
-        goto cleanup1;
     }
     
-    if(pid > 0)
-        _exit(EXIT_SUCCESS);
-    
-    /*
-     * We don't want to get closed when our tty is closed.
-     * Creating our own session will prevent this.
-     */
-    sid = setsid();
-    if(sid < 0) {
-        err = -errno;
-        goto cleanup1;
-    }
-    
-    /* 
-     * Exit session leading process:
-     * Only a session leading process is able to acquire
-     * a controlling terminal
-     */
-    pid = fork();
-    if(pid < 0) {
-        err = -errno;
-       goto cleanup1;
-    }
-    
-    if(pid > 0)
-        _exit(EXIT_SUCCESS);
-    
-#endif
     conf = climpd_config_new(".config/climp/climpd.conf");
     if(!conf) {
         err = -errno;
