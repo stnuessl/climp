@@ -26,8 +26,8 @@
 #include <stdbool.h>
 #include <sys/socket.h>
 #include <sys/un.h>
-#include <sys/eventfd.h>
-#include <sys/epoll.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 
 #include <libvci/map.h>
 #include <libvci/hash.h>
@@ -155,13 +155,18 @@ static int spawn_climpd(void)
     char *name = "/usr/local/bin/climpd";
     char *argv[] = { name, NULL };
     pid_t pid;
+    int status;
     
     pid = fork();
     if(pid < 0)
         return -errno;
-    
-    if(pid > 0)
+
+    if(pid > 0) {
+        if(waitpid(pid, &status, 1) == (pid_t) -1)
+            return -errno;
+        
         return 0;
+    }
     
     execve(name, argv, environ);
     
