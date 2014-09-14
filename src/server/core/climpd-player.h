@@ -74,6 +74,10 @@ int climpd_player_next(struct climpd_player *__restrict cp);
 
 int climpd_player_previous(struct climpd_player *__restrict cp);
 
+int climpd_player_peek(struct climpd_player *__restrict cp);
+
+int climpd_player_seek(struct climpd_player *__restrict cp, unsigned int val);
+
 int climpd_player_insert_media(struct climpd_player *__restrict cp, 
                                struct media *m);
 

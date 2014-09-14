@@ -400,11 +400,13 @@ int climpd_player_init(struct climpd_player *__restrict cp,
     assert(pl && "Invalid argument 'pl' (null)");
     assert(config && "Invalid argument 'config' (null)");
     
+    err = -ENOMEM;
+    
     /* init gstreamer pipeline */
     cp->pipeline = gst_pipeline_new(NULL);
     if(!cp->pipeline) {
         climpd_log_e(tag, "creating gstreamer pipeline failed\n");
-        return -ENOMEM;
+        return err;
     }
     
     for(i = 0; i < ARRAY_SIZE(elements); i += 2) {
@@ -602,6 +604,54 @@ int climpd_player_previous(struct climpd_player *__restrict cp)
     }
     
     return climpd_player_play_uri(cp, media_uri(m));
+}
+
+int climpd_player_peek(struct climpd_player *__restrict cp)
+{
+    bool ok;
+    GstFormat format;
+    gint64 val;
+    
+    format = GST_FORMAT_TIME;
+    
+    ok = gst_element_query_position(cp->pipeline, &format, &val);
+    if(!ok || format != GST_FORMAT_TIME) {
+        climpd_log_e(tag, "failed to query the position of the stream\n");
+        return -ENOTSUP;
+    }
+    
+    return (int) (val / (int) 1e9);
+}
+
+int climpd_player_seek(struct climpd_player *__restrict cp, unsigned int val)
+{
+    struct media *m;
+    const struct media_info *i;
+    long time;
+    bool ok;
+    
+    m = media_scheduler_running(cp->media_scheduler);
+    
+    i = media_info(m);
+    
+    if(!i->seekable)
+        return -ENOTSUP;
+    
+    if(val >= i->duration)
+        return -EINVAL;
+    
+    /* convert to nanoseconds */
+    time = (long) val * (unsigned int) 1e9;
+    
+    ok = gst_element_seek_simple(cp->pipeline, GST_FORMAT_TIME, 
+                                 GST_SEEK_FLAG_FLUSH, time);
+    
+    if(!ok) {
+        climpd_log_e(tag, "seeking to position %d failed\n", val);
+        return -ENOMEM;
+    }
+    
+    return 0;
 }
 
 int climpd_player_insert_media(struct climpd_player *__restrict cp, 

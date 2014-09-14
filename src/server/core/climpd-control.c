@@ -141,6 +141,70 @@ static int play(struct climpd_control *cc)
     return 0;
 }
 
+static int peek(struct climpd_control *cc)
+{
+    int val, min, sec;
+    
+    val = climpd_player_peek(&cc->player);
+    if(val < 0) {
+        dprintf(cc->fd_stderr, "failed to query stream position\n");
+        return val;
+    }
+    
+    min = val / 60;
+    sec = val % 60;
+    
+    dprintf(cc->fd_stdout, "  %u:%02u\n", min, sec);
+    
+    return 0;
+}
+
+static int seek(struct climpd_control *cc)
+{
+    const char *arg;
+    char *r;
+    long val;
+    int err;
+    
+    arg   = ipc_message_arg(&cc->msg_in);
+    errno = 0;
+    
+    val = strtol(arg, &r, 10);
+    if(errno) {
+        dprintf(cc->fd_stderr, "invalid value '%s'\n", arg);
+        return -EINVAL;
+    }
+    
+    if(*r != '\0') {
+        if(*r == ':' || *r == '.' || *r == ',' || *r == ' ') {
+            val *= 60;
+            errno = 0;
+            arg = r + 1;
+            
+            val += strtol(arg, &r, 10);
+            if(errno || *r != '\0') {
+                dprintf(cc->fd_stderr, "invalid time format or value '%s' - "
+                                       "use m:ss or just s\n", arg);
+                return -EINVAL;
+            }
+        } else {
+            dprintf(cc->fd_stderr, "invalid time format of value '%s' - "
+                                   "use m:ss or just s\n", arg);
+            
+            return -EINVAL;
+        }
+    }
+    
+    err = climpd_player_seek(&cc->player, val);
+    if(err < 0) {
+        dprintf(cc->fd_stderr, "climpd-player failed to seek - %s\n", 
+                strerr(-err));
+        return err;
+    }
+    
+    return 0;
+}
+
 static int stop(struct climpd_control *cc)
 {
     climpd_player_stop(&cc->player);
@@ -507,7 +571,9 @@ static int (*msg_handler[])(struct climpd_control *cc) = {
     [IPC_MESSAGE_NEXT]                  = &next,
     [IPC_MESSAGE_PAUSE]                 = &do_pause,
     [IPC_MESSAGE_PLAY]                  = &play,
+    [IPC_MESSAGE_PEEK]                  = &peek,
     [IPC_MESSAGE_PREVIOUS]              = &previous,
+    [IPC_MESSAGE_SEEK]                  = &seek,
     [IPC_MESSAGE_STOP]                  = &stop,
     
     [IPC_MESSAGE_GET_COLORS]            = &get_colors,

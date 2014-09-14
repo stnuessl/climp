@@ -49,8 +49,10 @@ const char *ipc_message_id_string(enum message_id id)
         [IPC_MESSAGE_MUTE]              = "IPC_MESSAGE_MUTE",
         [IPC_MESSAGE_NEXT]              = "IPC_MESSAGE_NEXT",
         [IPC_MESSAGE_PAUSE]             = "IPC_MESSAGE_PAUSE",
+        [IPC_MESSAGE_PEEK]              = "IPC_MESSAGE_PEEK",
         [IPC_MESSAGE_PLAY]              = "IPC_MESSAGE_PLAY",
         [IPC_MESSAGE_PREVIOUS]          = "IPC_MESSAGE_PREVIOUS",
+        [IPC_MESSAGE_SEEK]              = "IPC_MESSAGE_SEEK",
         [IPC_MESSAGE_STOP]              = "IPC_MESSAGE_STOP",
         
         [IPC_MESSAGE_GET_COLORS]        = "IPC_MESSAGE_GET_COLORS",
@@ -66,7 +68,6 @@ const char *ipc_message_id_string(enum message_id id)
         [IPC_MESSAGE_SET_SHUFFLE]       = "IPC_MESSAGE_SET_SHUFFLE",
         [IPC_MESSAGE_SET_VOLUME]        = "IPC_MESSAGE_SET_VOLUME",
         
-
         [IPC_MESSAGE_PLAY_FILE]         = "IPC_MESSAGE_PLAY_FILE",
         [IPC_MESSAGE_PLAY_TRACK]        = "IPC_MESSAGE_PLAY_TRACK",
         

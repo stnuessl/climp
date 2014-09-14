@@ -52,9 +52,11 @@ static struct command_handle {
 } cmd_handles[] = {
     { "pause",           IPC_MESSAGE_PAUSE,             false,  false   },
     { "play",            IPC_MESSAGE_PLAY,              false,  false   },
+    { "peek",            IPC_MESSAGE_PEEK,              false,  false   },
     { "stop",            IPC_MESSAGE_STOP,              false,  false   },
     { "next",            IPC_MESSAGE_NEXT,              false,  false   },
     { "previous",        IPC_MESSAGE_PREVIOUS,          false,  false   },
+    { "seek",            IPC_MESSAGE_SEEK,              true,   false   },
     
     { "discover",        IPC_MESSAGE_DISCOVER,          true,   true    },
     
