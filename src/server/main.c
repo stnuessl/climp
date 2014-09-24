@@ -31,6 +31,9 @@
 #include <locale.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <sys/stat.h>
+#include <execinfo.h>
+
 
 #include <gst/gst.h>
 
@@ -53,8 +56,40 @@
 static const char *tag = "main";
 
 static struct climpd_control *cc;
-static struct climpd_config *conf;
 static int server_fd;
+
+static void handle_error_signal(int signum)
+{
+#define STACKTRACE_BUFFER_SIZE 32
+    static void *buffer[STACKTRACE_BUFFER_SIZE];
+    int size;
+    
+    climpd_log_e(tag, "received signal %s\nbacktrace:\n", strsignal(signum));
+    
+    size = backtrace(buffer, STACKTRACE_BUFFER_SIZE);
+    if(size <= 0)
+        return;
+    
+    backtrace_symbols_fd(buffer, size, climpd_log_fd());
+}
+
+static void handle_signal_terminate(int signum)
+{
+    if(signum != SIGTERM)
+        return;
+    
+    climpd_log_i(tag, "terminating process on signal %s\n", strsignal(signum));
+    climpd_control_quit(cc);
+}
+
+static void handle_signal_hangup(int signum)
+{
+    if(signum != SIGHUP)
+        return;
+    
+    climpd_log_i(tag, "reloading config on signal %s\n", strsignal(signum));
+    climpd_control_reload_config(cc);
+}
 
 static int close_std_streams(void)
 {
@@ -74,11 +109,45 @@ static int close_std_streams(void)
     }
     
     close(fd);
+    
     return 0;
 }
 
 static int setup_signal_handlers(void)
 {
+    struct sigaction sa;
+    int error_signals[] = { SIGILL, SIGBUS, SIGSEGV, SIGFPE, SIGPIPE, SIGSYS };
+    int i, err;
+    
+    memset(&sa, 0, sizeof(sa));
+    
+    sa.sa_handler = SIG_IGN;
+
+    err = sigaction(SIGQUIT, &sa, NULL);
+    if(err < 0)
+        return -errno;
+    
+    sa.sa_handler = &handle_signal_terminate;
+    
+    err = sigaction(SIGTERM, &sa, NULL);
+    if(err < 0)
+        return -errno;
+    
+    sa.sa_handler = &handle_error_signal;
+    
+    for(i = 0; i < ARRAY_SIZE(error_signals); ++i) {
+        err = sigaction(error_signals[i], &sa, NULL);
+        if(err < 0)
+            return -errno;
+    }
+    
+    sa.sa_handler = &handle_signal_hangup;
+    sigfillset(&sa.sa_mask);
+    
+    err = sigaction(SIGHUP, &sa, NULL);
+    if(err < 0)
+        return -errno;
+    
     return 0;
 }
 
@@ -113,6 +182,8 @@ static int daemonize(void)
     
     if(pid > 0)
         _exit(EXIT_SUCCESS);
+    
+    umask(0);
     
     err = chdir("/");
     if(err < 0)
@@ -208,24 +279,17 @@ static int init(void)
         goto cleanup2;
     }
     
-    conf = climpd_config_new(".config/climp/climpd.conf");
-    if(!conf) {
-        err = -errno;
-        climpd_log_e(tag, "climpd_config_new(): %s\n", strerr(-err));
-        goto cleanup3;
-    }
-    
     err = init_server_fd();
     if(err < 0) {
         climpd_log_e(tag, "init_server_fd(): %s\n", strerr(-err));
-        goto cleanup4;
+        goto cleanup3;
     }
     
-    cc = climpd_control_new(server_fd, conf);
+    cc = climpd_control_new(server_fd, ".config/climp/climpd.conf");
     if(!cc) {
         err = -errno;
         climpd_log_e(tag, "climpd_control_new(): %s\n", strerr(-err));
-        goto cleanup5;
+        goto cleanup4;
     }
     
     climpd_log_i(tag, "initialization successful\n");
@@ -233,10 +297,8 @@ static int init(void)
     return 0;
 
 
-cleanup5:
-    destroy_server_fd();
 cleanup4:
-    climpd_config_delete(conf);
+    destroy_server_fd();
 cleanup3:
     bool_map_destroy();
 cleanup2:
@@ -252,7 +314,6 @@ cleanup1:
 static void destroy(void)
 {
     climpd_control_delete(cc);
-    climpd_config_delete(conf);
     destroy_server_fd();
     
     bool_map_destroy();

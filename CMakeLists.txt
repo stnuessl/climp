@@ -6,8 +6,8 @@ project(climp C)
 add_definitions(`pkg-config --cflags --libs gstreamer-pbutils-0.10 gstreamer-0.10`)
 add_definitions(-D_GNU_SOURCE)
 add_definitions(-Wall)
-#add_definitions(-O2 -DNDEBUG)
-add_definitions(-g3)
+add_definitions(-O2 -DNDEBUG)
+#add_definitions(-g3)
 
 
 set(CMAKE_INSTALL_PREFIX /usr/local)

@@ -42,4 +42,6 @@ void climpd_log_append(const char *fmt, ...)
 
 void climpd_log_print(int fd);
 
+int climpd_log_fd(void);
+
 #endif /* _CLIMPD_LOG_H_ */

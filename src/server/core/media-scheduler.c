@@ -283,10 +283,8 @@ struct media *media_scheduler_take_index(struct media_scheduler *__restrict ms,
 {
     assert(index < playlist_size(ms->playlist) && "INVALID INDEX");
     
-    if(ms->running != (unsigned int) -1) {
-        if(index <= ms->running)
-            ms->running -= 1;
-    }
+    if(ms->running != (unsigned int) -1 && index <= ms->running)
+        ms->running -= 1;
     
     vector_take_back(ms->random_ready);
     vector_take_all(ms->history, (void *)(long) index);
@@ -317,6 +315,7 @@ int media_scheduler_set_playlist(struct media_scheduler *__restrict ms,
         return 0;
     }
     
+    /* create new random ready vector for inserted playlist */
     ready = vector_new(size);
     if(!ready)
         return -errno;

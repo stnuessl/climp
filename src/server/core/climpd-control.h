@@ -46,15 +46,21 @@ struct climpd_control {
     
 };
 
-struct climpd_control *climpd_control_new(int sock, struct climpd_config *conf);
+struct climpd_control *climpd_control_new(int sock,
+                                          const char *__restrict config_path);
 
 void climpd_control_delete(struct climpd_control *__restrict cc);
 
 int climpd_control_init(struct climpd_control *__restrict cc, 
-                        int sock, struct climpd_config *conf);
+                        int sock,
+                        const char *__restrict config_path);
 
 void climpd_control_destroy(struct climpd_control *__restrict cc);
 
 void climpd_control_run(struct climpd_control *__restrict cc);
+
+void climpd_control_quit(struct climpd_control *__restrict cc);
+
+int climpd_control_reload_config(struct climpd_control *__restrict cc);
 
 #endif /* _MESSAGE_HANDLER_H_ */

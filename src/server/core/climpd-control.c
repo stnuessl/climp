@@ -654,6 +654,7 @@ static int add_connection(struct climpd_control *__restrict cc, int fd)
     }
     g_io_add_watch(cc->io, G_IO_IN, &socket_handler, cc);
     g_io_channel_set_close_on_unref(cc->io, true);
+    
     cc->socket_handler_run = true;
     
     cc->fd_socket = fd;
@@ -712,12 +713,13 @@ static gboolean handle_server_fd(GIOChannel *src, GIOCondition cond, void *data)
     
     return true;
     
-    out:
+out:
     close(fd);
     return true;
 }
 
-struct climpd_control *climpd_control_new(int sock, struct climpd_config *conf)
+struct climpd_control *climpd_control_new(int sock, 
+                                          const char *__restrict config_path)
 {
     struct climpd_control *cc;
     int err;
@@ -726,7 +728,7 @@ struct climpd_control *climpd_control_new(int sock, struct climpd_config *conf)
     if(!cc)
         return NULL;
     
-    err = climpd_control_init(cc, sock, conf);
+    err = climpd_control_init(cc, sock, config_path);
     if(err < 0) {
         free(cc);
         return NULL;
@@ -743,30 +745,39 @@ void climpd_control_delete(struct climpd_control *__restrict cc)
 
 int climpd_control_init(struct climpd_control *__restrict cc, 
                         int sock, 
-                        struct climpd_config *conf)
+                        const char *__restrict config_path)
 {
     struct playlist *pl;
     int err;
     
-    if(conf->default_playlist)
-        pl = playlist_new_from_file(conf->default_playlist);
+    cc->conf = climpd_config_new(config_path);
+    if(!cc->conf)
+        return -errno;
+    
+    if(cc->conf->default_playlist)
+        pl = playlist_new_from_file(cc->conf->default_playlist);
     else
         pl = playlist_new("");
     
-    err = climpd_player_init(&cc->player, conf, pl);
-    if(err < 0)
+    if(!pl) {
+        err = -errno;
         goto cleanup1;
+    }
+    
+    err = climpd_player_init(&cc->player, cc->conf, pl);
+    if(err < 0)
+        goto cleanup2;
     
     err = clock_init(&cc->cl, CLOCK_MONOTONIC);
     if(err < 0)
-        goto cleanup2;
+        goto cleanup3;
     
     clock_start(&cc->cl);
     
     cc->io_server = g_io_channel_unix_new(sock);
     if(!cc->io_server) {
         err = -EIO;
-        goto cleanup3;
+        goto cleanup4;
     }
     
     g_io_add_watch(cc->io_server, G_IO_IN, &handle_server_fd, cc);
@@ -774,7 +785,7 @@ int climpd_control_init(struct climpd_control *__restrict cc,
     cc->main_loop = g_main_loop_new(NULL, false);
     if(!cc->main_loop) {
         err = -EIO;
-        goto cleanup4;
+        goto cleanup5;
     }
     
     ipc_message_init(&cc->msg_in);
@@ -782,25 +793,24 @@ int climpd_control_init(struct climpd_control *__restrict cc,
         
     cc->io = NULL;
     
-    cc->conf = conf;
-    
     cc->fd_socket = -1;
     cc->fd_stdout = -1;
     cc->fd_stderr = -1;
     
-    cc->socket_handler_run = true;
+    cc->socket_handler_run = false;
 
     return 0;
 
-cleanup4:
+cleanup5:
     g_io_channel_unref(cc->io_server);
-cleanup3:
+cleanup4:
     clock_destroy(&cc->cl);
-cleanup2:
+cleanup3:
     climpd_player_destroy(&cc->player);
-cleanup1:
+cleanup2:
     playlist_delete(pl);
-    
+cleanup1:
+    climpd_config_delete(cc->conf);
     return err;
 }
 
@@ -826,9 +836,21 @@ void climpd_control_destroy(struct climpd_control *__restrict cc)
     
     clock_destroy(&cc->cl);
     climpd_player_destroy(&cc->player);
+    climpd_config_delete(cc->conf);
 }
 
 void climpd_control_run(struct climpd_control *__restrict cc)
 {
     g_main_loop_run(cc->main_loop);
 }
+
+void climpd_control_quit(struct climpd_control *__restrict cc)
+{
+    g_main_loop_quit(cc->main_loop);
+}
+
+int climpd_control_reload_config(struct climpd_control *__restrict cc)
+{
+    return climpd_config_reload(cc->conf);
+}
+

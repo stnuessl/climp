@@ -487,9 +487,14 @@ cleanup1:
 
 void climpd_player_destroy(struct climpd_player *__restrict cp)
 {
+    struct playlist *pl;
+    
     climpd_player_stop(cp);
     
+    pl = media_scheduler_playlist(cp->media_scheduler);
     media_scheduler_delete(cp->media_scheduler);
+    playlist_delete(pl);
+    
     gst_object_unref(cp->sink);
     gst_object_unref(cp->volume);
     gst_object_unref(cp->convert);

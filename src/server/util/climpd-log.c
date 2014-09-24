@@ -111,3 +111,8 @@ void climpd_log_print(int fd)
 {
     log_print(log, fd);
 }
+
+int climpd_log_fd(void)
+{
+    return log_fd(log);
+}

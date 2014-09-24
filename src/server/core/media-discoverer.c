@@ -108,8 +108,10 @@ int media_discoverer_init(struct media_discoverer *__restrict md,
     len = strlen(path);
     
     path_dup = malloc(len + 1 + 1);
-    if(!path_dup)
+    if(!path_dup) {
+        err = -errno;
         goto cleanup2;
+    }
     
     path_dup = strcpy(path_dup, path);
     
