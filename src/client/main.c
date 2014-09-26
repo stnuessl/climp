@@ -31,8 +31,8 @@
 #include "climpd.h"
 
 #define CLIMP_VERSION_MAJOR "0"
-#define CLIMP_VERSION_MINOR "0"
-#define CLIMP_VERSION_MICRO "4"
+#define CLIMP_VERSION_MINOR "1"
+#define CLIMP_VERSION_MICRO "0"
 
 #define CLIMP_CONFIG_PATH "~/.config/climp/climp.conf"
 
