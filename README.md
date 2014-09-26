@@ -64,7 +64,7 @@ Notice that '# make install' requires root privileges.
 
 Ok so you got climp installed, but how do you use it? 
 Here is a short guide providing the most important commands
-which may help you get started.
+which may help you getting started.
 
 ### Setting up and running a playlist
 
@@ -90,6 +90,7 @@ create a playlist:
 This command is also a lot faster than __discover__,
 however, there won't be any file checks from the climpd until it actually tries
 to play the returned files.
+In both cases you can consider piping the output to the __sort__ command to order the files appropriatly.
 
 ### Setting player options
 
@@ -123,6 +124,34 @@ e.g.:
 
     $ climp play-track 42
 
-### More (documentation) to come! There are already more featues in climp!
+### Removing a song
+
+The approach for this one is the same as for playing a particular song. Find out the number
+of the song in the playlist and run:
+
+    $ climp remove-track <number>
+    
+### Configuration
+
+The climpd can be controlled through a simple configuration file located under ~/.config/climp/climpd.conf.
+The configuration file looks like this:
+
+    DefaultPlaylist = /abs/path/to/playlist
+    MediaMetaLength = 32
+    MediaActiveColor = green
+    MediaPassiveColor = default
+    Volume = 60
+    Repeat = true
+    Shuffle = true
+
+If a default playlist is set a simple __climp play__ command will start the playback.
+The __Media*__ parameters control the output of the __get-playlist__ command. __MediaMetaLength__ influences
+the title, artist and album column width of the output. __MediaActiveColor__ defines the color in which the currently
+running track will be highlighted, whereas __MediaPassiveColor defines how the rest of the output shall be
+colored. Run __climp get-colors__ to get a list of supported colors.
 
 ## Bugs and bug reports
+
+You can leave a bug report on the [github project page](https://github.com/stnuessl/climp/issues), 
+however don't expect to get them fixed soon. Make sure to leave a note on how to reproduce the bug and 
+the output of the application (including the log file if applicable).

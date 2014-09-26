@@ -64,7 +64,7 @@ static void handle_error_signal(int signum)
     static void *buffer[STACKTRACE_BUFFER_SIZE];
     int size;
     
-    climpd_log_e(tag, "received signal %s\nbacktrace:\n", strsignal(signum));
+    climpd_log_e(tag, "received signal \"%s\"\nbacktrace:\n", strsignal(signum));
     
     size = backtrace(buffer, STACKTRACE_BUFFER_SIZE);
     if(size <= 0)
@@ -73,22 +73,26 @@ static void handle_error_signal(int signum)
     backtrace_symbols_fd(buffer, size, climpd_log_fd());
 }
 
-static void handle_signal_terminate(int signum)
+static void handle_signal(int signum)
 {
+    switch(signum) {
+    case SIGTERM:
+        climpd_log_i(tag, "terminating process on signal \"%s\"\n", strsignal(signum));
+        climpd_control_quit(cc);
+        break;
+    case SIGQUIT:
+        climpd_log_i(tag, "ignoring signal \"%s\"\n", strsignal(signum));
+        break;
+    case SIGHUP:
+        climpd_log_i(tag, "reloading config on signal \"%s\"\n", strsignal(signum));
+        climpd_control_reload_config(cc);
+        break;
+    default:
+        break;
+    }
     if(signum != SIGTERM)
         return;
-    
-    climpd_log_i(tag, "terminating process on signal %s\n", strsignal(signum));
-    climpd_control_quit(cc);
-}
 
-static void handle_signal_hangup(int signum)
-{
-    if(signum != SIGHUP)
-        return;
-    
-    climpd_log_i(tag, "reloading config on signal %s\n", strsignal(signum));
-    climpd_control_reload_config(cc);
 }
 
 static int close_std_streams(void)
@@ -116,24 +120,16 @@ static int close_std_streams(void)
 static int setup_signal_handlers(void)
 {
     struct sigaction sa;
-    int error_signals[] = { SIGILL, SIGBUS, SIGSEGV, SIGFPE, SIGPIPE, SIGSYS };
+    const static int error_signals[] = { 
+        SIGILL, SIGBUS, SIGSEGV, SIGFPE, SIGPIPE, SIGSYS 
+    };
+    const static int signals[] = { SIGQUIT, SIGTERM, SIGHUP };
     int i, err;
     
     memset(&sa, 0, sizeof(sa));
     
-    sa.sa_handler = SIG_IGN;
-
-    err = sigaction(SIGQUIT, &sa, NULL);
-    if(err < 0)
-        return -errno;
-    
-    sa.sa_handler = &handle_signal_terminate;
-    
-    err = sigaction(SIGTERM, &sa, NULL);
-    if(err < 0)
-        return -errno;
-    
     sa.sa_handler = &handle_error_signal;
+    sigemptyset(&sa.sa_mask);
     
     for(i = 0; i < ARRAY_SIZE(error_signals); ++i) {
         err = sigaction(error_signals[i], &sa, NULL);
@@ -141,12 +137,14 @@ static int setup_signal_handlers(void)
             return -errno;
     }
     
-    sa.sa_handler = &handle_signal_hangup;
+    sa.sa_handler = &handle_signal;
     sigfillset(&sa.sa_mask);
     
-    err = sigaction(SIGHUP, &sa, NULL);
-    if(err < 0)
-        return -errno;
+    for(i = 0; i < ARRAY_SIZE(signals); ++i) {
+        err = sigaction(signals[i], &sa, NULL);
+        if(err < 0)
+            return -errno;
+    }
     
     return 0;
 }

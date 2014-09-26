@@ -368,6 +368,7 @@ struct climpd_player *climpd_player_new(struct climpd_config *__restrict config,
     
     err = climpd_player_init(cp, config, pl);
     if(err < 0) {
+        errno = -err;
         free(cp);
         return NULL;
     }
@@ -618,7 +619,7 @@ int climpd_player_peek(struct climpd_player *__restrict cp)
     gint64 val;
     
     format = GST_FORMAT_TIME;
-    
+
     ok = gst_element_query_position(cp->pipeline, &format, &val);
     if(!ok || format != GST_FORMAT_TIME) {
         climpd_log_e(tag, "failed to query the position of the stream\n");
@@ -813,7 +814,13 @@ void climpd_player_print_playlist(struct climpd_player *__restrict cp, int fd)
     struct media **m;
     unsigned int index;
     
-    pl    = media_scheduler_playlist(cp->media_scheduler);
+    pl = media_scheduler_playlist(cp->media_scheduler);
+    
+    if(playlist_empty(pl)) {
+        dprintf(fd, "playlist is empty\n");
+        return;
+    }
+    
     index = 0;
     
     playlist_for_each(pl, m) {
@@ -829,6 +836,11 @@ void climpd_player_print_files(struct climpd_player *__restrict cp, int fd)
     struct media **m;
     
     pl = media_scheduler_playlist(cp->media_scheduler);
+    
+    if(playlist_empty(pl)) {
+        dprintf(fd, "playlist is empty\n");
+        return;
+    }
     
     playlist_for_each(pl, m)
         dprintf(fd, "%s\n", (*m)->path);

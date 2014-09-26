@@ -730,6 +730,7 @@ struct climpd_control *climpd_control_new(int sock,
     
     err = climpd_control_init(cc, sock, config_path);
     if(err < 0) {
+        errno = -err;
         free(cc);
         return NULL;
     }
