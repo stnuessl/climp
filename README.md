@@ -147,8 +147,8 @@ The configuration file looks like this:
 If a default playlist is set a simple __climp play__ command will start the playback.
 The __Media*__ parameters control the output of the __get-playlist__ command. __MediaMetaLength__ influences
 the title, artist and album column width of the output. __MediaActiveColor__ defines the color in which the currently
-running track will be highlighted, whereas __MediaPassiveColor defines how the rest of the output shall be
-colored. Run __climp__ __get-colors__ to get a list of supported colors.
+running track will be highlighted, whereas __MediaPassiveColor__ defines how the rest of the output shall be
+colored. Run __climp get-colors__ to get a list of supported colors.
 
 ## Bugs and bug reports
 
