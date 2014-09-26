@@ -61,9 +61,6 @@ include_directories(${GSTREAMER_INCLUDE_DIRS})
 include_directories(${GSTREAMER_PBUTILS_INCLUDE_DIRS})
 include_directories(${GLIB_INCLUDE_DIRS})
 
-#add_definitions(${GSTREAMER_CFLAGS})
-#add_definitions(${GSTREAMER_PBUTILS_CFLAGS})
-
 link_directories(${CMAKE_LIBRARY_PATH})
 link_directories(${GLIB_LIBRARY_DIRS})
 link_directories(${GSTREAMER_LIBRARY_DIRS})

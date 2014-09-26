@@ -58,13 +58,13 @@ static const char *tag = "main";
 static struct climpd_control *cc;
 static int server_fd;
 
-static void handle_error_signal(int signum)
+static void handle_error_signal(int sig)
 {
 #define STACKTRACE_BUFFER_SIZE 32
     static void *buffer[STACKTRACE_BUFFER_SIZE];
     int size;
     
-    climpd_log_e(tag, "received signal \"%s\"\nbacktrace:\n", strsignal(signum));
+    climpd_log_e(tag, "received signal \"%s\"\nbacktrace:\n", strsignal(sig));
     
     size = backtrace(buffer, STACKTRACE_BUFFER_SIZE);
     if(size <= 0)
@@ -73,26 +73,25 @@ static void handle_error_signal(int signum)
     backtrace_symbols_fd(buffer, size, climpd_log_fd());
 }
 
-static void handle_signal(int signum)
+static void handle_signal(int sig)
 {
-    switch(signum) {
+    const char *str;
+    
+    str = strsignal(sig);
+    
+    switch(sig) {
     case SIGTERM:
-        climpd_log_i(tag, "terminating process on signal \"%s\"\n", strsignal(signum));
+        climpd_log_i(tag, "terminating process on signal \"%s\"\n", str);
         climpd_control_quit(cc);
         break;
-    case SIGQUIT:
-        climpd_log_i(tag, "ignoring signal \"%s\"\n", strsignal(signum));
-        break;
     case SIGHUP:
-        climpd_log_i(tag, "reloading config on signal \"%s\"\n", strsignal(signum));
+        climpd_log_i(tag, "reloading config on signal \"%s\"\n", str);
         climpd_control_reload_config(cc);
         break;
     default:
+        climpd_log_i(tag, "ignoring signal \"%s\"\n", str);
         break;
     }
-    if(signum != SIGTERM)
-        return;
-
 }
 
 static int close_std_streams(void)
@@ -123,7 +122,9 @@ static int setup_signal_handlers(void)
     const static int error_signals[] = { 
         SIGILL, SIGBUS, SIGSEGV, SIGFPE, SIGPIPE, SIGSYS 
     };
-    const static int signals[] = { SIGQUIT, SIGTERM, SIGHUP };
+    const static int signals[] = { 
+        SIGQUIT, SIGTERM, SIGHUP, SIGINT, SIGTSTP, SIGTTIN, SIGTTOU 
+    };
     int i, err;
     
     memset(&sa, 0, sizeof(sa));
