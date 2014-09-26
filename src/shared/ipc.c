@@ -103,22 +103,26 @@ void ipc_message_delete(struct message *__restrict msg)
 void ipc_message_clear(struct message *__restrict msg)
 {
     struct cmsghdr *cmsg;
+    int *data;
     
     msg->msghdr.msg_control    = msg->fd_buf;
     msg->msghdr.msg_controllen = sizeof(msg->fd_buf);
     
     cmsg = CMSG_FIRSTHDR(&msg->msghdr); 
     
+    cmsg->cmsg_len   = msg->msghdr.msg_controllen;
     cmsg->cmsg_level = 0;
     cmsg->cmsg_type  = 0;
     
-    ((int *)CMSG_DATA(cmsg))[IPC_MESSAGE_FD_0] = -1;
-    ((int *)CMSG_DATA(cmsg))[IPC_MESSAGE_FD_1] = -1;
+    data = (int *) CMSG_DATA(cmsg);
+    data[IPC_MESSAGE_FD_0] = -1;
+    data[IPC_MESSAGE_FD_1] = -1;
 }
 
 void ipc_message_init(struct message *__restrict msg)
 {
     struct cmsghdr *cmsg;
+    int *data;
     
     memset(msg->arg, 0, sizeof(msg->arg));
     
@@ -135,14 +139,15 @@ void ipc_message_init(struct message *__restrict msg)
     msg->msghdr.msg_name       = NULL;
     msg->msghdr.msg_namelen    = 0;
     
-    cmsg = CMSG_FIRSTHDR(&msg->msghdr); 
+    cmsg = CMSG_FIRSTHDR(&msg->msghdr);
 
-    cmsg->cmsg_len   = CMSG_LEN(2 * sizeof(int));
+    cmsg->cmsg_len   = msg->msghdr.msg_controllen;
     cmsg->cmsg_level = 0;
     cmsg->cmsg_type  = 0;
     
-    ((int *)CMSG_DATA(cmsg))[IPC_MESSAGE_FD_0] = -1;
-    ((int *)CMSG_DATA(cmsg))[IPC_MESSAGE_FD_1] = -1;
+    data = (int *) CMSG_DATA(cmsg);
+    data[IPC_MESSAGE_FD_0] = -1;
+    data[IPC_MESSAGE_FD_1] = -1;    
 }
 
 void ipc_message_destroy(struct message *__restrict msg)
@@ -185,23 +190,27 @@ const char *ipc_message_arg(const struct message *__restrict msg)
 void ipc_message_set_fds(struct message *__restrict msg, int fd0, int fd1)
 {
     struct cmsghdr *cmsg;
+    int *data;
     
     cmsg = CMSG_FIRSTHDR(&msg->msghdr);
     
     cmsg->cmsg_level = SOL_SOCKET;
     cmsg->cmsg_type  = SCM_RIGHTS;
     
-    ((int *)CMSG_DATA(cmsg))[IPC_MESSAGE_FD_0] = fd0;
-    ((int *)CMSG_DATA(cmsg))[IPC_MESSAGE_FD_1] = fd1;
+    data = (int *) CMSG_DATA(cmsg);
+    data[IPC_MESSAGE_FD_0] = fd0;
+    data[IPC_MESSAGE_FD_1] = fd1;
 }
 
 int ipc_message_fd(const struct message *__restrict msg, int i)
 {
     struct cmsghdr *cmsg;
-    
+    int *data;
+
     cmsg = CMSG_FIRSTHDR(&msg->msghdr);
     
-    return ((int *)CMSG_DATA(cmsg))[i];
+    data = (int *) CMSG_DATA(cmsg);
+    return data[i];
 }
 
 int ipc_send_message(int fd, struct message *__restrict msg)
