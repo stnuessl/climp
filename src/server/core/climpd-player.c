@@ -170,10 +170,10 @@ static void handle_bus_error(GstMessage *msg)
     
     name = GST_OBJECT_NAME(msg->src);
     
-    climpd_log_e("Error received from element %s: %s\n", name, err->message);
+    climpd_log_e(tag, "Error received from element %s: %s\n", name, err->message);
     
     if(debug_info) {
-        climpd_log_i("Debugging information: %s\n", debug_info);
+        climpd_log_i(tag, "Debugging information: %s\n", debug_info);
         g_free(debug_info);
     }
     
