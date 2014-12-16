@@ -584,7 +584,7 @@ static int (*msg_handler[])(struct climpd_control *cc) = {
     [IPC_MESSAGE_GET_STATE]             = &get_state,
     [IPC_MESSAGE_GET_VOLUME]            = &get_volume,
     [IPC_MESSAGE_GET_LOG]               = &get_log,
-        
+    
     [IPC_MESSAGE_SET_PLAYLIST]          = &set_playlist,
     [IPC_MESSAGE_SET_REPEAT]            = &set_repeat,
     [IPC_MESSAGE_SET_SHUFFLE]           = &set_shuffle,

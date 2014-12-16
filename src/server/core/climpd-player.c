@@ -45,22 +45,35 @@
 
 static const char *tag = "climpd-player";
 
+
+static int climpd_player_set_state(struct climpd_player *__restrict cp,
+                                   GstState state)
+{
+    GstStateChangeReturn state_change;
+    
+    state_change = gst_element_set_state(cp->pipeline, state);
+    if(state_change == GST_STATE_CHANGE_FAILURE)
+        return -EINVAL;
+    
+    cp->state = state;
+
+    return 0;
+}
+
 static int climpd_player_play_uri(struct climpd_player *__restrict cp,
                                   const char *__restrict uri)
 {
-    GstStateChangeReturn state_change;
+    int err;
     
     climpd_player_stop(cp);
     
     g_object_set(cp->source, "uri", uri, NULL);
     
-    state_change = gst_element_set_state(cp->pipeline, GST_STATE_PLAYING);
-    if(state_change == GST_STATE_CHANGE_FAILURE) {
+    err = climpd_player_set_state(cp, GST_STATE_PLAYING);
+    if(err < 0) {
         climpd_log_e(tag, "unable to play '%s'\n", uri);
-        return -EINVAL;
+        return err;
     }
-    
-    cp->state = GST_STATE_PLAYING;
     
     climpd_log_i(tag, "now playling '%s'\n", uri);
     
@@ -205,15 +218,19 @@ out:
 
 static gboolean bus_watcher(GstBus *bus, GstMessage *msg, gpointer data)
 {
+    struct climpd_player *player;
+    
+    player = data;
+    
     switch (GST_MESSAGE_TYPE(msg)) {
         case GST_MESSAGE_ERROR:
             handle_bus_error(msg);
             break;
         case GST_MESSAGE_EOS:
-            handle_end_of_stream(data);
+            handle_end_of_stream(player);
             break;
         case GST_MESSAGE_TAG:
-            handle_tag(data, msg);
+            handle_tag(player, msg);
             break;
         case GST_MESSAGE_STATE_CHANGED:
         case GST_MESSAGE_WARNING:
@@ -543,9 +560,23 @@ int climpd_player_play_track(struct climpd_player *__restrict cp,
 int climpd_player_play(struct climpd_player *__restrict cp)
 {
     struct media *m;
+    int err;
     
     if(climpd_player_playing(cp))
         return 0;
+    
+    if (climpd_player_paused(cp)) {
+        m = media_scheduler_running(cp->media_scheduler);
+        
+        err = climpd_player_set_state(cp, GST_STATE_PLAYING);
+        if(err < 0) {
+            climpd_log_e(tag, "failed to resume '%s'.\n", media_uri(m));
+            return err;
+        }
+        
+        climpd_log_i(tag, "resuming '%s'.\n", media_uri(m)); 
+        return 0;
+    }
     
     m = media_scheduler_next(cp->media_scheduler);
     if(!m)
@@ -556,22 +587,26 @@ int climpd_player_play(struct climpd_player *__restrict cp)
 
 void climpd_player_pause(struct climpd_player *__restrict cp)
 {
+    int err;
+    
     if(cp->state == GST_STATE_PAUSED)
         return;
     
-    cp->state = GST_STATE_PAUSED;
-    
-    gst_element_set_state(cp->pipeline, cp->state);
+    err = climpd_player_set_state(cp, GST_STATE_PAUSED);
+    if(err < 0)
+        climpd_log_e(tag, "unable to enter paused state.\n");
 }
 
 void climpd_player_stop(struct climpd_player *__restrict cp)
 {
+    int err;
+    
     if(cp->state == GST_STATE_NULL)
         return;
     
-    cp->state = GST_STATE_NULL;
-    
-    gst_element_set_state(cp->pipeline, cp->state);
+    err = climpd_player_set_state(cp, GST_STATE_NULL);
+    if(err < 0)
+        climpd_log_e(tag, "unable to enter stopped state.\n");
 }
 
 int climpd_player_next(struct climpd_player *__restrict cp)
