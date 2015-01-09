@@ -24,6 +24,7 @@
 #include <string.h>
 #include <errno.h>
 #include <stdbool.h>
+#include <ctype.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <sys/types.h>
@@ -41,49 +42,78 @@
 
 extern char **environ;
 
+#define D_PAUSE "Pause playback."
+#define D_PLAY "Play next available track or resume if stopped."
+#define D_PEEK "Get current stream position. Does not work if stopped."
+#define D_STOP "Stop playback."
+#define D_NEXT "Jump to the next title."
+#define D_PREV "Jump to the previous title."
+#define D_SEEK "Set the current position of the stream."
+#define D_DISC "Discover playable songs inside a folder."
+#define D_SHUT "Shutdown the playback process (close the application)."
+#define D_GCOLOR "Get available colors for printing."
+#define D_GCONF "Print the currently loaded config."
+#define D_GFILES "Get the path of the files in the playlist."
+#define D_GPLAYL "Print the currently played playlist."
+#define D_GSTATE "Get current state of the player."
+#define D_GVOL "Get the current volume."
+#define D_GLOG "Display the log file."
+#define D_SPLAY "Set the playlist."
+#define D_SVOL "Set the volume of the player."
+#define D_SREP "Enable / disable repeat."
+#define D_SSHUFF "Enable / disable shuffling songs."
+#define D_PLAYF "Add a file to the playlist and play it."
+#define D_PLAYT "Play the song at position [arg] in the playlist."
+#define D_LDCONF "Load a configuration file." 
+#define D_LDMEDI "Add a song to the playlist." 
+#define D_RMTR "Remove song at position [arg] in the playlist."
+#define D_RMPLAY "Remove the current playlist."
+
+
 static int fd;
 static struct message *msg;
 
-static struct command_handle {
+static struct option {
     const char *command;
     enum message_id message_id;
     bool has_arg;
     bool arg_is_path;
-} cmd_handles[] = {
-    { "pause",           IPC_MESSAGE_PAUSE,             false,  false   },
-    { "play",            IPC_MESSAGE_PLAY,              false,  false   },
-    { "peek",            IPC_MESSAGE_PEEK,              false,  false   },
-    { "stop",            IPC_MESSAGE_STOP,              false,  false   },
-    { "next",            IPC_MESSAGE_NEXT,              false,  false   },
-    { "previous",        IPC_MESSAGE_PREVIOUS,          false,  false   },
-    { "seek",            IPC_MESSAGE_SEEK,              true,   false   },
+    const char *description;
+} opts[] = {
+    { "pause",           IPC_MESSAGE_PAUSE,           false,  false, D_PAUSE  },
+    { "play",            IPC_MESSAGE_PLAY,            false,  false, D_PLAY   },
+    { "peek",            IPC_MESSAGE_PEEK,            false,  false, D_PEEK   },
+    { "stop",            IPC_MESSAGE_STOP,            false,  false, D_STOP   },
+    { "next",            IPC_MESSAGE_NEXT,            false,  false, D_NEXT   },
+    { "previous",        IPC_MESSAGE_PREVIOUS,        false,  false, D_PREV   },
+    { "seek",            IPC_MESSAGE_SEEK,            true,   false, D_SEEK   },
     
-    { "discover",        IPC_MESSAGE_DISCOVER,          true,   true    },
+    { "discover",        IPC_MESSAGE_DISCOVER,        true,   true,  D_DISC   },
     
-    { "shutdown",        IPC_MESSAGE_SHUTDOWN,          false,  false   },
+    { "shutdown",        IPC_MESSAGE_SHUTDOWN,        false,  false, D_SHUT   },
     
-    { "get-colors",      IPC_MESSAGE_GET_COLORS,        false,  false   },
-    { "get-config",      IPC_MESSAGE_GET_CONFIG,        false,  false   },
-    { "get-files",       IPC_MESSAGE_GET_FILES,         false,  false   },
-    { "get-playlist",    IPC_MESSAGE_GET_PLAYLIST,      false,  false   },
-    { "get-state",       IPC_MESSAGE_GET_STATE,         false,  false   },
-    { "get-volume",      IPC_MESSAGE_GET_VOLUME,        false,  false   },
-    { "get-log",         IPC_MESSAGE_GET_LOG,           false,  false   },
+    { "get-colors",      IPC_MESSAGE_GET_COLORS,      false,  false, D_GCOLOR },
+    { "get-config",      IPC_MESSAGE_GET_CONFIG,      false,  false, D_GCONF  },
+    { "get-files",       IPC_MESSAGE_GET_FILES,       false,  false, D_GFILES },
+    { "get-playlist",    IPC_MESSAGE_GET_PLAYLIST,    false,  false, D_GPLAYL },
+    { "get-state",       IPC_MESSAGE_GET_STATE,       false,  false, D_GSTATE },
+    { "get-volume",      IPC_MESSAGE_GET_VOLUME,      false,  false, D_GVOL   },
+    { "get-log",         IPC_MESSAGE_GET_LOG,         false,  false, D_GLOG   },
     
-    { "set-playlist",    IPC_MESSAGE_SET_PLAYLIST,      true,   true    },
-    { "set-volume",      IPC_MESSAGE_SET_VOLUME,        true,   false   },
-    { "set-repeat",      IPC_MESSAGE_SET_REPEAT,        true,   false   },
-    { "set-shuffle",     IPC_MESSAGE_SET_SHUFFLE,       true,   false   },
+    { "set-playlist",    IPC_MESSAGE_SET_PLAYLIST,    true,   true,  D_SPLAY  },
+    { "set-volume",      IPC_MESSAGE_SET_VOLUME,      true,   false, D_SVOL   },
+    { "set-repeat",      IPC_MESSAGE_SET_REPEAT,      true,   false, D_SREP   },
+    { "set-shuffle",     IPC_MESSAGE_SET_SHUFFLE,     true,   false, D_SSHUFF },
     
-    { "play-file",       IPC_MESSAGE_PLAY_FILE,         true,   true    },
+    { "play-file",       IPC_MESSAGE_PLAY_FILE,       true,   true,  D_PLAYF  },
 
-    { "play-track",      IPC_MESSAGE_PLAY_TRACK,        true,   false   },
+    { "play-track",      IPC_MESSAGE_PLAY_TRACK,      true,   false, D_PLAYT  },
     
-    { "load-config",     IPC_MESSAGE_LOAD_CONFIG,       true,   false   },
-    { "load-media",      IPC_MESSAGE_LOAD_MEDIA,        true,   true    },
+    { "load-config",     IPC_MESSAGE_LOAD_CONFIG,     true,   false, D_LDCONF },
+    { "load-media",      IPC_MESSAGE_LOAD_MEDIA,      true,   true,  D_LDMEDI },
     
-    { "remove-track",    IPC_MESSAGE_REMOVE_TRACK,      true,   false   },
-    { "remove-playlist", IPC_MESSAGE_REMOVE_PLAYLIST,   true,   false   },
+    { "remove-track",    IPC_MESSAGE_REMOVE_TRACK,    true,   false, D_RMTR   },
+    { "remove-playlist", IPC_MESSAGE_REMOVE_PLAYLIST, true,   false, D_RMPLAY },
 };
 
 static struct map *cmd_map;
@@ -164,6 +194,13 @@ static int spawn_climpd(void)
         return -errno;
 
     if(pid > 0) {
+        /* 
+         * The child process gets deamonized. During this process
+         * it will fork its own child and then exits.
+         * This is a good way to check if everything is ok
+         * and give the child some time to initialize
+         * (although this is not necessary)
+         */
         if(waitpid(pid, &status, 1) == (pid_t) -1)
             return -errno;
         
@@ -201,6 +238,29 @@ static int climpd_send_message(enum message_id id, const char *__restrict arg)
     }
     
     return 0;
+}
+
+static void climpd_print_help(void)
+{
+    char *arg;
+    int i;
+    
+    fprintf(stdout, "climp - available options:\n");
+    
+    for(i = 0; i < ARRAY_SIZE(opts); ++i) {
+        arg = (opts[i].has_arg) ? "[arg]" : "     ";
+        
+        fprintf(stdout, "  %-20s %s  %s\n", 
+                opts[i].command, arg, opts[i].description);
+    }
+}
+
+static void to_lower_str(char *str)
+{
+    char *p;
+    
+    for (p = str; p != '\0'; ++p)
+        *p = (char) tolower(*p);
 }
 
 int climpd_init(void)
@@ -248,8 +308,8 @@ int climpd_init(void)
         goto cleanup2;
     }
     
-    for(i = 0; i < ARRAY_SIZE(cmd_handles); ++i) {
-        err = map_insert(cmd_map, cmd_handles[i].command, cmd_handles + i);
+    for(i = 0; i < ARRAY_SIZE(opts); ++i) {
+        err = map_insert(cmd_map, opts[i].command, opts + i);
         if(err < 0)
             goto cleanup3;
     }
@@ -275,32 +335,39 @@ void climpd_destroy(void)
 
 void climpd_handle_args(int argc, char *argv[])
 {
-    struct command_handle *handle;
+    struct option *opt;
     char *path;
     int i;
     
     for(i = 0; i < argc; ++i) {
-        handle = map_retrieve(cmd_map, argv[i]);
-        if(!handle) {
-            fprintf(stderr, "climp: unknown command '%s'\n", argv[i]);
+        to_lower_str(argv[i]);
+        
+        if(strcmp(argv[i], "help") == 0) {
+            climpd_print_help();
             continue;
         }
         
-        if(!handle->has_arg) {
-            climpd_send_message(handle->message_id, NULL);
+        opt = map_retrieve(cmd_map, argv[i]);
+        if(!opt) {
+            fprintf(stderr, "climp: unknown command '%s'\n", argv[i]);
+            continue;
+        }
+
+        if(!opt->has_arg) {
+            climpd_send_message(opt->message_id, NULL);
             continue;
         }
         
         i += 1;
         if(i >= argc) {
             fprintf(stderr, "climp: missing argument for command '%s'\n", 
-                    handle->command);
+                    opt->command);
             continue;
         }
         
         if(map_contains(cmd_map, argv[i])) {
             fprintf(stderr, "climp: missing argument for command '%s'\n", 
-                    handle->command);
+                    opt->command);
             i -= 1;
             continue;
         }
@@ -312,14 +379,14 @@ void climpd_handle_args(int argc, char *argv[])
             }
             
             /* now we can be sure we got a valid argument */
-            if(!handle->arg_is_path) {
-                climpd_send_message(handle->message_id, argv[i]);
+            if(!opt->arg_is_path) {
+                climpd_send_message(opt->message_id, argv[i]);
                 continue;
             }
             
             /* 
              * The climpd needs absolute paths since it may have a different 
-             * workind directory than this process
+             * working directory than this process
              */
             
             path = realpath(argv[i], NULL);
@@ -328,7 +395,7 @@ void climpd_handle_args(int argc, char *argv[])
                 continue;
             }
             
-            climpd_send_message(handle->message_id, path);
+            climpd_send_message(opt->message_id, path);
             
             free(path);
         }
