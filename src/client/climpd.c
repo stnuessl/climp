@@ -186,7 +186,7 @@ static int spawn_climpd(void)
 {
     char *name = "/usr/local/bin/climpd";
     char *argv[] = { name, NULL };
-    pid_t pid;
+    pid_t pid, x;
     int status;
     
     pid = fork();
@@ -201,7 +201,11 @@ static int spawn_climpd(void)
          * and give the child some time to initialize
          * (although this is not necessary)
          */
-        if(waitpid(pid, &status, 1) == (pid_t) -1)
+        do {
+            x = waitpid(pid, &status, 1);
+        } while (x == (pid_t) - 1 && errno == EINTR);
+        
+        if (x == (pid_t) -1)
             return -errno;
         
         return 0;
