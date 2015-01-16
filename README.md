@@ -125,14 +125,14 @@ Checkout the following commands:
     $ climp set-repeat { true, false, yes, no, on, off, y, n, 1, 0 }
     $ climp set-volume [0 - 100]
 
-### Play a particular songs
+### Play a particular song
 
-To play a particular song there are two possible ways to achieve this.
+To play a particular song there are two possible ways for achieving this.
 For the first one you need to now the file. Run:
     
     $ climp play-file <file>
 
-For the second way you run:
+For the second way, you run:
 
     $ climp get-playlist
 
