@@ -1,8 +1,18 @@
 # climp - Command Line Interface Music Player
 
-This project is incomplete. You should not use it.
-
 ## Overview
+
+* [Dependencies](https://github.com/stnuessl/climp#dependencies)
+    * [Arch Linux](https://github.com/stnuessl/climp#arch-linux)
+    * [Debian](https://github.com/stnuessl/climp#debian-jessie)
+* [Installation](https://github.com/stnuessl/climp#installation)
+* [Usage](https://github.com/stnuessl/climp#usage)
+    * [Setting up and running a playlist](https://github.com/stnuessl/climp#setting-up-and-running-a-playlist)
+    * [Setting player options](https://github.com/stnuessl/climp#setting-up-player-options)
+    * [Playing a particular song](https://github.com/stnuessl/climp#playing-a-particular-song)
+    * [Removing a song](https://github.com/stnuessl/climp#removing-a-song)
+    * [Configuration](https://github.com/stnuessl/climp#configuration)
+* [Bugs and bug reports](https://github.com/stnuessl/climp#bugs-and-bug-reports)
 
 ## Dependencies
 
@@ -22,22 +32,34 @@ In order to compile climp under Arch Linux you need to install to following
 package:
 
 * [gstreamer0.10](https://www.archlinux.org/packages/extra/x86_64/gstreamer0.10/)
-    
+
+To be capable of playing files climp needs additional gstreamer plugins,
+so it is probably best to install the following packages too:
+
+* [gstreamer0.10-bad-plugins](https://www.archlinux.org/packages/extra/x86_64/gstreamer0.10-bad-plugins/)
+* [gstreamer0.10-base-plugins](https://www.archlinux.org/packages/extra/x86_64/gstreamer0.10-base-plugins/)
+* [gstreamer0.10-good-plugins](https://www.archlinux.org/packages/extra/x86_64/gstreamer0.10-good-plugins/)
+* [gstreamer0.10-ffmpeg](https://www.archlinux.org/packages/extra/x86_64/gstreamer0.10-ffmpeg/)
+* [gstreamer0.10-ugly-plugins](https://www.archlinux.org/packages/extra/x86_64/gstreamer0.10-ugly-plugins/)
+
+Run the following command to install all the packages.
+
 ```
-# pacman -Syu gstreamer0.10
+# pacman -Syu gstreamer0.10 gstreamer0.10-bad-plugins gstreamer0.10-base-plugins gstreamer0.10-good-plugins gstreamer0.10-ffmpeg gstreamer0.10-ugly-plugins 
 ```
 
-### Debian
+### Debian (Jessie)
 
 To compile climp under Debian you will need the following packages:
 
 * [libgstreamer-plugins-base0.10-dev](https://packages.debian.org/de/sid/libgstreamer-plugins-base0.10-dev)
 * [libgstreamer0.10-dev](https://packages.debian.org/de/jessie/libgstreamer0.10-dev)
 * gstreamer0.10
-    
+
 ```
 # apt-get install gstreamer0.10 libgstreamer0.10-dev libgstreamer-plugins-base0.10-dev
 ```
+
 ## Installation
 
 First, make sure you got the following tools installed:
