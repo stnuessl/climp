@@ -7,10 +7,10 @@
     * [Debian](https://github.com/stnuessl/climp#debian-jessie)
 * [Installation](https://github.com/stnuessl/climp#installation)
 * [Usage](https://github.com/stnuessl/climp#usage)
-    * [Setting up and running a playlist](https://github.com/stnuessl/climp#setting-up-and-running-a-playlist)
-    * [Setting player options](https://github.com/stnuessl/climp#setting-up-player-options)
-    * [Playing a particular song](https://github.com/stnuessl/climp#playing-a-particular-song)
-    * [Removing a song](https://github.com/stnuessl/climp#removing-a-song)
+    * [Set up and run a playlist](https://github.com/stnuessl/climp#set-up-and-run-a-playlist)
+    * [Set player options](https://github.com/stnuessl/climp#set-player-options)
+    * [Play a particular song](https://github.com/stnuessl/climp#play-a-particular-song)
+    * [Remove a song](https://github.com/stnuessl/climp#remove-a-song)
     * [Configuration](https://github.com/stnuessl/climp#configuration)
 * [Bugs and bug reports](https://github.com/stnuessl/climp#bugs-and-bug-reports)
 
@@ -22,7 +22,7 @@ Also the needed packages may differ between distributions.
 Up to this date (June 2014) I got climp to run under
 
 1. Arch Linux
-2. Debian - Testing
+2. Debian (Jessie)
 
 with the packages mentioned in the following section.
 
@@ -88,7 +88,7 @@ Ok so you got climp installed, but how do you use it?
 Here is a short guide providing the most important commands
 which may help you getting started.
 
-### Setting up and running a playlist
+### Set up and run a playlist
 
 Consider having a some songs in <directory>.
 Run the following commands to get a playlist up and running:
@@ -114,7 +114,7 @@ however, there won't be any file checks from the climpd until it actually tries
 to play the returned files.
 In both cases you can consider piping the output to the __sort__ command to order the files appropriatly.
 
-### Setting player options
+### Set player options
 
 This is a short one. Some time during replay you propably want to change
 the volume. Or you want to hear the songs in a random order. Or you want to 
@@ -125,7 +125,7 @@ Checkout the following commands:
     $ climp set-repeat { true, false, yes, no, on, off, y, n, 1, 0 }
     $ climp set-volume [0 - 100]
 
-### Playing a particular songs
+### Play a particular songs
 
 To play a particular song there are two possible ways to achieve this.
 For the first one you need to now the file. Run:
@@ -146,7 +146,7 @@ e.g.:
 
     $ climp play-track 42
 
-### Removing a song
+### Remove a song
 
 The approach for this one is the same as for playing a particular song. Find out the number
 of the song in the playlist and run:
