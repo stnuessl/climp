@@ -46,9 +46,18 @@ static int string_compare(const void *a, const void *b)
 
 int terminal_color_map_init(void)
 {
+    const struct map_config map_conf = {
+        .size           = 32,
+        .lower_bound    = MAP_DEFAULT_LOWER_BOUND,
+        .upper_bound    = MAP_DEFAULT_UPPER_BOUND,
+        .static_size    = false,
+        .key_compare    = &string_compare,
+        .key_hash       = &hash_string,
+        .data_delete    = NULL,
+    };
     int i, err;
     
-    err = map_init(&color_map, 32, &string_compare, &hash_string);
+    err = map_init(&color_map, &map_conf);
     if(err < 0)
         return err;
     

@@ -32,7 +32,7 @@
 
 int main(int argc, char *argv[])
 {
-    int i, err;
+    int err;
     
     if(getuid() == 0) {
         fprintf(stderr, "climp: run as root\n");

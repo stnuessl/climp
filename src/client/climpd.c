@@ -124,7 +124,7 @@ static int climpd_connect(void)
     int err;
     
     fd = socket(AF_UNIX, SOCK_STREAM, 0);
-    if(fd < 0) {
+    if (fd < 0) {
         err = -errno;
         goto out;
     }
@@ -135,7 +135,7 @@ static int climpd_connect(void)
     strncpy(addr.sun_path, IPC_SOCKET_PATH, sizeof(addr.sun_path));
     
     err = connect(fd, (struct sockaddr *) &addr, sizeof(addr));
-    if(err < 0) {
+    if (err < 0) {
         err = -errno;
         goto cleanup1;
     }
@@ -145,18 +145,18 @@ static int climpd_connect(void)
     ipc_message_set_fds(msg, STDOUT_FILENO, STDERR_FILENO);
     
     err = ipc_send_message(fd, msg);
-    if(err < 0) {
+    if (err < 0) {
         fprintf(stderr, "climp: ipc_send_message(): %s\n", strerror(-err));
         goto cleanup1;
     }
     
     err = ipc_recv_message(fd, msg);
-    if(err < 0) {
+    if (err < 0) {
         fprintf(stderr, "climp: ipc_recv_message(): %s\n", strerror(-err));
         goto cleanup1;
     }
     
-    if(ipc_message_id(msg) != IPC_MESSAGE_OK) {
+    if (ipc_message_id(msg) != IPC_MESSAGE_OK) {
         err = -EIO;
         goto cleanup1;
     }
@@ -193,7 +193,7 @@ static int spawn_climpd(void)
     if(pid < 0)
         return -errno;
 
-    if(pid > 0) {
+    if (pid > 0) {
         /* 
          * The child process gets deamonized. During this process
          * it will fork its own child and then exits.
@@ -225,16 +225,16 @@ static int climpd_send_message(enum message_id id, const char *__restrict arg)
     ipc_message_clear(msg);
     ipc_message_set_id(msg, id);
     
-    if(arg) {
+    if (arg) {
         err = ipc_message_set_arg(msg, arg);
-        if(err < 0) {
+        if (err < 0) {
             fprintf(stderr, "climp: argument '%s' - %s\n", arg, strerror(-err));
             return err;
         }
     }
     
     err = ipc_send_message(fd, msg);
-    if(err < 0) {
+    if (err < 0) {
         fprintf(stderr, "climp: sending message '%s' failed - %s\n", 
                 ipc_message_id_string(id), strerror(-err));
 
@@ -251,7 +251,7 @@ static void climpd_print_help(void)
     
     fprintf(stdout, "climp - available options:\n");
     
-    for(i = 0; i < ARRAY_SIZE(opts); ++i) {
+    for (i = 0; i < ARRAY_SIZE(opts); ++i) {
         arg = (opts[i].has_arg) ? "[arg]" : "     ";
         
         fprintf(stdout, "  %-20s %s  %s\n", 
@@ -269,6 +269,15 @@ static void to_lower_str(char *str)
 
 int climpd_init(void)
 {
+    const struct map_config map_conf = {
+        .size           = 64,
+        .lower_bound    = MAP_DEFAULT_LOWER_BOUND,
+        .upper_bound    = MAP_DEFAULT_UPPER_BOUND,
+        .static_size    = false,
+        .key_compare    = &compare_string,
+        .key_hash       = &hash_string,
+        .data_delete    = NULL,
+    };
     int i, attempts, err;
 
     msg = ipc_message_new();
@@ -276,7 +285,7 @@ int climpd_init(void)
         return -errno;
     
     err = climpd_connect();
-    if(err < 0) {
+    if (err < 0) {
         if(err != -ENOENT && err != -ECONNREFUSED)
             goto cleanup1;
         
@@ -292,7 +301,7 @@ int climpd_init(void)
         
         attempts = 1000;
         
-        while(attempts--) {
+        while (attempts--) {
             usleep(10 * 1000);
             
             err = climpd_connect();
@@ -302,19 +311,19 @@ int climpd_init(void)
             break;
         }
         
-        if(err < 0)
+        if (err < 0)
             goto cleanup2;
     }
     
-    cmd_map = map_new(32, &compare_string, &hash_string);
+    cmd_map = map_new(&map_conf);
     if(!cmd_map) {
         err = -errno;
         goto cleanup2;
     }
     
-    for(i = 0; i < ARRAY_SIZE(opts); ++i) {
+    for (i = 0; i < ARRAY_SIZE(opts); ++i) {
         err = map_insert(cmd_map, opts[i].command, opts + i);
-        if(err < 0)
+        if (err < 0)
             goto cleanup3;
     }
 
@@ -343,33 +352,33 @@ void climpd_handle_args(int argc, char *argv[])
     char *path;
     int i;
     
-    for(i = 0; i < argc; ++i) {
+    for (i = 0; i < argc; ++i) {
         to_lower_str(argv[i]);
         
-        if(strcmp(argv[i], "help") == 0) {
+        if (strcmp(argv[i], "help") == 0) {
             climpd_print_help();
             continue;
         }
         
         opt = map_retrieve(cmd_map, argv[i]);
-        if(!opt) {
+        if (!opt) {
             fprintf(stderr, "climp: unknown command '%s'\n", argv[i]);
             continue;
         }
 
-        if(!opt->has_arg) {
+        if (!opt->has_arg) {
             climpd_send_message(opt->message_id, NULL);
             continue;
         }
         
         i += 1;
-        if(i >= argc) {
+        if (i >= argc) {
             fprintf(stderr, "climp: missing argument for command '%s'\n", 
                     opt->command);
             continue;
         }
         
-        if(map_contains(cmd_map, argv[i])) {
+        if (map_contains(cmd_map, argv[i])) {
             fprintf(stderr, "climp: missing argument for command '%s'\n", 
                     opt->command);
             i -= 1;
@@ -377,13 +386,13 @@ void climpd_handle_args(int argc, char *argv[])
         }
         
         for(; i < argc; ++i) {
-            if(map_contains(cmd_map, argv[i])) {
+            if (map_contains(cmd_map, argv[i])) {
                 i -= 1;
                 break;
             }
             
             /* now we can be sure we got a valid argument */
-            if(!opt->arg_is_path) {
+            if (!opt->arg_is_path) {
                 climpd_send_message(opt->message_id, argv[i]);
                 continue;
             }
@@ -394,7 +403,7 @@ void climpd_handle_args(int argc, char *argv[])
              */
             
             path = realpath(argv[i], NULL);
-            if(!path) {
+            if (!path) {
                 fprintf(stderr, "climp: %s - %s\n", argv[i], strerror(errno));
                 continue;
             }
