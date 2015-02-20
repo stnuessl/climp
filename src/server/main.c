@@ -71,6 +71,8 @@ static void handle_error_signal(int sig)
         return;
     
     backtrace_symbols_fd(buffer, size, climpd_log_fd());
+    
+    exit(EXIT_FAILURE);
 }
 
 static void handle_signal(int sig)
