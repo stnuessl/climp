@@ -263,7 +263,7 @@ static void to_lower_str(char *str)
 {
     char *p;
     
-    for (p = str; p != '\0'; ++p)
+    for (p = str; *p != '\0'; ++p)
         *p = (char) tolower(*p);
 }
 
