@@ -45,7 +45,6 @@
 
 static const char *tag = "climpd-player";
 
-
 static int climpd_player_set_state(struct climpd_player *__restrict cp,
                                    GstState state)
 {
@@ -340,11 +339,9 @@ static void print_media(struct climpd_player *__restrict cp,
                         unsigned int index, 
                         int fd) 
 {
-    struct climpd_config *conf;
     const char *color;
     const struct media_info *i;
-    unsigned int min, sec;
-    bool running;
+    unsigned int min, sec, meta_len;
     int err;
     
     if(!media_is_parsed(m)) {
@@ -355,22 +352,31 @@ static void print_media(struct climpd_player *__restrict cp,
         }
     }
     
-    conf = cp->config;
-    running = (m == climpd_player_running(cp));
-    
     i = media_info(m);
     
     min = i->duration / 60;
     sec = i->duration % 60;
     
+    meta_len = cp->config->media_meta_length;
     
-    color = (running) ? conf->media_active_color : conf->media_passive_color;
-    
-    dprintf(fd, "%s ( %3u )    %2u:%02u   %-*.*s %-*.*s %-*.*s\n" 
-            COLOR_CODE_DEFAULT, color, index, min, sec,
-            conf->media_meta_length, conf->media_meta_length, i->title, 
-            conf->media_meta_length, conf->media_meta_length, i->artist, 
-            conf->media_meta_length, conf->media_meta_length, i->album);
+    if (isatty(fd)) {
+        if (m == climpd_player_running(cp))
+            color = cp->config->media_active_color;
+        else
+            color = cp->config->media_passive_color;
+        
+        dprintf(fd, "%s ( %3u )    %2u:%02u   %-*.*s %-*.*s %-*.*s\n" 
+                COLOR_CODE_DEFAULT, color, index, min, sec,
+                meta_len, meta_len, i->title, 
+                meta_len, meta_len, i->artist, 
+                meta_len, meta_len, i->album);
+    } else {
+        dprintf(fd, " ( %3u )    %2u:%02u   %-*.*s %-*.*s %-*.*s\n", 
+                index, min, sec,
+                meta_len, meta_len, i->title, 
+                meta_len, meta_len, i->artist, 
+                meta_len, meta_len, i->album);
+    }
 }
 
 struct climpd_player *climpd_player_new(struct climpd_config *__restrict config, 
