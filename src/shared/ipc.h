@@ -21,94 +21,18 @@
 #ifndef _IPC_H_
 #define _IPC_H_
 
-#include <sys/socket.h>
-#include <sys/un.h>
+#define IPC_SOCKET_PATH "/tmp/.climp-unix"
 
-#define IPC_SOCKET_PATH         "/tmp/.climp-unix"
+int ipc_send_fds(int sock, int fd_out, int fd_err);
 
-#define IPC_MESSAGE_SIZE        512
-#define IPC_MESSAGE_FD_0        0
-#define IPC_MESSAGE_FD_1        1
-#define IPC_MESSAGE_EMPTY_ARG   ""
+int ipc_recv_fds(int sock, int *__restrict fd_out, int *__restrict fd_err);
 
-enum message_id {
-    IPC_MESSAGE_HELLO,
-    IPC_MESSAGE_GOODBYE,
-    IPC_MESSAGE_OK,
-    IPC_MESSAGE_NO,
-    
-    IPC_MESSAGE_SHUTDOWN,
-    
-    IPC_MESSAGE_DISCOVER,
-    
-    IPC_MESSAGE_MUTE,
-    IPC_MESSAGE_NEXT,
-    IPC_MESSAGE_PAUSE,
-    IPC_MESSAGE_PEEK,
-    IPC_MESSAGE_PLAY,
-    IPC_MESSAGE_PREVIOUS,
-    IPC_MESSAGE_SEEK,
-    IPC_MESSAGE_STOP,
-    
-    IPC_MESSAGE_GET_COLORS,
-    IPC_MESSAGE_GET_CONFIG,
-    IPC_MESSAGE_GET_FILES,
-    IPC_MESSAGE_GET_PLAYLIST,
-    IPC_MESSAGE_GET_STATE,
-    IPC_MESSAGE_GET_VOLUME,
-    IPC_MESSAGE_GET_LOG,
-    
-    IPC_MESSAGE_SET_PLAYLIST,
-    IPC_MESSAGE_SET_REPEAT,
-    IPC_MESSAGE_SET_SHUFFLE,
-    IPC_MESSAGE_SET_VOLUME,
-    
-    IPC_MESSAGE_PLAY_FILE,
-    IPC_MESSAGE_PLAY_TRACK,
-    
-    IPC_MESSAGE_LOAD_CONFIG,
-    IPC_MESSAGE_LOAD_MEDIA,
-    
-    IPC_MESSAGE_REMOVE_TRACK,
-    IPC_MESSAGE_REMOVE_PLAYLIST,
-    
-    IPC_MESSAGE_MAX_ID
-};
+int ipc_send_argv(int sock, const char **argv, int argc);
 
-struct message {
-    struct msghdr msghdr;
-    struct iovec iovec[2];
-    enum message_id id;
-    char arg[IPC_MESSAGE_SIZE - sizeof(enum message_id)];
-    char fd_buf[CMSG_SPACE(2 * sizeof(int))];
-};
+int ipc_recv_argv(int sock, char ***argv, int *argc);
 
-const char *ipc_message_id_string(enum message_id id);
+int ipc_send_status(int sock, int status);
 
-struct message *ipc_message_new(void);
-
-void ipc_message_delete(struct message *__restrict msg);
-
-void ipc_message_init(struct message *__restrict msg);
-
-void ipc_message_destroy(struct message *__restrict msg);
-
-void ipc_message_clear(struct message *__restrict msg);
-
-void ipc_message_set_id(struct message *__restrict msg, enum message_id id);
-
-enum message_id ipc_message_id(const struct message *__restrict msg);
-
-int ipc_message_set_arg(struct message *__restrict msg, const char *arg);
-
-const char *ipc_message_arg(const struct message *__restrict msg);
-
-void ipc_message_set_fds(struct message *__restrict msg, int fd0, int fd1);
-
-int ipc_message_fd(const struct message *__restrict msg, int i);
-
-int ipc_send_message(int fd, struct message *__restrict msg);
-
-int ipc_recv_message(int fd, struct message *__restrict msg);
+int ipc_recv_status(int sock, int *__restrict status);
 
 #endif /* _IPC_H_ */

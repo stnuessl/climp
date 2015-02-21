@@ -21,12 +21,10 @@
 #ifndef _CLIMPD_H_
 #define _CLIMPD_H_
 
-#include "../shared/ipc.h"
-
 int climpd_init(void);
 
 void climpd_destroy(void);
 
-void climpd_handle_args(int argc, char *argv[]);
+void climpd_handle_args(int argc, const char *argv[]);
 
 #endif /* _CLIMPD_H_ */

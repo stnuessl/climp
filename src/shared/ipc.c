@@ -19,208 +19,28 @@
  */
 
 #include <stdlib.h>
-#include <stdio.h>
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
-#include <stdbool.h>
+#include <assert.h>
+
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <linux/sockios.h>
-#include <assert.h>
 
-#include <libvci/macro.h>
+#include <libvci/buffer.h>
 
 #include "ipc.h"
 
-const char *ipc_message_id_string(enum message_id id)
-{
-    static const char *message_names[] = {
-        [IPC_MESSAGE_HELLO]             = "IPC_MESSAGE_HELLO",
-        [IPC_MESSAGE_GOODBYE]           = "IPC_MESSAGE_GOODBYE",
-        [IPC_MESSAGE_OK]                = "IPC_MESSAGE_OK",
-        [IPC_MESSAGE_NO]                = "IPC_MESSAGE_NO",
-        
-        [IPC_MESSAGE_SHUTDOWN]          = "IPC_MESSAGE_SHUTDOWN",
-        
-        [IPC_MESSAGE_DISCOVER]          = "IPC_MESSAGE_DISCOVER",
-        
-        [IPC_MESSAGE_MUTE]              = "IPC_MESSAGE_MUTE",
-        [IPC_MESSAGE_NEXT]              = "IPC_MESSAGE_NEXT",
-        [IPC_MESSAGE_PAUSE]             = "IPC_MESSAGE_PAUSE",
-        [IPC_MESSAGE_PEEK]              = "IPC_MESSAGE_PEEK",
-        [IPC_MESSAGE_PLAY]              = "IPC_MESSAGE_PLAY",
-        [IPC_MESSAGE_PREVIOUS]          = "IPC_MESSAGE_PREVIOUS",
-        [IPC_MESSAGE_SEEK]              = "IPC_MESSAGE_SEEK",
-        [IPC_MESSAGE_STOP]              = "IPC_MESSAGE_STOP",
-        
-        [IPC_MESSAGE_GET_COLORS]        = "IPC_MESSAGE_GET_COLORS",
-        [IPC_MESSAGE_GET_CONFIG]        = "IPC_MESSAGE_GET_CONFIG",
-        [IPC_MESSAGE_GET_FILES]         = "IPC_MESSAGE_GET_FILES",
-        [IPC_MESSAGE_GET_PLAYLIST]      = "IPC_MESSAGE_GET_PLAYLIST",
-        [IPC_MESSAGE_GET_STATE]         = "IPC_MESSAGE_GET_STATE",
-        [IPC_MESSAGE_GET_VOLUME]        = "IPC_MESSAGE_GET_VOLUME",
-        [IPC_MESSAGE_GET_LOG]           = "IPC_MESSAGE_GET_LOG",
-        
-        [IPC_MESSAGE_SET_PLAYLIST]      = "IPC_MESSAGE_SET_PLAYLIST",
-        [IPC_MESSAGE_SET_REPEAT]        = "IPC_MESSAGE_SET_REPEAT",
-        [IPC_MESSAGE_SET_SHUFFLE]       = "IPC_MESSAGE_SET_SHUFFLE",
-        [IPC_MESSAGE_SET_VOLUME]        = "IPC_MESSAGE_SET_VOLUME",
-        
-        [IPC_MESSAGE_PLAY_FILE]         = "IPC_MESSAGE_PLAY_FILE",
-        [IPC_MESSAGE_PLAY_TRACK]        = "IPC_MESSAGE_PLAY_TRACK",
-        
-        [IPC_MESSAGE_LOAD_CONFIG]       = "IPC_MESSAGE_LOAD_CONFIG",
-        [IPC_MESSAGE_LOAD_MEDIA]        = "IPC_MESSAGE_LOAD_MEDIA",
-        
-        [IPC_MESSAGE_REMOVE_TRACK]      = "IPC_MESSAGE_REMOVE_TRACK",
-        [IPC_MESSAGE_REMOVE_PLAYLIST]   = "IPC_MESSAGE_REMOVE_PLAYLIST"
-    };
-    
-    return message_names[id];
-}
-
-struct message *ipc_message_new(void)
-{
-    struct message *msg;
-    
-    msg = malloc(sizeof(*msg));
-    if(!msg)
-        return NULL;
-    
-    ipc_message_init(msg);
-    
-    return msg;
-}
-
-void ipc_message_delete(struct message *__restrict msg)
-{
-    ipc_message_destroy(msg);
-    free(msg);
-}
-
-void ipc_message_clear(struct message *__restrict msg)
-{
-    struct cmsghdr *cmsg;
-    int *data;
-    
-    msg->msghdr.msg_control    = msg->fd_buf;
-    msg->msghdr.msg_controllen = sizeof(msg->fd_buf);
-    
-    cmsg = CMSG_FIRSTHDR(&msg->msghdr); 
-    
-    cmsg->cmsg_len   = msg->msghdr.msg_controllen;
-    cmsg->cmsg_level = 0;
-    cmsg->cmsg_type  = 0;
-    
-    data = (int *) CMSG_DATA(cmsg);
-    data[IPC_MESSAGE_FD_0] = -1;
-    data[IPC_MESSAGE_FD_1] = -1;
-}
-
-void ipc_message_init(struct message *__restrict msg)
-{
-    struct cmsghdr *cmsg;
-    int *data;
-    
-    memset(msg->arg, 0, sizeof(msg->arg));
-    
-    msg->iovec[0].iov_base = &msg->id;
-    msg->iovec[0].iov_len  = sizeof(msg->id);
-    
-    msg->iovec[1].iov_base = msg->arg;
-    msg->iovec[1].iov_len  = sizeof(msg->arg);
-    
-    msg->msghdr.msg_control    = msg->fd_buf;
-    msg->msghdr.msg_controllen = sizeof(msg->fd_buf);
-    msg->msghdr.msg_iov        = msg->iovec;
-    msg->msghdr.msg_iovlen     = ARRAY_SIZE(msg->iovec);
-    msg->msghdr.msg_name       = NULL;
-    msg->msghdr.msg_namelen    = 0;
-    
-    cmsg = CMSG_FIRSTHDR(&msg->msghdr);
-
-    cmsg->cmsg_len   = msg->msghdr.msg_controllen;
-    cmsg->cmsg_level = 0;
-    cmsg->cmsg_type  = 0;
-    
-    data = (int *) CMSG_DATA(cmsg);
-    data[IPC_MESSAGE_FD_0] = -1;
-    data[IPC_MESSAGE_FD_1] = -1;    
-}
-
-void ipc_message_destroy(struct message *__restrict msg)
-{
-    memset(msg, 0, sizeof(*msg));
-}
-
-void ipc_message_set_id(struct message *__restrict msg, enum message_id id)
-{
-    msg->id = id;
-}
-
-enum message_id ipc_message_id(const struct message *__restrict msg)
-{
-    return msg->id;
-}
-
-int ipc_message_set_arg(struct message *__restrict msg, const char *arg)
-{
-    size_t size;
-    
-    if(!arg)
-        arg = IPC_MESSAGE_EMPTY_ARG;
-    
-    size = strlen(arg) + 1;
-    
-    if(size >= sizeof(msg->arg))
-        return -EMSGSIZE;
-    
-    memcpy(msg->arg, arg, size);
-    
-    return 0;
-}
-
-const char *ipc_message_arg(const struct message *__restrict msg)
-{
-    return msg->arg;
-}
-
-void ipc_message_set_fds(struct message *__restrict msg, int fd0, int fd1)
-{
-    struct cmsghdr *cmsg;
-    int *data;
-    
-    cmsg = CMSG_FIRSTHDR(&msg->msghdr);
-    
-    cmsg->cmsg_level = SOL_SOCKET;
-    cmsg->cmsg_type  = SCM_RIGHTS;
-    
-    data = (int *) CMSG_DATA(cmsg);
-    data[IPC_MESSAGE_FD_0] = fd0;
-    data[IPC_MESSAGE_FD_1] = fd1;
-}
-
-int ipc_message_fd(const struct message *__restrict msg, int i)
-{
-    struct cmsghdr *cmsg;
-    int *data;
-
-    cmsg = CMSG_FIRSTHDR(&msg->msghdr);
-    
-    data = (int *) CMSG_DATA(cmsg);
-    return data[i];
-}
-
-int ipc_send_message(int fd, struct message *__restrict msg)
+static int ipc_send(int sock, void *__restrict buf, size_t len)
 {
     int err;
     
 again:
-    err = sendmsg(fd, &msg->msghdr, MSG_NOSIGNAL);
-    if(err < 0) {
-        if(errno == EINTR)
+    err = send(sock, buf, len, MSG_NOSIGNAL);
+    if (err < 0) {
+        if (errno == EINTR)
             goto again;
         
         return -errno;
@@ -229,24 +49,183 @@ again:
     return 0;
 }
 
-int ipc_recv_message(int fd, struct message *msg)
+static int ipc_recv(int sock, void *__restrict buf, size_t len)
 {
     ssize_t err;
     
 again:
-    err = recvmsg(fd, &msg->msghdr, MSG_NOSIGNAL);
-    if(err < 0) {
-        if(errno == EINTR)
+    err = recv(sock, buf, len, MSG_NOSIGNAL);
+    if (err < 0) {
+        if (errno == EINTR)
             goto again;
         
         return -errno;
     }
     
-    if(err == 0)
+    if (err == 0)
         return -EIO;
     
-    if(err != IPC_MESSAGE_SIZE)
-        return -EINVAL;
+    return 0;
+}
+
+int ipc_send_fds(int sock, int fd_out, int fd_err)
+{
+    struct msghdr msghdr;
+    struct cmsghdr *cmsg;
+    char data[CMSG_SPACE(sizeof(fd_out) + sizeof(fd_err))];
+    int *fds;
+    ssize_t err;
+    
+    msghdr.msg_control    = data;
+    msghdr.msg_controllen = sizeof(data);
+    msghdr.msg_iov        = NULL;
+    msghdr.msg_iovlen     = 0;
+    msghdr.msg_name       = NULL;
+    msghdr.msg_namelen    = 0;
+    
+    cmsg = CMSG_FIRSTHDR(&msg->msghdr);
+    
+    cmsg->cmsg_len   = msghdr.msg_controllen;
+    cmsg->cmsg_level = SOL_SOCKET;
+    cmsg->cmsg_type  = SCM_RIGHTS;
+    
+    fds = (int *) CMSG_DATA(cmsg);
+    fds[0] = fd_out;
+    fds[1] = fd_err;
+    
+again:
+    err = sendmsg(sock, &msghdr, MSG_NOSIGNAL);
+    if (err < 0) {
+        if (errno == EINTR)
+            goto again;
+        
+        return -errno;
+    }
     
     return 0;
+}
+
+int ipc_recv_fds(int sock, int *__restrict fd_out, int *__restrict fd_err)
+{
+    struct msghdr msghdr;
+    struct cmsghdr *cmsg;
+    char data[CMSG_SPACE(sizeof(fd_out) + sizeof(fd_err))];
+    int *fds;
+    ssize_t err;
+    
+    msghdr.msg_control    = data;
+    msghdr.msg_controllen = sizeof(data);
+    msghdr.msg_iov        = NULL;
+    msghdr.msg_iovlen     = 0;
+    msghdr.msg_name       = NULL;
+    msghdr.msg_namelen    = 0;
+    
+    cmsg = CMSG_FIRSTHDR(&msg->msghdr);
+    
+    cmsg->cmsg_len   = msghdr.msg_controllen;
+    cmsg->cmsg_level = 0;
+    cmsg->cmsg_type  = 0;
+    
+again:
+    err = recvmsg(sock &msghdr, MSG_NOSIGNAL);
+    if (err < 0) {
+        if (errno == EINTR)
+            goto again;
+    }
+    
+    if (err == 0)
+        return -EIO;
+    
+    fds = (int *) CMSG_DATA(cmsg);
+    *fd_out = fds[0];
+    *fd_err = fds[1];
+
+    return 0;
+}
+
+int ipc_send_argv(int sock, const char **argv, int argc)
+{
+    struct buffer buf;
+    int i, err;
+    size_t buf_size, argv_lengths[argc];
+    
+    buf_size = sizeof(argc) + sizeof(buf_size);
+    
+    for (i = 0; i < argc; ++i) {
+        argv_lengths[i] = strlen(argv[i]) + 1;
+        buf_size += argv_lengths[i];
+    }
+    
+    err = buffer_init(&buf, buf_size);
+    if (err < 0)
+        return err;
+    
+    buffer_write_int(&buf, argc);
+    buffer_write(&buf, &buf_size, sizeof(buf_size));
+    
+    for (i = 0; i < argc; ++i)
+        buffer_write(&buf, argv[i], argv_lengths[i]);
+    
+    assert(buffer_size(&buf) == buf_len && "Invalid buffer size");
+    
+    err = ipc_send(sock, buffer_data(&buf), buffer_size(&buf));
+    
+    buffer_destroy(&buf);
+    
+    return err;
+}
+
+int ipc_recv_argv(int sock, char ***argv, int *__restrict argc)
+{
+    static const int arg_max = (int) sysconf(_SC_ARG_MAX);
+    char *buf;
+    size_t buf_len, size;
+    int i, err;
+    
+    err = ipc_recv(sock, argc, sizeof(*argc));
+    if (err < 0)
+        return err;
+    
+    err = ipc_recv(sock, &buf_len, sizeof(buf_len));
+    if (err < 0)
+        return err;
+    
+    if (*argc > arg_max)
+        return -EINVAL;
+    
+    /* allocate space for 'argv' array plus all transmitted strings */
+    size = *argc * sizeof(*argv) + buf_len - sizeof(*argc) - sizeof(buf_len);
+    
+    buf = malloc(size);
+    if (!buf)
+        return -errno;
+    
+    *argv = (char **) buf;
+    /* 
+     * leave space for the 'argv' array 
+     * and jump to the beginning of the string buffer 
+     */
+    buf += *argc * sizeof(*argv);
+    
+    /* read in all strings at once */
+    err = ipc_recv(sock, buf, buf_len - sizeof(*argc) - sizeof(buf_len));
+    if (err < 0) {
+        free(*argv);
+        return err;
+    }
+    
+    for (i = 0; i < *argc; ++i, buf = strchr(buf, '\0') + 1)
+        (*argv)[i] = buf;
+    
+    return 0;
+}
+
+int ipc_send_status(int sock, int status)
+{
+    return ipc_send(sock, &status, sizeof(status));
+}
+
+int ipc_recv_status(int sock, int *__restrict status)
+{
+    return ipc_recv(sock, status, sizeof(*status));
 }
