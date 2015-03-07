@@ -22,6 +22,7 @@
 #define _MESSAGE_HANDLER_H_
 
 #include <libvci/clock.h>
+#include <libvci/options.h>
 
 #include "core/climpd-player.h"
 
@@ -29,21 +30,34 @@
 
 struct climpd_control {
     struct climpd_player player;
-    struct message msg_in;
-    struct message msg_out;
     struct clock cl;
     struct climpd_config *conf;
    
     GIOChannel *io_server;
-    GIOChannel *io;
     GMainLoop *main_loop;
     
-    int fd_socket;
-    int fd_stdout;
-    int fd_stderr;
-
-    gboolean socket_handler_run;
+    struct vector add_args;
+    struct vector play_args;
+    struct vector list_args;
+    struct vector volume_args;
     
+    bool pause;
+    bool quit;
+    
+    struct program_options po[] = {
+        { "add", "a",     PO_STRING_VEC, &add_args,    "" },
+        { "play", "p",    PO_STRING,     &play_arg,    "" },
+        { "pause", "",    PO_BOOL,       &pause,       "" },
+        { "list", "l",    PO_STRING_VEC, &list_args,   "" },
+        { "remove", "",   PO_STRING_VEC, &remove_args, "" },
+        { "repeat", "r",  PO_STRING,     &repeat_arg,  "" },
+        { "shuffle", "s", PO_STRING      &shuffle_arg, "" },
+        { "volume", "v",  PO_STRING,     &volume_arg,  "" },
+        { "quit", "q",    PO_BOOL,       &quit,        "" },
+        { "previous", "", PO_BOOL,       &previous,    "" },  
+    };
+    
+    struct options opts;
 };
 
 struct climpd_control *climpd_control_new(int sock,

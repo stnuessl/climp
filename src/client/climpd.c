@@ -127,7 +127,7 @@ static int spawn_climpd(void)
 
 int climpd_init(void)
 {
-    int i, attempts, err;
+    int attempts, err;
     
     err = climpd_connect();
     if (err < 0) {

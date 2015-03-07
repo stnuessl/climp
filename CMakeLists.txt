@@ -5,12 +5,13 @@ project(climp C)
 
 add_definitions(-D_GNU_SOURCE)
 add_definitions(-Wall)
-add_definitions(-O2 -DNDEBUG)
-#add_definitions(-g3)
+#add_definitions(-O2 -DNDEBUG)
+add_definitions(-g3)
 
 #set(CMAKE_BUILD_TYPE "release")
 #set(CMAKE_BUILD_TYPE "debug")
 
+set(CMAKE_C_FLAGS "-std=c99")
 set(CMAKE_INSTALL_PREFIX /usr/local)
 set(TARGET_INSTALL_DIR bin)
 
@@ -27,7 +28,6 @@ set(SOURCE_CLIMPD
     src/server/util/terminal-color-map.c
     src/server/util/bool-map.c
     src/server/util/climpd-log.c
-    src/server/core/climpd-control.c
     src/server/core/climpd-player.c
     src/server/core/climpd-config.c
     src/server/core/media-discoverer.c

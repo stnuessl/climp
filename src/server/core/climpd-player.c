@@ -357,13 +357,13 @@ static void print_media(struct climpd_player *__restrict cp,
     min = i->duration / 60;
     sec = i->duration % 60;
     
-    meta_len = cp->config->media_meta_length;
+    meta_len = cp->config.media_meta_length;
     
     if (isatty(fd)) {
         if (m == climpd_player_running(cp))
-            color = cp->config->media_active_color;
+            color = cp->config.media_active_color;
         else
-            color = cp->config->media_passive_color;
+            color = cp->config.media_passive_color;
         
         dprintf(fd, "%s ( %3u )    %2u:%02u   %-*.*s %-*.*s %-*.*s\n" 
                 COLOR_CODE_DEFAULT, color, index, min, sec,
@@ -379,8 +379,8 @@ static void print_media(struct climpd_player *__restrict cp,
     }
 }
 
-struct climpd_player *climpd_player_new(struct climpd_config *__restrict config, 
-                                        struct playlist *__restrict pl)
+struct climpd_player *climpd_player_new(struct playlist *__restrict pl,
+                                        const struct climpd_config *config)
 {
     struct climpd_player *cp;
     int err;
@@ -389,7 +389,7 @@ struct climpd_player *climpd_player_new(struct climpd_config *__restrict config,
     if(!cp)
         return NULL;
     
-    err = climpd_player_init(cp, config, pl);
+    err = climpd_player_init(cp, pl, config);
     if(err < 0) {
         errno = -err;
         free(cp);
@@ -406,8 +406,8 @@ void climpd_player_delete(struct climpd_player *__restrict cp)
 }
 
 int climpd_player_init(struct climpd_player *__restrict cp,
-                       struct climpd_config *config,
-                       struct playlist *pl)
+                       struct playlist *pl,
+                       const struct climpd_config *config)
 {
     static const char *elements[] = {
         "uridecodebin",         "gst_source",
@@ -420,8 +420,7 @@ int climpd_player_init(struct climpd_player *__restrict cp,
     GError *error;
     bool ok;
     int i, err;
-    
-    assert(pl && "Invalid argument 'pl' (null)");
+
     assert(config && "Invalid argument 'config' (null)");
     
     err = -ENOMEM;
@@ -479,16 +478,22 @@ int climpd_player_init(struct climpd_player *__restrict cp,
         g_error_free(error);
         goto cleanup2;
     }
+    
+    bool shuffle = config->shuffle;
+    bool repeat  = config->repeat;
 
     /* init media-scheduler */
-    cp->media_scheduler = media_scheduler_new(config, pl);
+    cp->media_scheduler = media_scheduler_new(pl, shuffle, repeat);
     if(!cp->media_scheduler) {
         err = -errno;
         goto cleanup3;
     }
     
-    cp->config = config;
     cp->state  = GST_STATE_NULL;
+    
+    cp->config.media_active_color  = config->media_active_color;
+    cp->config.media_passive_color = config->media_passive_color;
+    cp->config.media_meta_length   = config->media_meta_length;
     
     climpd_player_set_volume(cp, config->volume);
 
@@ -755,7 +760,7 @@ void climpd_player_set_volume(struct climpd_player *__restrict cp,
     vol = max(vol, 0);
     vol = min(vol, 100);
     
-    cp->config->volume = vol;
+    cp->volume_val = vol;
 
     volume = (100.0 - 50 * log10(101.0 - vol)) / 100;
         
@@ -764,7 +769,7 @@ void climpd_player_set_volume(struct climpd_player *__restrict cp,
 
 unsigned int climpd_player_volume(const struct climpd_player *__restrict cp)
 {
-    return cp->config->volume;
+    return cp->volume_val;
 }
 
 void climpd_player_set_muted(struct climpd_player *__restrict cp, bool mute)

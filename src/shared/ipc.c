@@ -33,6 +33,8 @@
 
 #include "ipc.h"
 
+#define MAGIC_DATA 0x50505050
+
 static int ipc_send(int sock, void *__restrict buf, size_t len)
 {
     int err;
@@ -71,19 +73,25 @@ again:
 int ipc_send_fds(int sock, int fd_out, int fd_err)
 {
     struct msghdr msghdr;
+    struct iovec iov;
     struct cmsghdr *cmsg;
-    char data[CMSG_SPACE(sizeof(fd_out) + sizeof(fd_err))];
-    int *fds;
+    char fd_data[CMSG_SPACE(sizeof(fd_out) + sizeof(fd_err))];
+    int *fds, data;
     ssize_t err;
     
-    msghdr.msg_control    = data;
-    msghdr.msg_controllen = sizeof(data);
-    msghdr.msg_iov        = NULL;
-    msghdr.msg_iovlen     = 0;
+    /* We have to send some dummy date */
+    data = MAGIC_DATA;
+    iov.iov_base = &data;
+    iov.iov_len  = sizeof(data);
+    
+    msghdr.msg_control    = fd_data;
+    msghdr.msg_controllen = sizeof(fd_data);
+    msghdr.msg_iov        = &iov;
+    msghdr.msg_iovlen     = 1;
     msghdr.msg_name       = NULL;
     msghdr.msg_namelen    = 0;
     
-    cmsg = CMSG_FIRSTHDR(&msg->msghdr);
+    cmsg = CMSG_FIRSTHDR(&msghdr);
     
     cmsg->cmsg_len   = msghdr.msg_controllen;
     cmsg->cmsg_level = SOL_SOCKET;
@@ -108,32 +116,38 @@ again:
 int ipc_recv_fds(int sock, int *__restrict fd_out, int *__restrict fd_err)
 {
     struct msghdr msghdr;
+    struct iovec iov;
     struct cmsghdr *cmsg;
-    char data[CMSG_SPACE(sizeof(fd_out) + sizeof(fd_err))];
-    int *fds;
+    char fd_data[CMSG_SPACE(sizeof(*fd_out) + sizeof(*fd_err))];
+    int *fds, data;
     ssize_t err;
     
-    msghdr.msg_control    = data;
-    msghdr.msg_controllen = sizeof(data);
-    msghdr.msg_iov        = NULL;
-    msghdr.msg_iovlen     = 0;
+    iov.iov_base = &data;
+    iov.iov_len  = sizeof(data);
+    
+    msghdr.msg_control    = fd_data;
+    msghdr.msg_controllen = sizeof(fd_data);
+    msghdr.msg_iov        = &iov;
+    msghdr.msg_iovlen     = 1;
     msghdr.msg_name       = NULL;
     msghdr.msg_namelen    = 0;
     
-    cmsg = CMSG_FIRSTHDR(&msg->msghdr);
+    cmsg = CMSG_FIRSTHDR(&msghdr);
     
     cmsg->cmsg_len   = msghdr.msg_controllen;
     cmsg->cmsg_level = 0;
     cmsg->cmsg_type  = 0;
     
 again:
-    err = recvmsg(sock &msghdr, MSG_NOSIGNAL);
+    err = recvmsg(sock, &msghdr, MSG_NOSIGNAL);
     if (err < 0) {
         if (errno == EINTR)
             goto again;
+        
+        return err;
     }
     
-    if (err == 0)
+    if (err == 0 || data != MAGIC_DATA)
         return -EIO;
     
     fds = (int *) CMSG_DATA(cmsg);
@@ -166,7 +180,7 @@ int ipc_send_argv(int sock, const char **argv, int argc)
     for (i = 0; i < argc; ++i)
         buffer_write(&buf, argv[i], argv_lengths[i]);
     
-    assert(buffer_size(&buf) == buf_len && "Invalid buffer size");
+    assert(buffer_size(&buf) == buf_size && "Invalid buffer size");
     
     err = ipc_send(sock, buffer_data(&buf), buffer_size(&buf));
     
@@ -177,7 +191,6 @@ int ipc_send_argv(int sock, const char **argv, int argc)
 
 int ipc_recv_argv(int sock, char ***argv, int *__restrict argc)
 {
-    static const int arg_max = (int) sysconf(_SC_ARG_MAX);
     char *buf;
     size_t buf_len, size;
     int i, err;
@@ -190,7 +203,7 @@ int ipc_recv_argv(int sock, char ***argv, int *__restrict argc)
     if (err < 0)
         return err;
     
-    if (*argc > arg_max)
+    if (*argc > (int) sysconf(_SC_ARG_MAX))
         return -EINVAL;
     
     /* allocate space for 'argv' array plus all transmitted strings */

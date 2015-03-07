@@ -32,8 +32,6 @@
 #include "core/playlist.h"
 
 struct climpd_player {
-    struct climpd_config *config;
-    
     GstElement *pipeline;
     GstElement *source;
     GstElement *convert;
@@ -45,17 +43,25 @@ struct climpd_player {
     struct media_scheduler *media_scheduler;
     
     GstState state;
+    
+    unsigned int volume_val;
+    
+    struct {
+        const char *media_active_color;
+        const char *media_passive_color;
+        unsigned int media_meta_length;
+    } config;
 };
 
-struct climpd_player *climpd_player_new(struct climpd_config *__restrict config, 
-                                        struct playlist *__restrict pl);
+struct climpd_player *climpd_player_new(struct playlist *__restrict pl,
+                                        const struct climpd_config *config);
 
 void climpd_player_delete(struct climpd_player *__restrict cp);
 
 int climpd_player_init(struct climpd_player *__restrict cp,
-                       struct climpd_config *config,
-                       struct playlist *pl);
-
+                       struct playlist *pl,
+                       const struct climpd_config *config);
+                       
 void climpd_player_destroy(struct climpd_player *__restrict cp);
 
 int climpd_player_play_media(struct climpd_player *__restrict cp,

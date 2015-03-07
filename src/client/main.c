@@ -45,7 +45,7 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
     
-    climpd_handle_args(argc - 1, argv + 1);
+    climpd_handle_args(argc - 1, (const char **) argv + 1);
     
     climpd_destroy();
     
