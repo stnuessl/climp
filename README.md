@@ -31,21 +31,20 @@ with the packages mentioned in the following section.
 In order to compile climp under Arch Linux you need to install to following
 package:
 
-* [gstreamer0.10](https://www.archlinux.org/packages/extra/x86_64/gstreamer0.10/)
+* [gstreamer](https://www.archlinux.org/packages/extra/x86_64/gstreamer/)
 
 To be capable of playing files climp needs additional gstreamer plugins,
 so it is probably best to install the following packages too:
 
-* [gstreamer0.10-bad-plugins](https://www.archlinux.org/packages/extra/x86_64/gstreamer0.10-bad-plugins/)
-* [gstreamer0.10-base-plugins](https://www.archlinux.org/packages/extra/x86_64/gstreamer0.10-base-plugins/)
-* [gstreamer0.10-good-plugins](https://www.archlinux.org/packages/extra/x86_64/gstreamer0.10-good-plugins/)
-* [gstreamer0.10-ffmpeg](https://www.archlinux.org/packages/extra/x86_64/gstreamer0.10-ffmpeg/)
-* [gstreamer0.10-ugly-plugins](https://www.archlinux.org/packages/extra/x86_64/gstreamer0.10-ugly-plugins/)
+* [gst-plugins-bad](https://www.archlinux.org/packages/extra/x86_64/gst-plugins-bad/)
+* [gst-plugins-base](https://www.archlinux.org/packages/extra/x86_64/gst-plugins-base/)
+* [gst-plugins-good](https://www.archlinux.org/packages/extra/x86_64/gst-plugins-good/)
+* [gst-plugins-ugly](https://www.archlinux.org/packages/extra/x86_64/gst-plugins-ugly/)
 
 Run the following command to install all the packages.
 
 ```
-# pacman -Syu gstreamer0.10 gstreamer0.10-bad-plugins gstreamer0.10-base-plugins gstreamer0.10-good-plugins gstreamer0.10-ffmpeg gstreamer0.10-ugly-plugins 
+# pacman -Syu gstreamer gst-plugins-bad gst-plugins-base gst-plugins-good gst-plugins-ugly 
 ```
 
 ### Debian (Jessie)

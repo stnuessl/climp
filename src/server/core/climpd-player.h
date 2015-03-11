@@ -26,10 +26,12 @@
 #include <gst/gst.h>
 #include <gst/pbutils/pbutils.h>
 
-#include "core/climpd-config.h"
-#include "core/media-scheduler.h"
-#include "core/media.h"
-#include "core/playlist.h"
+#include <libvci/stack.h>
+
+#include <core/climpd-config.h>
+#include <core/playlist.h>
+#include <core/media-list.h>
+#include <core/media.h>
 
 struct climpd_player {
     GstElement *pipeline;
@@ -40,11 +42,11 @@ struct climpd_player {
     
     GstDiscoverer *discoverer;
     
-    struct media_scheduler *media_scheduler;
-    
     GstState state;
-    
     unsigned int volume_val;
+    
+    struct playlist playlist;
+    struct media *running_track;
     
     struct {
         const char *media_active_color;
@@ -53,22 +55,15 @@ struct climpd_player {
     } config;
 };
 
-struct climpd_player *climpd_player_new(struct playlist *__restrict pl,
-                                        const struct climpd_config *config);
-
-void climpd_player_delete(struct climpd_player *__restrict cp);
-
 int climpd_player_init(struct climpd_player *__restrict cp,
-                       struct playlist *pl,
                        const struct climpd_config *config);
-                       
+
 void climpd_player_destroy(struct climpd_player *__restrict cp);
 
-int climpd_player_play_media(struct climpd_player *__restrict cp,
-                             struct media *m);
+int climpd_player_play_path(struct climpd_player *__restrict cp,
+                            const char *path);
 
-int climpd_player_play_track(struct climpd_player *__restrict cp, 
-                             unsigned int index);
+int climpd_player_play_track(struct climpd_player *__restrict cp, int index);
 
 int climpd_player_play(struct climpd_player *__restrict cp);
 
@@ -84,11 +79,10 @@ int climpd_player_peek(struct climpd_player *__restrict cp);
 
 int climpd_player_seek(struct climpd_player *__restrict cp, unsigned int val);
 
-int climpd_player_insert_media(struct climpd_player *__restrict cp, 
-                               struct media *m);
+int climpd_player_insert(struct climpd_player *__restrict cp, 
+                         const char *__restrict path);
 
-struct media *climpd_player_take_index(struct climpd_player *__restrict cp, 
-                                       unsigned int index);
+void climpd_player_delete_index(struct climpd_player *__restrict cp, int index);
 
 void climpd_player_set_volume(struct climpd_player *__restrict cp, 
                               unsigned int vol);
@@ -99,25 +93,37 @@ void climpd_player_set_muted(struct climpd_player *__restrict cp, bool mute);
 
 bool climpd_player_muted(const struct climpd_player *__restrict cp);
 
+bool climpd_player_toggle_muted(struct climpd_player *__restrict cp);
+
 void climpd_player_set_repeat(struct climpd_player *__restrict cp, bool repeat);
 
 bool climpd_player_repeat(const struct climpd_player *__restrict cp);
+
+bool climpd_player_toggle_repeat(struct climpd_player *__restrict cp);
 
 void climpd_player_set_shuffle(struct climpd_player *__restrict cp, 
                                bool shuffle);
 
 bool climpd_player_shuffle(const struct climpd_player *__restrict cp);
 
-bool climpd_player_playing(const struct climpd_player *__restrict cp);
+bool climpd_player_toggle_shuffle(struct climpd_player *__restrict cp);
 
-bool climpd_player_paused(const struct climpd_player *__restrict cp);
+bool climpd_player_is_playing(const struct climpd_player *__restrict cp);
 
-bool climpd_player_stopped(const struct climpd_player *__restrict cp);
+bool climpd_player_is_paused(const struct climpd_player *__restrict cp);
 
-struct media *climpd_player_running(const struct climpd_player *__restrict cp);
+bool climpd_player_is_stopped(const struct climpd_player *__restrict cp);
 
-int climpd_player_set_playlist(struct climpd_player *__restrict cp,
-                               struct playlist *pl);
+int climpd_player_add_media_list(struct climpd_player *__restrict cp,
+                                 struct media_list *__restrict ml);
+
+int climpd_player_set_media_list(struct climpd_player *__restrict cp,
+                                 struct media_list *__restrict ml);
+
+void climpd_player_clear_playlist(struct climpd_player *__restrict cp);
+
+void climpd_player_set_config(struct climpd_player *__restrict cp,
+                              const struct climpd_config *__restrict conf);
 
 void climpd_player_print_playlist(struct climpd_player *__restrict cp, int fd);
 
@@ -127,8 +133,5 @@ void climpd_player_print_running_track(struct climpd_player *__restrict cp,
                                        int fd);
 
 void climpd_player_print_volume(struct climpd_player *__restrict cp, int fd);
-
-void climpd_player_print_state(const struct climpd_player *__restrict cp, 
-                               int fd);
 
 #endif /* _CLIMPD_PLAYER_H_ */

@@ -22,6 +22,7 @@
 #define _MEDIA_H_
 
 #include <stdbool.h>
+#include <stdatomic.h>
 
 #include <libvci/link.h>
 
@@ -44,11 +45,15 @@ struct media {
     char *name;
     
     bool parsed;
+    
+    atomic_int ref_count;
 };
 
-struct media *media_new(const char *path);
+struct media *media_new(const char *__restrict path);
 
-void media_delete(struct media *__restrict media);
+struct media *media_ref(struct media *__restrict media);
+
+void media_unref(struct media *__restrict media);
 
 struct media_info *media_info(struct media *__restrict media);
 
@@ -61,5 +66,8 @@ const char *media_name(const struct media *__restrict media);
 void media_set_parsed(struct media *__restrict media);
 
 bool media_is_parsed(const struct media *__restrict media);
+
+bool media_contains_path(const struct media *__restrict media, 
+                         const char *__restrict path);
 
 #endif /* _MEDIA_H_ */

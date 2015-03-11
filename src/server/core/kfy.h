@@ -1,7 +1,7 @@
-/* 
- * Copyright (C) 2014  Steffen Nüssle
+/*
+ * Copyright (C) 2015  Steffen Nüssle
  * climp - Command Line Interface Music Player
- * 
+ *
  * This file is part of climp.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -13,26 +13,40 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef _IPC_H_
-#define _IPC_H_
+#ifndef _KFY_H_
+#define _KFY_H_
 
-#define IPC_SOCKET_PATH "/tmp/.climp-unix"
+#include <stdbool.h>
 
-int ipc_send_setup(int sock, int fd_out, int fd_err, const char *cwd);
+#include <libvci/random.h>
 
-int ipc_recv_setup(int sock, int *fd_out, int *fd_err, char **cwd);
+struct kfy {
+    struct random rand;
+    unsigned int *a;
+    unsigned int end;
+    unsigned int size;
+    unsigned int capacity;
+};
 
-int ipc_send_argv(int sock, const char **argv, int argc);
+int kfy_init(struct kfy *__restrict k, unsigned int size);
 
-int ipc_recv_argv(int sock, char ***argv, int *argc);
+void kfy_destroy(struct kfy *__restrict k);
 
-int ipc_send_status(int sock, int status);
+void kfy_reset(struct kfy *__restrict k);
 
-int ipc_recv_status(int sock, int *__restrict status);
+unsigned int kfy_shuffle(struct kfy *__restrict k);
 
-#endif /* _IPC_H_ */
+int kfy_add(struct kfy *__restrict k, unsigned int cnt);
+
+void kfy_take(struct kfy *__restrict k, unsigned int val);
+
+unsigned int kfy_size(const struct kfy *__restrict k);
+
+bool kfy_cycle_done(const struct kfy *__restrict k);
+
+#endif /* _KFY_H_ */

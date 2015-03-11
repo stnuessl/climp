@@ -61,19 +61,19 @@ int bool_map_init(void)
         .key_hash       = &hash_string,
         .data_delete    = NULL,
     };
-    int i, err;
+    int err;
     
     err = map_init(&bool_map, &map_conf);
     if(err < 0)
         return err;
     
-    for(i = 0; i < ARRAY_SIZE(t); ++i) {
+    for(unsigned int i = 0; i < ARRAY_SIZE(t); ++i) {
         err = map_insert(&bool_map, t[i], &yes);
         if(err < 0)
             goto fail;
     }
     
-    for(i = 0; i < ARRAY_SIZE(f); ++i) {
+    for(unsigned int i = 0; i < ARRAY_SIZE(f); ++i) {
         err = map_insert(&bool_map, f[i], &no);
         if(err < 0)
             goto fail;
@@ -99,13 +99,13 @@ const bool *bool_map_value(const char *key)
 void bool_map_print(int fd)
 {
     const char *p, *q;
-    int i, size;
+    unsigned int size;
     
     size = max(ARRAY_SIZE(t), ARRAY_SIZE(f));
     
     dprintf(fd, " true  --> %s\t\tfalse --> %s\n", t[0], f[0]);
     
-    for(i = 1; i < size; ++i) {
+    for(unsigned int i = 1; i < size; ++i) {
         p = (i < ARRAY_SIZE(t)) ? t[i] : "";
         q = (i < ARRAY_SIZE(f)) ? f[i] : "";
      

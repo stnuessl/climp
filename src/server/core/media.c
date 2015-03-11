@@ -20,27 +20,37 @@
 
 #include <stdlib.h>
 #include <string.h>
-#include <errno.h>
 #include <assert.h>
 #include <fcntl.h>
-#include <sys/stat.h>
+#include <errno.h>
+
+#include <libvci/filesystem.h>
 
 #include "media.h"
 
 #define MEDIA_FILE_PREFIX        "file://"
 #define MEDIA_META_ELEMENT_SIZE  64
 
-struct media *media_new(const char *path)
+struct media *media_new(const char *__restrict path)
 {
     struct media *media;
-    struct stat st;
     int err;
     
-    err = stat(path, &st);
-    if(err < 0)
-        return NULL;
+    if (!path_is_absolute(path)) {
+        char *rpath = realpath(path, NULL);
+        if (!rpath)
+            return NULL;
+        
+        media = media_new(rpath);
+        
+        err = errno;
+        free(rpath);
+        errno = err;
+        
+        return media;
+    }
     
-    if(!S_ISREG(st.st_mode)) {
+    if (!path_is_reg(path)) {
         errno = EINVAL;
         return NULL;
     }
@@ -53,9 +63,9 @@ struct media *media_new(const char *path)
     if(!media->uri)
         goto cleanup1;
     
-    strncpy(media->info.title, "not initialized", MEDIA_META_ELEMENT_SIZE);
-    strncpy(media->info.artist, "not initialized", MEDIA_META_ELEMENT_SIZE);
-    strncpy(media->info.album, "not initialized", MEDIA_META_ELEMENT_SIZE);
+    strncpy(media->info.title, "", MEDIA_META_ELEMENT_SIZE);
+    strncpy(media->info.artist, "", MEDIA_META_ELEMENT_SIZE);
+    strncpy(media->info.album, "", MEDIA_META_ELEMENT_SIZE);
     
     media->info.track = 0;
     media->info.duration = 0;
@@ -70,6 +80,8 @@ struct media *media_new(const char *path)
     media->name = (media->name) ? media->name + 1 : media->path;
     
     media->parsed = false;
+    
+    atomic_init(&media->ref_count, 1);
 
     return media;
 
@@ -79,10 +91,18 @@ cleanup1:
     return NULL;
 }
 
-void media_delete(struct media *__restrict media)
+struct media *media_ref(struct media *__restrict media)
 {
-    free(media->uri);
-    free(media);
+    atomic_fetch_add(&media->ref_count, 1);
+    return media;
+}
+
+void media_unref(struct media *__restrict media)
+{
+    if (atomic_fetch_sub(&media->ref_count, 1) == 1) {
+        free(media->uri);
+        free(media);
+    }
 }
 
 struct media_info *media_info(struct media *__restrict media)
@@ -113,4 +133,21 @@ void media_set_parsed(struct media *__restrict media)
 bool media_is_parsed(const struct media *__restrict media)
 {
     return media->parsed;
+}
+
+bool media_contains_path(const struct media *__restrict media, 
+                         const char *__restrict path)
+{
+    if (path_is_absolute(path))
+        return strcmp(media->path, path);
+    
+    char *rpath = realpath(path, NULL);
+    if (!rpath)
+        return false;
+        
+    bool ret = strcmp(media->path, rpath) == 0;
+        
+    free(rpath);
+        
+    return ret;
 }

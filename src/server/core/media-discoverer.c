@@ -21,30 +21,69 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <unistd.h>
 #include <errno.h>
 #include <dirent.h>
 #include <sys/types.h>
+#include <linux/limits.h>
 
 #include <gst/gst.h>
 #include <gst/pbutils/pbutils.h>
 
+#include <libvci/filesystem.h>
 #include <libvci/error.h>
 
-#include "core/media-discoverer.h"
+#include <core/media-discoverer.h>
+#include <util/climpd-log.h>
 
-#include "util/climpd-log.h"
+#define URI_PREFIX "file://"
+#define URI_MAX (PATH_MAX + sizeof(URI_PREFIX))
 
 static const char *tag = "media-discoverer";
 
-static bool is_playable(struct media_discoverer *__restrict md,
-                        const char *__restrict uri)
+static inline const char *uri_get_path(const char *__restrict uri)
+{
+    return uri + sizeof(URI_PREFIX) - 1;
+}
+
+static const char *media_discoverer_set_uri(struct media_discoverer *__restrict md, 
+                             const char *__restrict path,
+                             size_t len,
+                             const char *__restrict name)
+{
+    if (sizeof(URI_PREFIX) + len + 1 + strlen(name) >= URI_MAX)
+        return NULL;
+    
+    strcpy(md->uri, URI_PREFIX);
+    strcat(md->uri, path);
+    strcat(md->uri, "/");
+    strcat(md->uri, name);
+    
+    return md->uri;
+}
+
+static void report_uri_too_long(const char *__restrict path, 
+                                const char *__restrict name)
+{
+    climpd_log_w(tag, "URI to file \"%s\" in directory \"%s\" is "
+                 "too long -> skipping file \n", name, path);
+}
+
+static void report_insertion_fail(int err, const char *__restrict path)
+{
+    climpd_log_e(tag, "failed to create media object for \"%s\" - %s\n", 
+                 path, strerr(-err));
+}
+
+static bool 
+media_discoverer_uri_is_playable(struct media_discoverer *__restrict md)
 {
     GstDiscovererResult result;
     GstDiscovererInfo *info;
     GstDiscovererStreamInfo *s_info, *s_info_next;
     GError *err;
     
-    info = gst_discoverer_discover_uri(md->discoverer, uri, &err);
+    info = gst_discoverer_discover_uri(md->discoverer, md->uri, &err);
     
     if(err)
         g_error_free(err);
@@ -74,19 +113,15 @@ static bool is_playable(struct media_discoverer *__restrict md,
         
         s_info = s_info_next;
     }
-
+    
     gst_discoverer_info_unref(info);
     
     return true;
 }
 
-int media_discoverer_init(struct media_discoverer *__restrict md, 
-                          const char *path,
-                          int fd)
+int media_discoverer_init(struct media_discoverer *__restrict md)
 {
     GError *error;
-    char *path_dup;
-    size_t len;
     int err;
     
     md->discoverer = gst_discoverer_new(5 * GST_SECOND, &error);
@@ -97,134 +132,231 @@ int media_discoverer_init(struct media_discoverer *__restrict md,
         return err;
     }
     
-    md->dir_vec = vector_new(64);
-    if(!md->dir_vec) {
+    md->rpath = malloc(PATH_MAX * sizeof(*md->rpath));
+    if (!md->rpath) {
         err = -errno;
         goto cleanup1;
     }
     
-    vector_set_data_delete(md->dir_vec, &free);
-    
-    len = strlen(path);
-    
-    path_dup = malloc(len + 1 + 1);
-    if(!path_dup) {
+    md->uri = malloc(URI_MAX * sizeof(*md->uri));
+    if (!md->uri) {
         err = -errno;
         goto cleanup2;
     }
     
-    path_dup = strcpy(path_dup, path);
-    
-    if(path[len] != '/')
-        path_dup = strcat(path_dup, "/");
-    
-    err = vector_insert_back(md->dir_vec, path_dup);
-    if(err < 0)
-        goto cleanup3;
-    
-    md->fd = fd;
-    
+    climpd_log_i(tag, "initialized\n");
+
     return 0;
-    
-cleanup3:
-    free(path_dup);
+
 cleanup2:
-    vector_delete(md->dir_vec);
+    free(md->rpath);
 cleanup1:
     gst_object_unref(md->discoverer);
-    
     return err;
 }
 
 void media_discoverer_destroy(struct media_discoverer *__restrict md)
 {
-    vector_delete(md->dir_vec);
+    free(md->uri);
+    free(md->rpath);
     gst_object_unref(md->discoverer);
 }
 
 
-void media_discoverer_scan(struct media_discoverer *__restrict md)
+int media_discoverer_scan_dir(struct media_discoverer *__restrict md, 
+                              const char *__restrict path,
+                              struct media_list *__restrict ml)
 {
     DIR *dir;
     struct dirent buf, *ent;
-    char *current_dir, *path, *uri;
-    size_t len, len_path;
-    unsigned int i;
+    unsigned int old_size;
+    size_t len;
     int err;
     
-    /* 
-     * Don't use 'vector_for_each()', the iterator pointer may become invalid
-     * if the vector gets resized during a insert-operation. Yes, I insert
-     * elements into the vector while iterating.
-     */
-    for(i = 0; i < vector_size(md->dir_vec); ++i) {
-        current_dir = *vector_at(md->dir_vec, i);
+    if (!path_is_absolute(path)) {
+        if (!realpath(path, md->rpath))
+            return -errno;
         
-        len_path = strlen(current_dir);
+        return media_discoverer_scan_dir(md, md->rpath, ml);
+    }
+
+    dir = opendir(path);
+    if (!dir)
+        return -errno;
+    
+    len = strlen(path);
+    old_size = media_list_size(ml);
+    
+    while (1) {
+        err = readdir_r(dir, &buf, &ent);
+        if (err) {
+            climpd_log_e(tag, "unable to read dir \"%s\" - %s\n", path, 
+                         strerr(err));
+            goto cleanup1;
+        }
         
-        dir = opendir(current_dir);
-        if(!dir) {
-            climpd_log_w(tag, "failed to open directory");
-            climpd_log_append(" %s - %s\n", current_dir, errstr);
+        if (!ent)
+            break;
+        
+        if (strcmp(ent->d_name, ".") == 0 || strcmp(ent->d_name, "..") == 0)
+            continue;
+        
+        if (ent->d_type != DT_REG)
+            continue;
+        
+        if (!media_discoverer_set_uri(md, path, len, ent->d_name)) {
+            report_uri_too_long(path, ent->d_name);
             continue;
         }
+
+        if (!media_discoverer_uri_is_playable(md))
+            continue;
         
-        while(1) {
-            err = readdir_r(dir, &buf, &ent);
-            if(err || !ent)
-                break;
-            
-            if(strcmp(ent->d_name, ".") == 0 || strcmp(ent->d_name, "..") == 0)
-                continue;
-            
-            if(ent->d_type == DT_DIR) {
-                path = malloc(len_path + strlen(ent->d_name) + 2);
-                if(!path) {
-                    err = -errno;
-                    climpd_log_w(tag, "failed to open directory %s - %s\n", 
-                                 ent->d_name, strerr(-err));
-                    continue;
-                }
-                
-                path = strcpy(path, current_dir);
-                path = strcat(path, ent->d_name);
-                path = strcat(path, "/");
-                
-                err = vector_insert_back(md->dir_vec, path);
-                if(err < 0) {
-                    climpd_log_w(tag, "skipping directory %s - %s\n", path, 
-                                 strerr(-err));
-                    continue;
-                }
-                
-            } else if(ent->d_type == DT_REG) {
-                /* 
-                 * Add an additional byte if the trailing '/' 
-                 * is missing in 'd->path'
-                 */
-                len = sizeof("file://") + len_path + strlen(ent->d_name);
-                
-                uri = malloc(len);
-                if(!uri) {
-                    climpd_log_w(tag, "ignoring file %s - %s\n", ent->d_name, 
-                                 strerr(ENOMEM));
-                    continue;
-                }
-                
-                uri = strcpy(uri, "file://");
-                uri = strcat(uri, current_dir);
-                uri = strcat(uri, ent->d_name);
-                
-                if(is_playable(md, uri))
-                    dprintf(md->fd, "%s\n", uri + sizeof("file://") - 1);
-                
-                free(uri);
-            }
+        err = media_list_emplace_back(ml, uri_get_path(md->uri));
+        if (err < 0) {
+            report_insertion_fail(err, uri_get_path(md->uri));
+            goto cleanup1;
+        }
+    }
+    
+    closedir(dir);
+    
+    climpd_log_i(tag, "finished scanning \"%s\"\n", path);
+    
+    return err;
+    
+cleanup1:
+    while (media_list_size(ml) != old_size)
+        media_unref(media_list_take_back(ml));
+
+    closedir(dir);
+
+    return err;
+}
+
+int media_discoverer_scan_all(struct media_discoverer *__restrict md, 
+                              const char *__restrict path,
+                              struct media_list *__restrict ml)
+{
+    DIR *dir;
+    struct dirent buf, *ent;
+    size_t len;
+    unsigned int old_size;
+    int err;
+    
+    len = strlen(path);
+    
+    if (len >= PATH_MAX) {
+        err = -ENAMETOOLONG;
+        climpd_log_e(tag, "unable to scan \"%s\" - %s\n", path, strerr(-err));
+        return err;
+    }
+    
+    if (!path_is_absolute(path)) {
+        if (!realpath(path, md->rpath))
+            return -errno;
+        
+        return media_discoverer_scan_all(md, md->rpath, ml);
+    }
+    
+    dir = opendir(path);
+    if (!dir) {
+        err = -errno;
+        climpd_log_e(tag, "failed to open dir \"%s\" - %s\n", path, errstr);
+        return err;
+    }
+    
+    strcpy(md->rpath, path);
+
+    old_size = media_list_size(ml);
+    
+    while (1) {
+        err = readdir_r(dir, &buf, &ent);
+        if (err) {
+            climpd_log_e(tag, "unable to read dir \"%s\" - %s\n", path, 
+                         strerr(err));
+            goto cleanup1;
         }
         
-        closedir(dir);
-        free(current_dir);
+        if (!ent)
+            break;
         
-        *vector_at(md->dir_vec, i) = NULL;
+        if (strcmp(ent->d_name, ".") == 0 || strcmp(ent->d_name, "..") == 0)
+            continue;
+        
+        switch (ent->d_type) {
+        case DT_REG:
+            if (!media_discoverer_set_uri(md,  path, len, ent->d_name)) {
+                report_uri_too_long(path, ent->d_name);
+                continue;
+            }
+            
+            if (!media_discoverer_uri_is_playable(md))
+                continue;
+            
+            err = media_list_emplace_back(ml, uri_get_path(md->uri));
+            if (err < 0) {
+                report_insertion_fail(err, uri_get_path(md->uri));
+                goto cleanup1;
+            }
+            
+            break;
+        case DT_DIR:
+            if (len + 1 + 1 + strlen(ent->d_name) > PATH_MAX) {
+                climpd_log_w(tag, "path to subdirectory \"%s\" in directory "
+                             "\"%s\" too long -> skipping subdirectory\n", 
+                             ent->d_name, path);
+                continue;
+            }
+            
+            strcat(md->rpath, "/");
+            strcat(md->rpath, ent->d_name);
+            
+            err = media_discoverer_scan_all(md, md->rpath, ml);
+            
+            md->rpath[len] = '\0';
+            
+            if (err < 0) {
+                climpd_log_e(tag, "failed to scan subdirectory \"%s\" at"
+                             "\"%s\" - %s\n", ent->d_name, path, strerr(-err));
+                goto cleanup1;
+            }
+            break;
+        default:
+            break;
+        }
     }
+    
+    closedir(dir);
+    
+    climpd_log_i(tag, "finished scanning \"%s\"\n", path);
+    
+    return 0;
+    
+cleanup1:
+    while(media_list_size(ml) != old_size)
+        media_unref(media_list_take_back(ml));
+    
+    closedir(dir);
+    
+    return err;
+}
+
+bool media_discoverer_file_is_playable(struct media_discoverer *__restrict md,
+                                       const char *__restrict path)
+{
+    if (!path_is_absolute(path)) {
+        if (!realpath(path, md->rpath))
+            return false;
+        
+        return media_discoverer_file_is_playable(md, md->rpath);
+    }
+    
+    if (strlen(path) + sizeof(URI_PREFIX) >= URI_MAX)
+        return false;
+    
+    strcpy(md->uri, URI_PREFIX);
+    strcat(md->uri, path);
+    
+    return media_discoverer_uri_is_playable(md);
 }

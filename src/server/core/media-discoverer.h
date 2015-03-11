@@ -25,18 +25,28 @@
 
 #include <libvci/vector.h>
 
+#include <core/media-list.h>
+
 struct media_discoverer {
     GstDiscoverer *discoverer;
-    struct vector *dir_vec;
-    int fd;
+
+    char *rpath;
+    char *uri;
 };
 
-int media_discoverer_init(struct media_discoverer *__restrict md, 
-                          const char *path,
-                          int fd);
+int media_discoverer_init(struct media_discoverer *__restrict md);
 
 void media_discoverer_destroy(struct media_discoverer *__restrict md);
 
-void media_discoverer_scan(struct media_discoverer *__restrict md);
+int media_discoverer_scan_dir(struct media_discoverer *__restrict md, 
+                              const char *__restrict path,
+                              struct media_list *__restrict ml);
+
+int media_discoverer_scan_all(struct media_discoverer *__restrict md, 
+                              const char *__restrict path,
+                              struct media_list *__restrict ml);
+
+bool media_discoverer_file_is_playable(struct media_discoverer *__restrict md,
+                                       const char *__restrict path);
 
 #endif /* _MEDIA_DISCOVERER_H_ */

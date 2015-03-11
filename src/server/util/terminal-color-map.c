@@ -55,13 +55,13 @@ int terminal_color_map_init(void)
         .key_hash       = &hash_string,
         .data_delete    = NULL,
     };
-    int i, err;
+    int err;
     
     err = map_init(&color_map, &map_conf);
     if(err < 0)
         return err;
     
-    for(i = 0; i < ARRAY_SIZE(color_table); i += 2) {
+    for(unsigned int i = 0; i < ARRAY_SIZE(color_table); i += 2) {
         err = map_insert(&color_map, color_table[i], color_table[i + 1]);
         if(err < 0) {
             map_destroy(&color_map);

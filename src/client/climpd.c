@@ -39,7 +39,7 @@ extern char **environ;
 
 static int fd;
 
-static int climpd_connect(void)
+static int climpd_connect(const char *__restrict cwd)
 {
     struct sockaddr_un addr;
     int err;
@@ -61,7 +61,7 @@ static int climpd_connect(void)
         goto cleanup1;
     }
     
-    err = ipc_send_fds(fd, STDOUT_FILENO, STDERR_FILENO);
+    err = ipc_send_setup(fd, STDOUT_FILENO, STDERR_FILENO, cwd);
     if (err < 0) {
         fprintf(stderr, "climp: ipc_send_fds(): %s\n", strerr(-err));
         goto cleanup1;
@@ -128,8 +128,14 @@ static int spawn_climpd(void)
 int climpd_init(void)
 {
     int attempts, err;
+    const char *cwd = getenv("PWD");
     
-    err = climpd_connect();
+    if (!cwd) {
+        fprintf(stderr, "climp: unable to determine current working directy\n");
+        return -ENOENT;
+    }
+    
+    err = climpd_connect(cwd);
     if (err < 0) {
         if(err != -ENOENT && err != -ECONNREFUSED)
             return err;
@@ -147,7 +153,7 @@ int climpd_init(void)
         while (attempts--) {
             usleep(10 * 1000);
             
-            err = climpd_connect();
+            err = climpd_connect(cwd);
             if(err < 0)
                 continue;
             

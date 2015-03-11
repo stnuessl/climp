@@ -248,7 +248,7 @@ struct climpd_config *climpd_config_new(const char *__restrict name)
     struct climpd_config_p *cc;
     char *config_path, *home;
     size_t home_len;
-    int i, fd, err;
+    int fd, err;
     
     home = getenv("HOME");
     if(!home) {
@@ -304,7 +304,7 @@ struct climpd_config *climpd_config_new(const char *__restrict name)
         goto cleanup2;
     }
     
-    for(i = 0; i < ARRAY_SIZE(handles); ++i) {
+    for(unsigned int i = 0; i < ARRAY_SIZE(handles); ++i) {
         handles[i].arg = &cc->values;
         err = config_insert_handle(&cc->config, handles + i);
         if(err < 0)

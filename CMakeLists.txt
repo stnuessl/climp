@@ -3,18 +3,18 @@ cmake_minimum_required(VERSION 2.6)
 # project name
 project(climp C)
 
+add_definitions(-Wall -Wextra -Wpedantic)
 add_definitions(-D_GNU_SOURCE)
-add_definitions(-Wall)
-#add_definitions(-O2 -DNDEBUG)
+#add_definitions(-DNDEBUG)
+#add_definitions(-O2) 
 add_definitions(-g3)
 
 #set(CMAKE_BUILD_TYPE "release")
 #set(CMAKE_BUILD_TYPE "debug")
 
-set(CMAKE_C_FLAGS "-std=c99")
+set(CMAKE_C_FLAGS "-std=c11")
 set(CMAKE_INSTALL_PREFIX /usr/local)
 set(TARGET_INSTALL_DIR bin)
-
 set(CMAKE_LIBRARY_PATH /usr/local/lib)
 
 set(SOURCE_CLIMP
@@ -31,9 +31,10 @@ set(SOURCE_CLIMPD
     src/server/core/climpd-player.c
     src/server/core/climpd-config.c
     src/server/core/media-discoverer.c
-    src/server/core/media-scheduler.c
     src/server/core/playlist.c
+    src/server/core/media-list.c
     src/server/core/media.c
+    src/server/core/kfy.c
     src/shared/ipc.c
     src/shared/util.c
     )
@@ -43,8 +44,8 @@ find_package(PkgConfig REQUIRED)
 
 pkg_check_modules(GLIB glib-2.0)
 pkg_check_modules(GOBJECT gobject-2.0)
-pkg_check_modules(GSTREAMER gstreamer-0.10)
-pkg_check_modules(GSTREAMER_PBUTILS gstreamer-pbutils-0.10)
+pkg_check_modules(GSTREAMER gstreamer-1.0)
+pkg_check_modules(GSTREAMER_PBUTILS gstreamer-pbutils-1.0)
 
 # <XPREFIX>_FOUND          ... set to 1 if module(s) exist
 # <XPREFIX>_LIBRARIES      ... only the libraries (w/o the '-l')
