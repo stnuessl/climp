@@ -43,7 +43,7 @@ unsigned int kfy_shuffle(struct kfy *__restrict k);
 
 int kfy_add(struct kfy *__restrict k, unsigned int cnt);
 
-void kfy_take(struct kfy *__restrict k, unsigned int val);
+void kfy_remove(struct kfy *__restrict k, unsigned int cnt);
 
 unsigned int kfy_size(const struct kfy *__restrict k);
 

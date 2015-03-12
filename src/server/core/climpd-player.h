@@ -132,6 +132,9 @@ int climpd_player_add_media_list(struct climpd_player *__restrict cp,
 int climpd_player_set_media_list(struct climpd_player *__restrict cp,
                                  struct media_list *__restrict ml);
 
+void climpd_player_remove_media_list(struct climpd_player *__restrict cp,
+                                     struct media_list *__restrict ml);
+
 void climpd_player_clear_playlist(struct climpd_player *__restrict cp);
 
 void climpd_player_set_config(struct climpd_player *__restrict cp,

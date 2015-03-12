@@ -145,18 +145,15 @@ int kfy_add(struct kfy *__restrict k, unsigned int cnt)
     return 0;
 }
 
-void kfy_take(struct kfy *__restrict k, unsigned int val)
+void kfy_remove(struct kfy *__restrict k, unsigned int cnt)
 {
-    for (unsigned int i = 0; i < k->end; ++i) {
-        if (k->a[i] == val) {
-            k->end -= 1;
-            
-            k->a[i] = k->a[k->end];
-            break;
-        }
+    if (cnt > 0) {
+        k->end  -= cnt;
+        k->size -= cnt;
+        
+        for (unsigned int i = 0; i < k->end; ++i)
+            k->a[i] = i;
     }
-    
-    k->size--;
 }
 
 unsigned int kfy_size(const struct kfy *__restrict k)

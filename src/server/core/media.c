@@ -37,7 +37,6 @@ static __thread char rpath[PATH_MAX];
 struct media *media_new(const char *__restrict path)
 {
     struct media *media;
-    int err;
     
     if (!path_is_absolute(path)) {
         if (!realpath(path, rpath))

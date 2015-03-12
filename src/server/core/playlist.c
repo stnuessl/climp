@@ -158,6 +158,29 @@ cleanup1:
     return err;
 }
 
+void playlist_remove_media_list(struct playlist *__restrict pl, 
+                                struct media_list *__restrict ml)
+{
+    unsigned int size, cnt;
+    
+    cnt  = 0;
+    size = media_list_size(ml);
+    
+    for (unsigned int i = 0; i < size; ++i) {
+        struct media *m = media_list_at(ml, i);
+        struct media *n = vector_take(&pl->vec_media, m);
+        
+        if (n) {
+            cnt++;
+            media_unref(n);
+        }
+        
+        media_unref(m);
+    }
+    
+    kfy_remove(&pl->kfy, cnt);
+}
+
 struct media *playlist_at(struct playlist *__restrict pl, int index)
 {
     assert((unsigned int) abs(index) < playlist_size(pl) && "INVALID INDEX");
@@ -175,7 +198,7 @@ struct media *playlist_take(struct playlist *__restrict pl, int index)
     if (index < 0)
         index = playlist_size(pl) + index;
     
-    kfy_take(&pl->kfy, (unsigned int) index);
+    kfy_remove(&pl->kfy, 1);
     
     return vector_take_at(&pl->vec_media,  (unsigned int) index);
 }
@@ -201,25 +224,13 @@ unsigned int playlist_index_of(const struct playlist *__restrict pl,
 
 unsigned int playlist_index_of_path(struct playlist *__restrict pl,
                                     const char *__restrict path)
-{
-    if (!path_is_absolute(path)) {
-        char *rpath = realpath(path, NULL);
-        if (!rpath)
-            return (unsigned int) -1;
-        
-        unsigned int ret = playlist_index_of_path(pl, rpath);
-        
-        free(rpath);
-        
-        return ret;
-    }
-    
+{    
     unsigned int size = vector_size(&pl->vec_media);
     
     for (unsigned int i = 0; i < size; ++i) {
         struct media *m = *vector_at(&pl->vec_media, i);
         
-        if (strcmp(media_path(m), path) == 0)
+        if (media_path_compare(m, path) == 0)
             return i;
     }
     

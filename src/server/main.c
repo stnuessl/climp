@@ -574,14 +574,8 @@ static int handle_remove(const char **argv, int argc)
         }
     }
     
-    for (unsigned int i = 0, size = media_list_size(&ml); i < size; ++i) {
-        struct media *m = media_list_at(&ml, i);
-        
-        climpd_player_delete_media(&player, m);
-        
-        media_unref(m);
-    }
-    
+    climpd_player_remove_media_list(&player, &ml);
+
 cleanup1:
     media_list_destroy(&ml);
     

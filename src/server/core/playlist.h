@@ -51,6 +51,9 @@ int playlist_emplace_back(struct playlist *__restrict pl, const char *path);
 int playlist_add_media_list(struct playlist *__restrict pl, 
                             struct media_list *__restrict ml);
 
+void playlist_remove_media_list(struct playlist *__restrict pl, 
+                                struct media_list *__restrict ml);
+
 struct media *playlist_at(struct playlist *__restrict pl, int index);
 
 struct media *playlist_take(struct playlist *__restrict pl, int index);

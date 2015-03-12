@@ -843,6 +843,12 @@ int climpd_player_set_media_list(struct climpd_player *__restrict cp,
     return err;
 }
 
+void climpd_player_remove_media_list(struct climpd_player *__restrict cp,
+                                     struct media_list *__restrict ml)
+{
+    playlist_remove_media_list(&cp->playlist, ml);
+}
+
 void climpd_player_clear_playlist(struct climpd_player *__restrict cp)
 {
     playlist_clear(&cp->playlist);
