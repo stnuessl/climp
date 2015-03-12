@@ -40,13 +40,19 @@ static const char *tag = "playlist";
 
 int playlist_init(struct playlist *__restrict pl, bool repeat, bool shuffle)
 {
+    void (*del)(void *);
+    int (*cmp)(const void *, const void *);
     int err;
 
     err = vector_init(&pl->vec_media, 32);
     if(err < 0)
         return err;
     
-    vector_set_data_delete(&pl->vec_media, (void (*)(void *)) &media_unref);
+    del = (void (*)(void *)) &media_unref;
+    cmp = (int (*)(const void *, const void *)) &media_compare;
+    
+    vector_set_data_delete(&pl->vec_media, del);
+    vector_set_data_compare(&pl->vec_media, cmp);
     
     err = kfy_init(&pl->kfy, 0);
     if (err < 0) {
@@ -174,6 +180,19 @@ struct media *playlist_take(struct playlist *__restrict pl, int index)
     return vector_take_at(&pl->vec_media,  (unsigned int) index);
 }
 
+void playlist_update_index(struct playlist *__restrict pl, int index)
+{
+    if (index < 0)
+        index = playlist_size(pl) + index;
+    
+    /* 
+     * Only relevant if not in random mode, so playlist_next() will get 
+     * the right next track. Note how playlist_next() will handle 
+     * an invalid index.
+     */
+    pl->index = (unsigned int) index + 1;
+}
+
 unsigned int playlist_index_of(const struct playlist *__restrict pl,
                                const struct media *__restrict m)
 {
@@ -219,6 +238,9 @@ bool playlist_empty(const struct playlist *__restrict pl)
 
 struct media *playlist_next(struct playlist *__restrict pl)
 {
+    if (vector_empty(&pl->vec_media))
+        return NULL;
+    
     if (pl->shuffle) {
         if (kfy_cycle_done(&pl->kfy) && !pl->repeat) {
             kfy_reset(&pl->kfy);
@@ -231,7 +253,7 @@ struct media *playlist_next(struct playlist *__restrict pl)
         
         return media_ref(*vector_at(&pl->vec_media, pl->index));
     }
-    
+   
     if (pl->index < vector_size(&pl->vec_media))
         return media_ref(*vector_at(&pl->vec_media, pl->index++));
     

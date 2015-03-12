@@ -23,6 +23,7 @@
 #include <assert.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <linux/limits.h>
 
 #include <libvci/filesystem.h>
 
@@ -31,23 +32,18 @@
 #define MEDIA_FILE_PREFIX        "file://"
 #define MEDIA_META_ELEMENT_SIZE  64
 
+static __thread char rpath[PATH_MAX];
+
 struct media *media_new(const char *__restrict path)
 {
     struct media *media;
     int err;
     
     if (!path_is_absolute(path)) {
-        char *rpath = realpath(path, NULL);
-        if (!rpath)
+        if (!realpath(path, rpath))
             return NULL;
         
-        media = media_new(rpath);
-        
-        err = errno;
-        free(rpath);
-        errno = err;
-        
-        return media;
+        path = rpath;
     }
     
     if (!path_is_reg(path)) {
@@ -135,19 +131,21 @@ bool media_is_parsed(const struct media *__restrict media)
     return media->parsed;
 }
 
-bool media_contains_path(const struct media *__restrict media, 
-                         const char *__restrict path)
+int media_compare(const struct media *__restrict m1, 
+                  const struct media *__restrict m2)
 {
-    if (path_is_absolute(path))
-        return strcmp(media->path, path);
+    return strcmp(m1->path, m2->path);
+}
+
+int media_path_compare(const struct media *__restrict media, 
+                       const char *__restrict path)
+{
+    if (!path_is_absolute(path)) {
+        if(!realpath(path, rpath))
+            return 1;
+        
+        path = rpath;
+    }
     
-    char *rpath = realpath(path, NULL);
-    if (!rpath)
-        return false;
-        
-    bool ret = strcmp(media->path, rpath) == 0;
-        
-    free(rpath);
-        
-    return ret;
+    return strcmp(media->path, path);
 }

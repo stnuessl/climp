@@ -67,7 +67,10 @@ void media_set_parsed(struct media *__restrict media);
 
 bool media_is_parsed(const struct media *__restrict media);
 
-bool media_contains_path(const struct media *__restrict media, 
-                         const char *__restrict path);
+int media_compare(const struct media *__restrict m1, 
+                  const struct media *__restrict m2);
+
+int media_path_compare(const struct media *__restrict media, 
+                       const char *__restrict path);
 
 #endif /* _MEDIA_H_ */

@@ -33,6 +33,12 @@
 #include <core/media-list.h>
 #include <core/media.h>
 
+enum climpd_player_state {
+    CLIMPD_PLAYER_PLAYING = GST_STATE_PLAYING,
+    CLIMPD_PLAYER_PAUSED  = GST_STATE_PAUSED,
+    CLIMPD_PLAYER_STOPPED = GST_STATE_NULL,
+};
+
 struct climpd_player {
     GstElement *pipeline;
     GstElement *source;
@@ -84,6 +90,9 @@ int climpd_player_insert(struct climpd_player *__restrict cp,
 
 void climpd_player_delete_index(struct climpd_player *__restrict cp, int index);
 
+void climpd_player_delete_media(struct climpd_player *__restrict cp,
+                                const struct media *__restrict m);
+
 void climpd_player_set_volume(struct climpd_player *__restrict cp, 
                               unsigned int vol);
 
@@ -107,6 +116,9 @@ void climpd_player_set_shuffle(struct climpd_player *__restrict cp,
 bool climpd_player_shuffle(const struct climpd_player *__restrict cp);
 
 bool climpd_player_toggle_shuffle(struct climpd_player *__restrict cp);
+
+enum climpd_player_state 
+climpd_player_state(const struct climpd_player *__restrict cp);
 
 bool climpd_player_is_playing(const struct climpd_player *__restrict cp);
 

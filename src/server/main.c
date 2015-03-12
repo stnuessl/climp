@@ -184,6 +184,13 @@ static void report_error(const char *__restrict cmd,
     dprintf(fd_err, "climpd: %s: %s - %s\n", cmd, msg, strerr(-err));
 }
 
+static void report_invalid_time_format(const char *__restrict cmd, 
+                                       const char *__restrict arg)
+{
+    dprintf(fd_err, "climpd: %s: \"%s\" - invalid time format, "
+            "use m:ss, m.ss, m,ss or just s\n", cmd, arg);
+}
+
 static void report_redundant_if_applicable(const char **argv, int argc)
 {
     if (argc <= 0)
@@ -371,7 +378,7 @@ static int handle_playlist(const char **argv, int argc)
     err = climpd_player_set_media_list(&player, &ml);
     if (err < 0) {
         dprintf(fd_err, "climpd: setting new media list failed - %s :: "
-                "media-player might have lost all files\n", strerr(-err));
+                "climpd-player might have lost all files\n", strerr(-err));
         return err;
     }
     
@@ -412,53 +419,46 @@ static int handle_mute(const char **argv, int argc)
 
 static int handle_next(const char **argv, int argc)
 {
+    int err;
+    
     report_redundant_if_applicable(argv, argc);
+    
+    err = climpd_player_next(&player);
+    if (err < 0) {
+        report_error("--next", "failed to play next track", err);
+        return err;
+    }
+    
+    if (climpd_player_is_stopped(&player))
+        dprintf(fd_out, "climpd: --next: finished playback\n");
     
     return 0;
 }
 
 static int handle_pause(const char **argv, int argc)
 {
-    report_redundant_if_applicable(argv + 1, argc - 1);
+    int err;
     
-    if (climpd_player_is_stopped(&player)) {
-        dprintf(fd_out, "  player is stopped - '--pause' has no effect\n");
-        return 0;
-    }
-    
-    if (argc == 0) {
-        if (climpd_player_is_paused(&player))
-            return climpd_player_play(&player);
-    
-        if (climpd_player_is_playing(&player)) {
-            climpd_player_pause(&player);
-            return 0;
-        }
-        
-        assert(climpd_player_is_stopped(&player) && "UNDEFINED PLAYER STATE");
-        
-        /* if player is stopped it remains stopped */
-        return 0;
-    }
-    
-    const bool *val = bool_map_value(argv[0]);
-    if (!val) {
-        report_invalid_boolean(argv[0]);
-        return -EINVAL;
-    }
-    
-    if (!*val && climpd_player_is_paused(&player))
-        return climpd_player_play(&player);
-    
-    if (*val && climpd_player_is_playing(&player)) {
+    report_redundant_if_applicable(argv, argc);
+
+    switch (climpd_player_state(&player)) {
+    case CLIMPD_PLAYER_PLAYING:
         climpd_player_pause(&player);
-        return 0;
+        break;
+    case CLIMPD_PLAYER_PAUSED:
+        err = climpd_player_play(&player);
+        if (err < 0) {
+            report_error("--pause", "unable to resume playing", err);
+            return err;
+        }
+        break;
+    case CLIMPD_PLAYER_STOPPED:
+        dprintf(fd_out, "climpd: --pause: player is stopped - done\n");
+        break;
+    default:
+        break;
     }
-    
-    assert(climpd_player_is_stopped(&player) && "UNDEFINED PLAYER_STATE");
-    
-    /* TODO: function is a mess */
-    
+        
     return 0;
 }
 
@@ -553,10 +553,37 @@ static int handle_quit(const char **argv, int argc)
 
 static int handle_remove(const char **argv, int argc)
 {
-    (void) argv;
-    (void) argc;
+    struct media_list ml;
+    int err;
     
-    assert(0 && "NOT IMPLEMENTED");
+    err = media_list_init(&ml);
+    
+    for (int i = 0; i < argc; ++i) {
+        int index;
+        
+        err = string_to_integer(argv[i], &index);
+        if (err == 0) {
+            climpd_player_delete_index(&player, index);
+            continue;
+        }
+        
+        err = make_arg_insertion(&ml, argv[i]);
+        if (err < 0) {
+            report_arg_error("--remove", argv[i], err);
+            goto cleanup1;
+        }
+    }
+    
+    for (unsigned int i = 0, size = media_list_size(&ml); i < size; ++i) {
+        struct media *m = media_list_at(&ml, i);
+        
+        climpd_player_delete_media(&player, m);
+        
+        media_unref(m);
+    }
+    
+cleanup1:
+    media_list_destroy(&ml);
     
     return 0;
 }
@@ -585,6 +612,10 @@ static int handle_repeat(const char **argv, int argc)
 
 static int handle_seek(const char **argv, int argc)
 {
+    char *r;
+    long val;
+    int err;
+ 
     report_redundant_if_applicable(argv + 1, argc - 1);
     
     if (argc == 0) {
@@ -596,9 +627,45 @@ static int handle_seek(const char **argv, int argc)
         dprintf(fd_out, "  %d:%02d\n", min, sec);
         return 0;
     }
+
+    errno = 0;
+    val = strtol(argv[0], &r, 10);
+    if (errno) {
+        err = -errno;
+        report_arg_error("--seek", argv[0], err);
+        return err;
+    }
     
+    if (*r != '\0') {
+        if (*r != ':' && *r != '.' && *r != ',' && *r != ' ') {
+            report_invalid_time_format("--seek", argv[0]);
+            return -EINVAL;
+        }
+        
+        val *= 60;
+        errno = 0;
+        
+        val += strtol(r + 1, &r, 10);
+        if (errno) {
+            err = -errno;
+            report_arg_error("--seek", argv[0], err);
+            return err;
+        } else if (*r != '\0') {
+            report_invalid_time_format("--seek", argv[0]);
+            return -EINVAL;
+        }
+    }
+    
+    err = climpd_player_seek(&player, val);
+    if(err < 0) {
+        report_error("--seek", "seeking to position failed", err);
+        return err;
+    }
+
     return 0;
 }
+
+
 
 static int handle_shuffle(const char **argv, int argc)
 {
@@ -701,11 +768,12 @@ static int handle_connection(int fd)
     }
     
     err = chdir(cwd);
-    if (err < 0)
+    if (err < 0) {
         climpd_log_w(tag, "changing working directory to '%s' failed - %s\n", 
-                    cwd, errstr);
+                     cwd, errstr);
+    }
     
-    err = handle_argv((const char **)argv, argc);
+    err = handle_argv((const char **) argv, argc);
     
     chdir("/");
     
