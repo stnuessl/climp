@@ -155,6 +155,8 @@ void kfy_take(struct kfy *__restrict k, unsigned int val)
             break;
         }
     }
+    
+    k->size--;
 }
 
 unsigned int kfy_size(const struct kfy *__restrict k)
