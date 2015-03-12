@@ -32,6 +32,7 @@ In order to compile climp under Arch Linux you need to install to following
 package:
 
 * [gstreamer](https://www.archlinux.org/packages/extra/x86_64/gstreamer/)
+* [gst-plugins-base-libs](https://www.archlinux.org/packages/extra/x86_64/gst-plugins-base-libs/)
 
 To be capable of playing files climp needs additional gstreamer plugins,
 so it is probably best to install the following packages too:
@@ -51,12 +52,12 @@ Run the following command to install all the packages.
 
 To compile climp under Debian you will need the following packages:
 
-* [libgstreamer-plugins-base0.10-dev](https://packages.debian.org/de/sid/libgstreamer-plugins-base0.10-dev)
-* [libgstreamer0.10-dev](https://packages.debian.org/de/jessie/libgstreamer0.10-dev)
-* gstreamer0.10
+* gstreamer1.0
+* libgstreamer1.0-dev
+* libgstreamer-plugins-base1.0-dev
 
 ```
-# apt-get install gstreamer0.10 libgstreamer0.10-dev libgstreamer-plugins-base0.10-dev
+# apt-get install gstreamer1.0 libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
 ```
 
 ## Installation
@@ -82,94 +83,6 @@ if this is possible.
 Notice that '# make install' requires root privileges.
 
 ## Usage
-
-Ok so you got climp installed, but how do you use it? 
-Here is a short guide providing the most important commands
-which may help you getting started.
-
-### Set up and run a playlist
-
-Consider having a some songs in <directory>.
-Run the following commands to get a playlist up and running:
-
-    $ climp discover <directory> > my_playlist.txt
-    $ climp set-playlist my_playlist.txt
-    $ climp play
-
-Ok, so what does that do? First the, __discover__ command prints playable (audio) files
-to your standard output. We pipe this into a file to create a playlist for climp.
-Second, we load and set the playlist active with __set-playlist__. Finally, we start the
-climp music player with __play__.
-Notice, that you can also __pause__ and __stop__ the player.
-Alternativley, you don't have to use __discover__ to create a playlist.  
-A playlist is just a file where each line points (with an absolute path!) 
-to a file on your file system. The following command can also be used to
-create a playlist:
-
-    $ find /abs/path/to/music/folder -iname *.mp3 [-o -iname *.file-ending] > my_playlist.txt
-
-This command is also a lot faster than __discover__,
-however, there won't be any file checks from the climpd until it actually tries
-to play the returned files.
-In both cases you can consider piping the output to the __sort__ command to order the files appropriatly.
-
-### Set player options
-
-This is a short one. Some time during replay you propably want to change
-the volume. Or you want to hear the songs in a random order. Or you want to 
-automatically repeat the playlist.
-Checkout the following commands:
-
-    $ climp set-shuffle { true, false, yes, no, on, off, y, n, 1, 0 }
-    $ climp set-repeat { true, false, yes, no, on, off, y, n, 1, 0 }
-    $ climp set-volume [0 - 100]
-
-### Play a particular song
-
-To play a particular song there are two possible ways for achieving this.
-For the first one you need to now the file. Run:
-    
-    $ climp play-file <file>
-
-For the second way, you run:
-
-    $ climp get-playlist
-
-And pick the number of the song you want to hear. If the output is too long for your
-terminal window, notice that you can use _grep_ on the __get-titles__ command:
-
-    $ climp get-playlist | grep { artist, album, title }
-    
-Finally run __play-track__ with the corresponding track number given by __get-titles__,
-e.g.:
-
-    $ climp play-track 42
-
-### Remove a song
-
-The approach for this one is the same as for playing a particular song. Find out the number
-of the song in the playlist and run:
-
-    $ climp remove-track <number>
-    
-### Configuration
-
-The climpd can be controlled through a simple configuration file located under ~/.config/climp/climpd.conf.
-The configuration file looks like this:
-
-    DefaultPlaylist = /abs/path/to/playlist
-    MediaMetaLength = 32
-    MediaActiveColor = green
-    MediaPassiveColor = default
-    Volume = 60
-    Repeat = true
-    Shuffle = true
-
-If a default playlist is set a simple __climp play__ command will start the playback.
-The __Media*__ parameters control the output of the __get-playlist__ command. __MediaMetaLength__ influences
-the title, artist and album column width of the output. __MediaActiveColor__ defines the color in which the currently
-running track will be highlighted, whereas __MediaPassiveColor__ defines how the rest of the output shall be
-colored. Run __climp get-colors__ to get a list of supported colors.
 
 ## Bugs and bug reports
 
