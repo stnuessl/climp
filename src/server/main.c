@@ -52,6 +52,7 @@
 #include "util/terminal-color-map.h"
 
 #include <core/climpd-player.h>
+#include <core/media_list_loader.h>
 #include <core/media-discoverer.h>
 #include <core/climpd-config.h>
 #include <core/media-list.h>
