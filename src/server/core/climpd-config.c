@@ -220,7 +220,7 @@ static struct config_handle handles[] = {
     { &set_shuffle,                "Shuffle",              NULL }
 };
 
-static const char default_config_text[] = {
+static const char config_text[] = {
     "# Set default played playlist\n"
     ";DefaultPlaylist = "DEFAULT_STR_DEFAULT_PLAYLIST"\n"
     "\n"
@@ -248,7 +248,7 @@ struct climpd_config *climpd_config_new(const char *__restrict name)
     struct climpd_config_p *cc;
     char *config_path, *home;
     size_t home_len;
-    int fd, err;
+    int err;
     
     home = getenv("HOME");
     if(!home) {
@@ -278,29 +278,10 @@ struct climpd_config *climpd_config_new(const char *__restrict name)
     config_path = strcat(config_path, "/");
     config_path = strcat(config_path, name);
     
-    err = create_leading_directories(config_path, DEFAULT_DIR_MODE);
-    if(err < 0) {
-        climpd_log_e(tag, "create_leading_directories(): %s\n", strerr(-err));
-        goto cleanup2;
-    }
-    
-    /* Create and initialize file if necessary */
-    fd = open(config_path, O_CREAT | O_EXCL | O_WRONLY,  DEFAULT_FILE_MODE);
-    if(fd < 0) {
-        if(errno != EEXIST) {
-            climpd_log_e(tag, "open(): %s\n", errstr);
-            err = -errno;
-            goto cleanup2;
-        }
-    } else {
-        dprintf(fd, "%s\n", default_config_text);
-        close(fd);
-    }
-    
     /* Read config file */
-    err = config_init(&cc->config, config_path);
+    err = config_init(&cc->config, config_path, config_text);
     if(err < 0) {
-        climpd_log_e(tag, "config_new(): %s\n", strerr(errno));
+        climpd_log_e(tag, "config_new(): %s\n", strerr(-err));
         goto cleanup2;
     }
     

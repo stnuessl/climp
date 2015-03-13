@@ -126,7 +126,7 @@ int kfy_add(struct kfy *__restrict k, unsigned int cnt)
         return 0;
     }
     
-    new_cap  = next_pow_2(new_size);
+    new_cap = next_pow_2(new_size);
     
     assert(new_cap > k->capacity && "INVALID CAPACITY");
     

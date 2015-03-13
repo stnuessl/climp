@@ -56,6 +56,12 @@
 #include <core/climpd-config.h>
 #include <core/media-list.h>
 
+/*
+ * TODO:        playlist file filder under .config/tq/playlists
+ * TODO:        autoload last playlist
+ * TODO:        cleanup climpd-config
+ */
+
 static int handle_add(const char **argv, int argc);
 static int handle_clear(const char **argv, int argc);
 static int handle_config(const char **argv, int argc);
@@ -873,6 +879,7 @@ static void handle_signal(int sig)
     case SIGHUP:
         climpd_log_i(tag, "reloading config on signal \"%s\"\n", str);
         climpd_config_reload(conf);
+        climpd_player_set_config(&player, conf);
         break;
     default:
         climpd_log_i(tag, "ignoring signal \"%s\"\n", str);
