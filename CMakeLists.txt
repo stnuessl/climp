@@ -25,16 +25,18 @@ set(SOURCE_CLIMP
     
 set(SOURCE_CLIMPD
     src/server/main.c
-    src/server/util/terminal-color-map.c
-    src/server/util/bool-map.c
-    src/server/util/climpd-log.c
+    src/server/core/bool-map.c
+    src/server/core/climpd-log.c
     src/server/core/climpd-player.c
     src/server/core/climpd-config.c
     src/server/core/media-discoverer.c
-    src/server/core/playlist.c
-    src/server/core/media-list.c
-    src/server/core/media.c
-    src/server/core/kfy.c
+    src/server/core/climpd-paths.c
+    src/server/core/media-loader.c
+    src/server/core/terminal-color-map.c
+    src/server/obj/playlist.c
+    src/server/obj/media-list.c
+    src/server/obj/media.c
+    src/server/obj/kfy.c
     src/shared/ipc.c
     src/shared/util.c
     )

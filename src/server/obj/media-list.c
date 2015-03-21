@@ -27,9 +27,8 @@
 #include <libvci/filesystem.h>
 #include <libvci/error.h>
 
-#include <core/media.h>
-#include <core/media-list.h>
-#include <util/climpd-log.h>
+#include <core/climpd-log.h>
+#include <obj/media-list.h>
 
 static const char *tag = "media-list";
 

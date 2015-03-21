@@ -25,9 +25,9 @@
 
 #include <libvci/vector.h>
 
-#include <core/media.h>
-#include <core/media-list.h>
-#include <core/kfy.h>
+#include <obj/media.h>
+#include <obj/media-list.h>
+#include <obj/kfy.h>
 
 struct playlist {
     struct vector vec_media;

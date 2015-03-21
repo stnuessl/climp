@@ -18,24 +18,15 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef _TERMINAL_COLOR_MAP_H_
-#define _TERMINAL_COLOR_MAP_H_
+#ifndef _BOOL_MAP_H_
+#define _BOOL_MAP_H_
 
-#define COLOR_CODE_DEFAULT  "\x1B[0m"
-#define COLOR_CODE_RED      "\x1B[31m"
-#define COLOR_CODE_GREEN    "\x1B[32m"
-#define COLOR_CODE_ORANGE   "\x1B[33m"
-#define COLOR_CODE_BLUE     "\x1B[34m"
-#define COLOR_CODE_MAGENTA  "\x1B[35m"
-#define COLOR_CODE_CYAN     "\x1B[36m"
-#define COLOR_CODE_WHITE    "\x1B[37m"
+void bool_map_init(void);
 
-int terminal_color_map_init(void);
+void bool_map_destroy(void);
 
-void terminal_color_map_destroy(void);
+const bool *bool_map_value(const char *key);
 
-const char *terminal_color_map_color_code(const char *key);
+void bool_map_print(int fd);
 
-void terminal_color_map_print(int fd);
-
-#endif /* _TERMINAL_COLOR_MAP_H_ */
+#endif /* _BOOL_MAP_H_ */

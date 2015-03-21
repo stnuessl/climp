@@ -29,22 +29,23 @@
 #include <libvci/log.h>
 #include <libvci/error.h>
 
-#include "climpd-log.h"
+#include <core/climpd-log.h>
 
 #define CLIMPD_LOG_FILE "/tmp/climpd.log"
 
-
 static struct log *log;
 
-int climpd_log_init(void)
+void climpd_log_init(void)
 {
     log = log_new(CLIMPD_LOG_FILE, LOG_ALL);
-    if(!log)
-        return -errno;
+    if(!log) {
+        /* last hope is to get a error message to stderr ... */
+        fprintf(stderr, "climpd: failed to initialize log file - %s - "
+                "aborting...\n", strerr(errno));
+        exit(EXIT_FAILURE);
+    }
     
     log_set_level(log, LOG_DEBUG);
-    
-    return 0;
 }
 
 void climpd_log_destroy(void)

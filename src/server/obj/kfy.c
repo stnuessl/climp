@@ -22,7 +22,7 @@
 #include <errno.h>
 #include <assert.h>
 
-#include <core/kfy.h>
+#include <obj/kfy.h>
 
 #define KFY_MIN_CAPACITY 8
 

@@ -34,32 +34,35 @@
 #include <libvci/error.h>
 
 #include <core/media-discoverer.h>
-#include <util/climpd-log.h>
+#include <core/climpd-log.h>
 
 #define URI_PREFIX "file://"
 #define URI_MAX (PATH_MAX + sizeof(URI_PREFIX))
 
 static const char *tag = "media-discoverer";
 
+static GstDiscoverer *_gst_discoverer;
+static char _rpath_buf[PATH_MAX];
+static char _uri_buf[URI_MAX];
+
 static inline const char *uri_get_path(const char *__restrict uri)
 {
     return uri + sizeof(URI_PREFIX) - 1;
 }
 
-static const char *media_discoverer_set_uri(struct media_discoverer *__restrict md, 
-                             const char *__restrict path,
-                             size_t len,
-                             const char *__restrict name)
+static const char *set_uri_buf(const char *__restrict path, 
+                               size_t len, 
+                               const char *__restrict name)
 {
     if (sizeof(URI_PREFIX) + len + 1 + strlen(name) >= URI_MAX)
         return NULL;
     
-    strcpy(md->uri, URI_PREFIX);
-    strcat(md->uri, path);
-    strcat(md->uri, "/");
-    strcat(md->uri, name);
+    strcpy(_uri_buf, URI_PREFIX);
+    strcat(_uri_buf, path);
+    strcat(_uri_buf, "/");
+    strcat(_uri_buf, name);
     
-    return md->uri;
+    return _uri_buf;
 }
 
 static void report_uri_too_long(const char *__restrict path, 
@@ -75,15 +78,14 @@ static void report_insertion_fail(int err, const char *__restrict path)
                  path, strerr(-err));
 }
 
-static bool 
-media_discoverer_uri_is_playable(struct media_discoverer *__restrict md)
+static bool media_discoverer_uri_is_playable(const char *__restrict uri)
 {
     GstDiscovererResult result;
     GstDiscovererInfo *info;
     GstDiscovererStreamInfo *s_info, *s_info_next;
     GError *err;
     
-    info = gst_discoverer_discover_uri(md->discoverer, md->uri, &err);
+    info = gst_discoverer_discover_uri(_gst_discoverer, uri, &err);
     
     if(err)
         g_error_free(err);
@@ -119,52 +121,38 @@ media_discoverer_uri_is_playable(struct media_discoverer *__restrict md)
     return true;
 }
 
-int media_discoverer_init(struct media_discoverer *__restrict md)
+void media_discoverer_init(void)
 {
     GError *error;
-    int err;
     
-    md->discoverer = gst_discoverer_new(5 * GST_SECOND, &error);
-    if(!md->discoverer) {
-        err = -error->code;
+    _gst_discoverer = gst_discoverer_new(5 * GST_SECOND, &error);
+    if(!_gst_discoverer) {
         climpd_log_e(tag, "creating discoverer failed - %s\n", error->message);
         g_error_free(error);
-        return err;
+        goto fail;
     }
     
-    md->rpath = malloc(PATH_MAX * sizeof(*md->rpath));
-    if (!md->rpath) {
-        err = -errno;
-        goto cleanup1;
-    }
-    
-    md->uri = malloc(URI_MAX * sizeof(*md->uri));
-    if (!md->uri) {
-        err = -errno;
-        goto cleanup2;
-    }
-    
+    _rpath_buf[0] = '\0';
+    _uri_buf[0]   = '\0';
+
     climpd_log_i(tag, "initialized\n");
 
-    return 0;
+    return;
 
-cleanup2:
-    free(md->rpath);
-cleanup1:
-    gst_object_unref(md->discoverer);
-    return err;
+fail:
+    climpd_log_e(tag, "failed to initialize - aborting...\n");
+    exit(EXIT_FAILURE);
 }
 
-void media_discoverer_destroy(struct media_discoverer *__restrict md)
+void media_discoverer_destroy(void)
 {
-    free(md->uri);
-    free(md->rpath);
-    gst_object_unref(md->discoverer);
+    gst_object_unref(_gst_discoverer);
+    
+    climpd_log_i(tag, "destroyed\n");
 }
 
 
-int media_discoverer_scan_dir(struct media_discoverer *__restrict md, 
-                              const char *__restrict path,
+int media_discoverer_scan_dir(const char *__restrict path,
                               struct media_list *__restrict ml)
 {
     DIR *dir;
@@ -174,10 +162,10 @@ int media_discoverer_scan_dir(struct media_discoverer *__restrict md,
     int err;
     
     if (!path_is_absolute(path)) {
-        if (!realpath(path, md->rpath))
+        if (!realpath(path, _rpath_buf))
             return -errno;
         
-        return media_discoverer_scan_dir(md, md->rpath, ml);
+        return media_discoverer_scan_dir(_rpath_buf, ml);
     }
 
     dir = opendir(path);
@@ -204,17 +192,17 @@ int media_discoverer_scan_dir(struct media_discoverer *__restrict md,
         if (ent->d_type != DT_REG)
             continue;
         
-        if (!media_discoverer_set_uri(md, path, len, ent->d_name)) {
+        if (!set_uri_buf(path, len, ent->d_name)) {
             report_uri_too_long(path, ent->d_name);
             continue;
         }
 
-        if (!media_discoverer_uri_is_playable(md))
+        if (!media_discoverer_uri_is_playable(_uri_buf))
             continue;
         
-        err = media_list_emplace_back(ml, uri_get_path(md->uri));
+        err = media_list_emplace_back(ml, uri_get_path(_uri_buf));
         if (err < 0) {
-            report_insertion_fail(err, uri_get_path(md->uri));
+            report_insertion_fail(err, uri_get_path(_uri_buf));
             goto cleanup1;
         }
     }
@@ -234,8 +222,7 @@ cleanup1:
     return err;
 }
 
-int media_discoverer_scan_all(struct media_discoverer *__restrict md, 
-                              const char *__restrict path,
+int media_discoverer_scan_all(const char *__restrict path,
                               struct media_list *__restrict ml)
 {
     DIR *dir;
@@ -253,10 +240,10 @@ int media_discoverer_scan_all(struct media_discoverer *__restrict md,
     }
     
     if (!path_is_absolute(path)) {
-        if (!realpath(path, md->rpath))
+        if (!realpath(path, _rpath_buf))
             return -errno;
         
-        return media_discoverer_scan_all(md, md->rpath, ml);
+        return media_discoverer_scan_all(_rpath_buf, ml);
     }
     
     dir = opendir(path);
@@ -266,7 +253,7 @@ int media_discoverer_scan_all(struct media_discoverer *__restrict md,
         return err;
     }
     
-    strcpy(md->rpath, path);
+    strcpy(_rpath_buf, path);
 
     old_size = media_list_size(ml);
     
@@ -286,17 +273,17 @@ int media_discoverer_scan_all(struct media_discoverer *__restrict md,
         
         switch (ent->d_type) {
         case DT_REG:
-            if (!media_discoverer_set_uri(md,  path, len, ent->d_name)) {
+            if (!set_uri_buf(path, len, ent->d_name)) {
                 report_uri_too_long(path, ent->d_name);
                 continue;
             }
             
-            if (!media_discoverer_uri_is_playable(md))
+            if (!media_discoverer_uri_is_playable(_uri_buf))
                 continue;
             
-            err = media_list_emplace_back(ml, uri_get_path(md->uri));
+            err = media_list_emplace_back(ml, uri_get_path(_uri_buf));
             if (err < 0) {
-                report_insertion_fail(err, uri_get_path(md->uri));
+                report_insertion_fail(err, uri_get_path(_uri_buf));
                 goto cleanup1;
             }
             
@@ -309,12 +296,12 @@ int media_discoverer_scan_all(struct media_discoverer *__restrict md,
                 continue;
             }
             
-            strcat(md->rpath, "/");
-            strcat(md->rpath, ent->d_name);
+            strcat(_rpath_buf, "/");
+            strcat(_rpath_buf, ent->d_name);
             
-            err = media_discoverer_scan_all(md, md->rpath, ml);
+            err = media_discoverer_scan_all(_rpath_buf, ml);
             
-            md->rpath[len] = '\0';
+            _rpath_buf[len] = '\0';
             
             if (err < 0) {
                 climpd_log_e(tag, "failed to scan subdirectory \"%s\" at"
@@ -342,21 +329,20 @@ cleanup1:
     return err;
 }
 
-bool media_discoverer_file_is_playable(struct media_discoverer *__restrict md,
-                                       const char *__restrict path)
+bool media_discoverer_file_is_playable(const char *__restrict path)
 {
     if (!path_is_absolute(path)) {
-        if (!realpath(path, md->rpath))
+        if (!realpath(path, _rpath_buf))
             return false;
         
-        return media_discoverer_file_is_playable(md, md->rpath);
+        return media_discoverer_file_is_playable(_rpath_buf);
     }
     
     if (strlen(path) + sizeof(URI_PREFIX) >= URI_MAX)
         return false;
     
-    strcpy(md->uri, URI_PREFIX);
-    strcat(md->uri, path);
+    strcpy(_uri_buf, URI_PREFIX);
+    strcat(_uri_buf, path);
     
-    return media_discoverer_uri_is_playable(md);
+    return media_discoverer_uri_is_playable(_uri_buf);
 }

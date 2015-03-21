@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014  Steffen Nüssle
+ * Copyright (C) 2015  Steffen Nüssle
  * climp - Command Line Interface Music Player
  *
  * This file is part of climp.
@@ -18,15 +18,16 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef _BOOL_MAP_H_
-#define _BOOL_MAP_H_
+#ifndef _MEDIA_LOADER_H_
+#define _MEDIA_LOADER_H_
 
-int bool_map_init(void);
+#include <obj/media-list.h>
 
-void bool_map_destroy(void);
+void media_loader_init(void);
 
-const bool *bool_map_value(const char *key);
+void media_loader_destroy(void);
 
-void bool_map_print(int fd);
+int media_loader_load(const char *__restrict path, 
+                      struct media_list *__restrict ml);
 
-#endif /* _BOOL_MAP_H_ */
+#endif /* _MEDIA_LOADER_H_ */

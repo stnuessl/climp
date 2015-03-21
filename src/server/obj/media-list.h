@@ -25,7 +25,7 @@
 
 #include <libvci/vector.h>
 
-#include <core/media.h>
+#include <obj/media.h>
 
 struct media_list {
     struct vector media_vec;

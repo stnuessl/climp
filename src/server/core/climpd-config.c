@@ -31,187 +31,186 @@
 #include <libvci/macro.h>
 #include <libvci/error.h>
 
-#include "util/climpd-log.h"
-#include "util/terminal-color-map.h"
-#include "util/bool-map.h"
-
-#include "core/climpd-config.h"
+#include <core/climpd-log.h>
+#include <core/terminal-color-map.h>
+#include <core/bool-map.h>
+#include <core/climpd-paths.h>
+#include <core/climpd-config.h>
 
 #include "../../shared/util.h"
 #include "../../shared/constants.h"
 
-#define DEFAULT_STR_PLAYLIST_FILE        ""
-#define DEFAULT_STR_SAVE_PLAYLIST_FILE   "false"
-#define DEFAULT_STR_DEFAULT_PLAYLIST     ""
-#define DEFAULT_STR_MEDIA_META_LENGTH    "24"
-#define DEFAULT_STR_MEDIA_ACTIVE_COLOR   "green"
-#define DEFAULT_STR_MEDIA_PASSIVE_COLOR  "default"
-#define DEFAULT_STR_VOLUME               "100"
-#define DEFAULT_STR_REPEAT               "false"
-#define DEFAULT_STR_SHUFFLE              "false"
-
-#define DEFAULT_VAL_PLAYLIST_FILE       NULL
-#define DEFAULT_VAL_SAVE_PLAYLIST_FILE  false
-#define DEFAULT_VAL_DEFAULT_PLAYLIST    NULL
 #define DEFAULT_VAL_MEDIA_META_LENGTH   24
 #define DEFAULT_VAL_MEDIA_ACTIVE_COLOR  COLOR_CODE_GREEN
 #define DEFAULT_VAL_MEDIA_PASSIVE_COLOR COLOR_CODE_DEFAULT
-#define DEFAULT_VAL_VOLUME              100
+#define DEFAULT_VAL_VOLUME              60
 #define DEFAULT_VAL_REPEAT              false
 #define DEFAULT_VAL_SHUFFLE             false
 
-
-struct climpd_config_p {
-    struct config config;
-    struct climpd_config values;
-};
-
 static const char *tag = "climpd-config";
 
-static void set_default_playlist(const char *key, const char *val, void *arg)
+static struct config _config;
+static unsigned int _media_meta_length;
+static const char *_media_active_color;
+static const char *_media_passive_color;
+static unsigned int _volume;
+static bool _repeat;
+static bool _shuffle;
+
+static void config_text_init(int fd, void *arg)
 {
-    struct climpd_config *values;
-    struct stat st;
-    int err;
+    (void) arg;
     
-    (void) key;
-    
-    values = arg;
-    
-    if(strcasecmp(val, DEFAULT_STR_DEFAULT_PLAYLIST) == 0)
-        return;
-    
-    err = stat(val, &st);
-    if(err < 0) {
-        climpd_log_e(tag, "%s: %s\n", val, strerr(errno));
-        return;
-    }
-    
-    if(!S_ISREG(st.st_mode)) {
-        climpd_log_w(tag, "%s is not a file\n", val);
-        return;
-    }
-    
-    values->default_playlist = val;
+    dprintf(fd, "# When printed, column width of meta information\n"
+                "MediaMetaLength = %u\n\n"
+                "# When printed, color of the currently played track\n"
+                "MediaActiveColor = %s\n\n"
+                "# When printed, color of the tracks in the playlist\n"
+                "MediaPassiveColor = %s\n\n"
+                "# Volume of the audio output\n"
+                "Volume = %u\n\n"
+                "# Repeat playlist\n"
+                "Repeat = %s\n\n"
+                "# Play tracks in the playlist in random order\n"
+                "Shuffle = %s\n\n",
+            _media_meta_length, _media_active_color, _media_passive_color, 
+            _volume, 
+            (_repeat) ? "true" : "false", 
+            (_shuffle) ? "true" : "false");
 }
+
+
+// static void set_default_playlist(const char *key, const char *val, void *arg)
+// {
+//     struct climpd_config *values;
+//     struct stat st;
+//     int err;
+//     
+//     (void) key;
+//     
+//     values = arg;
+//     
+//     if(strcasecmp(val, DEFAULT_STR_DEFAULT_PLAYLIST) == 0)
+//         return;
+//     
+//     err = stat(val, &st);
+//     if(err < 0) {
+//         climpd_log_e(tag, "%s: %s\n", val, strerr(errno));
+//         return;
+//     }
+//     
+//     if(!S_ISREG(st.st_mode)) {
+//         climpd_log_w(tag, "%s is not a file\n", val);
+//         return;
+//     }
+//     
+//     values->default_playlist = val;
+// }
 
 static void set_media_meta_length(const char *key, const char *val, void *arg)
 {
-    struct climpd_config *values;
     unsigned int num;
     
     (void) key;
-    
-    values = arg;
+    (void) arg;
     
     errno = 0;
     num = (unsigned int) strtol(val, NULL, 10);
     
     if(errno) {
-        climpd_log_w(tag, "invalid MediaMetaLength %s\n", val);
+        climpd_log_w(tag, "invalid MediaMetaLength \"%s\"\n", val);
         num = DEFAULT_VAL_MEDIA_META_LENGTH;
         return;
     }
     
-    values->media_meta_length = num;
+    _media_meta_length = num;
 }
 
 static void set_media_active_color(const char *key, const char *val, void *arg)
 {
-    struct climpd_config *values;
     const char *code;
     
     (void) key;
-    
-    values = arg;
+    (void) arg;
     
     code = terminal_color_map_color_code(val);
     if(!code) {
-        climpd_log_w(tag, "invalid MediaActiceColor %s\n", val);
+        climpd_log_w(tag, "invalid MediaActiceColor \"%s\"\n", val);
         code = DEFAULT_VAL_MEDIA_ACTIVE_COLOR;
     }
     
-    values->media_active_color = code;
+    _media_active_color = code;
 }
 
 static void set_media_passive_color(const char *key, const char *val, void *arg)
 {
-    struct climpd_config *values;
     const char *code;
     
     (void) key;
-    
-    values = arg;
+    (void) arg;
     
     code = terminal_color_map_color_code(val);
     if(!code) {
-        climpd_log_w(tag, "invalid MediaPassiveColor %s\n", val);
+        climpd_log_w(tag, "invalid MediaPassiveColor \"%s\"\n", val);
         code = DEFAULT_VAL_MEDIA_PASSIVE_COLOR;
     }
     
-    values->media_passive_color = code;
+    _media_passive_color = code;
 }
 
 static void set_volume(const char *key, const char *val, void *arg)
 {
-    struct climpd_config *values;
     unsigned int num;
     
     (void) key;
-    
-    values = arg;
-    
+    (void) arg;
+
     errno = 0;
     num = (unsigned int) strtol(val, NULL, 10);
     
     if(errno) {
-        climpd_log_w(tag, "invalid Volume %s\n", val);
+        climpd_log_w(tag, "invalid Volume \"%s\"\n", val);
         num = DEFAULT_VAL_VOLUME;
     }
     
-    values->volume = num;
+    _volume = num;
 }
 
 static void set_repeat(const char *key, const char *val, void *arg)
 {
-    struct climpd_config *values;
     const bool *bval;
     
     (void) key;
-    
-    values = arg;
+    (void) arg;
     
     bval = bool_map_value(val);
     if(!bval) {
-        climpd_log_w(tag, "invalid Repeat %s\n", val);
-        values->repeat = DEFAULT_VAL_REPEAT;
+        climpd_log_w(tag, "invalid Repeat \"%s\"\n", val);
+        _repeat = DEFAULT_VAL_REPEAT;
         return;
     }
     
-    values->repeat = *bval;
+    _repeat = *bval;
 }
 
 static void set_shuffle(const char *key, const char *val, void *arg)
 {
-    struct climpd_config *values;
     const bool *bval;
     
     (void) key;
-
-    values = arg;
+    (void) arg;
     
     bval = bool_map_value(val);
     if(!bval) {
-        climpd_log_w(tag, "invalid Shuffle %s\n", val);
-        values->shuffle = DEFAULT_VAL_SHUFFLE;
+        climpd_log_w(tag, "invalid Shuffle \"%s\"\n", val);
+        _shuffle = DEFAULT_VAL_SHUFFLE;
         return;
     }
     
-    values->shuffle = *bval;
+    _shuffle = *bval;
 }
 
 static struct config_handle handles[] = {
-    { &set_default_playlist,       "DefaultPlaylist",      NULL },
     { &set_media_active_color,     "MediaActiveColor",     NULL },
     { &set_media_passive_color,    "MediaPassiveColor",    NULL },
     { &set_media_meta_length,      "MediaMetaLength",      NULL },
@@ -220,146 +219,75 @@ static struct config_handle handles[] = {
     { &set_shuffle,                "Shuffle",              NULL }
 };
 
-static const char config_text[] = {
-    "# Set default played playlist\n"
-    ";DefaultPlaylist = "DEFAULT_STR_DEFAULT_PLAYLIST"\n"
-    "\n"
-    "# Table width of the playlist\n"
-    "MediaMetaLength = "DEFAULT_STR_MEDIA_META_LENGTH"\n"
-    "\n"
-    "# When printed, color of the currently played track\n"
-    "MediaActiveColor = "DEFAULT_STR_MEDIA_ACTIVE_COLOR"\n"
-    "\n"
-    "# When printed, color of the tracks\n"
-    "MediaPassiveColor = "DEFAULT_STR_MEDIA_PASSIVE_COLOR"\n"
-    "\n"
-    "# Set the volume of the audio output\n"
-    "Volume = "DEFAULT_STR_VOLUME"\n"
-    "\n"
-    "# Repeat the playlist?\n"
-    "Repeat = "DEFAULT_STR_REPEAT"\n"
-    "\n"
-    "# Play songs in random order?\n"
-    "Shuffle = "DEFAULT_STR_SHUFFLE"\n"
-};
-
-struct climpd_config *climpd_config_new(const char *__restrict name)
+void climpd_config_init(void)
 {
-    struct climpd_config_p *cc;
-    char *config_path, *home;
-    size_t home_len;
+    const char *path = climpd_paths_config();
     int err;
     
-    home = getenv("HOME");
-    if(!home) {
-        err = -ENOENT;
-        climpd_log_e(tag, "no home directory for user %d\n", getuid());
-        goto out;
-    }
+    _media_meta_length   = DEFAULT_VAL_MEDIA_META_LENGTH;
+    _media_active_color  = DEFAULT_VAL_MEDIA_ACTIVE_COLOR;
+    _media_passive_color = DEFAULT_VAL_MEDIA_PASSIVE_COLOR;
+    _volume              = DEFAULT_VAL_VOLUME;
+    _repeat              = DEFAULT_VAL_REPEAT;
+    _shuffle             = DEFAULT_VAL_SHUFFLE;
     
-    cc = malloc(sizeof(*cc));
-    if(!cc) {
-        err = -errno;
-        climpd_log_e(tag, "malloc() - %s\n", errstr);
-        goto out;
-    }
-
-    /* Init some path variables */
-    home_len = strlen(home);
     
-    config_path = malloc(home_len + strlen(name) + 2);
-    if(!config_path) {
-        err = -errno;
-        climpd_log_e(tag, "malloc() - %s\n", errstr);
-        goto cleanup1;
-    }
-    
-    config_path = strcpy(config_path, home);
-    config_path = strcat(config_path, "/");
-    config_path = strcat(config_path, name);
-    
-    /* Read config file */
-    err = config_init(&cc->config, config_path, config_text);
+    err = config_init(&_config, path, &config_text_init, NULL);
     if(err < 0) {
-        climpd_log_e(tag, "config_new(): %s\n", strerr(-err));
-        goto cleanup2;
+        climpd_log_e(tag, "initializing config failed - %s\n", strerr(-err));
+        goto fail;
     }
     
     for(unsigned int i = 0; i < ARRAY_SIZE(handles); ++i) {
-        handles[i].arg = &cc->values;
-        err = config_insert_handle(&cc->config, handles + i);
-        if(err < 0)
-            goto cleanup3;
+        err = config_insert_handle(&_config, handles + i);
+        if(err < 0) {
+            climpd_log_e(tag, "adding config handle \"%s\" failed - %s\n",
+                         handles[i].key, strerr(-err));
+            goto fail;
+        }
     }
     
-    cc->values.default_playlist    = DEFAULT_VAL_DEFAULT_PLAYLIST;
-    cc->values.media_active_color  = DEFAULT_VAL_MEDIA_ACTIVE_COLOR;
-    cc->values.media_passive_color = DEFAULT_VAL_MEDIA_PASSIVE_COLOR;
-    cc->values.volume              = DEFAULT_VAL_VOLUME;
-    cc->values.repeat              = DEFAULT_VAL_REPEAT;
-    cc->values.shuffle             = DEFAULT_VAL_SHUFFLE;
-    
-    err = climpd_config_reload(&cc->values);
+    err = climpd_config_reload();
     if(err < 0) {
         climpd_log_e(tag, "loading config failed: %s\n", strerr(-err));
-        goto cleanup3;
+        goto fail;
     }
-    
-    free(config_path);
     
     climpd_log_i(tag, "initialized\n");
     
-    return &cc->values;
-    
-cleanup3:
-    config_destroy(&cc->config);
-cleanup2:
-    free(config_path);
-cleanup1:
-    free(cc);
-out:
-    climpd_log_e(tag, "initialization failed\n");
-    errno = -err;
-    return NULL;
+    return;
+
+fail:
+    climpd_log_e(tag, "initialization failed - aborting...\n");
+    exit(EXIT_FAILURE);
 }
 
-void climpd_config_delete(struct climpd_config *__restrict cc)
+void climpd_config_destroy(void)
 {
-    struct climpd_config_p *cc_p;
-    
-    cc_p = container_of(cc, struct climpd_config_p, values);
-    
-    config_destroy(&cc_p->config);
-    free(cc_p);
+    config_destroy(&_config);
     
     climpd_log_i(tag, "destroyed\n");
 }
 
-int climpd_config_reload(struct climpd_config *__restrict cc)
+int climpd_config_reload(void)
 {
-    struct climpd_config_p *cc_p;
     int err;
-    
-    cc_p = container_of(cc, struct climpd_config_p, values);
-    
-    err = config_parse(&cc_p->config);
+        
+    err = config_parse(&_config);
     if(err < 0)
-        return err;
-    
-    return 0;
+        climpd_log_w(tag, "reloading config failed - %s\n", strerr(-err));
+        
+    return err;
 }
 
-void climpd_config_print(const struct climpd_config *__restrict cc, int fd)
+void climpd_config_print(int fd)
 {
-    struct climpd_config_p *cc_p;
     struct entry *e;
     const char *key, *val;
+        
+    dprintf(fd, "\n climpd-config: %s\n", config_path(&_config));
     
-    cc_p = container_of(cc, struct climpd_config_p, values);
-    
-    dprintf(fd, "\n climpd-config: %s\n", config_path(&cc_p->config));
-    
-    config_for_each(&cc_p->config, e) {
+    config_for_each(&_config, e) {
         key = entry_key(e);
         val = entry_data(e);
         
@@ -367,4 +295,34 @@ void climpd_config_print(const struct climpd_config *__restrict cc, int fd)
     }
     
     dprintf(fd, "\n");
+}
+
+unsigned int climpd_config_media_meta_length(void)
+{
+    return _media_meta_length;
+}
+
+const char *climpd_config_media_active_color(void)
+{
+    return _media_active_color;
+}
+
+const char *climpd_config_media_passive_color(void)
+{
+    return _media_passive_color;
+}
+
+unsigned int climpd_config_volume(void)
+{
+    return _volume;
+}
+
+bool climpd_config_repeat(void)
+{
+    return _repeat;
+}
+
+bool climpd_config_shuffle(void)
+{
+    return _shuffle;
 }

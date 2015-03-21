@@ -32,17 +32,17 @@
 #define MEDIA_FILE_PREFIX        "file://"
 #define MEDIA_META_ELEMENT_SIZE  64
 
-static __thread char rpath[PATH_MAX];
+static __thread char _rpath_buf[PATH_MAX];
 
 struct media *media_new(const char *__restrict path)
 {
     struct media *media;
     
     if (!path_is_absolute(path)) {
-        if (!realpath(path, rpath))
+        if (!realpath(path, _rpath_buf))
             return NULL;
         
-        path = rpath;
+        path = _rpath_buf;
     }
     
     if (!path_is_reg(path)) {
@@ -140,10 +140,10 @@ int media_path_compare(const struct media *__restrict media,
                        const char *__restrict path)
 {
     if (!path_is_absolute(path)) {
-        if(!realpath(path, rpath))
+        if(!realpath(path, _rpath_buf))
             return 1;
         
-        path = rpath;
+        path = _rpath_buf;
     }
     
     return strcmp(media->path, path);

@@ -14,7 +14,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+//  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -35,39 +35,47 @@
 #include <libvci/macro.h>
 #include <libvci/error.h>
 
-#include "util/climpd-log.h"
-#include "util/terminal-color-map.h"
+#include <core/climpd-log.h>
+#include <core/terminal-color-map.h>
+#include <core/climpd-player.h>
 
-#include "core/playlist.h"
-#include "core/climpd-config.h"
-#include "core/climpd-player.h"
+#include <obj/playlist.h>
 
 static const char *tag = "climpd-player";
 
-static int climpd_player_set_state(struct climpd_player *__restrict cp,
-                                   GstState state)
+static GstElement *_gst_pipeline;
+static GstElement *_gst_source;
+static GstElement *_gst_convert;
+static GstElement *_gst_volume;
+static GstElement *_gst_sink;
+static GstDiscoverer *_gst_discoverer;
+static GstState _gst_state;
+static unsigned int _volume;
+static struct playlist _playlist;
+static struct media *_running_track;
+
+static int climpd_player_set_state(GstState state)
 {
     GstStateChangeReturn state_change;
     
-    state_change = gst_element_set_state(cp->pipeline, state);
+    state_change = gst_element_set_state(_gst_pipeline, state);
     if(state_change == GST_STATE_CHANGE_FAILURE)
         return -EINVAL;
     
-    cp->state = state;
+    _gst_state = state;
 
     return 0;
 }
 
-static int climpd_player_play_uri(struct climpd_player *__restrict cp,
-                                  const char *__restrict uri)
+static int climpd_player_play_uri(const char *__restrict uri)
 {
     int err;
     
-    climpd_player_stop(cp);
+    climpd_player_stop();
     
-    g_object_set(cp->source, "uri", uri, NULL);
+    g_object_set(_gst_source, "uri", uri, NULL);
     
-    err = climpd_player_set_state(cp, GST_STATE_PLAYING);
+    err = climpd_player_set_state(GST_STATE_PLAYING);
     if(err < 0) {
         climpd_log_e(tag, "unable to play '%s'\n", uri);
         return err;
@@ -77,16 +85,16 @@ static int climpd_player_play_uri(struct climpd_player *__restrict cp,
 }
 
 static void on_pad_added(GstElement *src, GstPad *new_pad, void *data) {
-    struct climpd_player *cp = data;
     GstPad *sink_pad;
     GstPadLinkReturn ret;
     GstCaps *new_pad_caps;
     GstStructure *new_pad_struct;
     const gchar *new_pad_type;
     
+    (void) data;
     (void) src;
         
-    sink_pad = gst_element_get_static_pad(cp->convert, "sink");
+    sink_pad = gst_element_get_static_pad(_gst_convert, "sink");
     
     /* If our converter is already linked, we have nothing to do here */
     if(gst_pad_is_linked(sink_pad))
@@ -148,23 +156,23 @@ static void parse_tags(const GstTagList *list, const gchar *tag, void *data)
     }
 }
 
-static void handle_end_of_stream(struct climpd_player *__restrict cp)
+static void handle_end_of_stream(void)
 {
     int err;
     
-    if (cp->running_track) {
-        climpd_log_i(tag, "finished '%s'\n", media_uri(cp->running_track));
-        media_unref(cp->running_track);
+    if (_running_track) {
+        climpd_log_i(tag, "finished '%s'\n", media_uri(_running_track));
+        media_unref(_running_track);
     }
     
-    cp->running_track = playlist_next(&cp->playlist);
-    if(!cp->running_track) {
+    _running_track = playlist_next(&_playlist);
+    if(!_running_track) {
         climpd_log_i(tag, "finished playing current playlist\n");
-        cp->state = GST_STATE_NULL;
+        _gst_state = GST_STATE_NULL;
         return;
     }
     
-    err = climpd_player_play_uri(cp, media_uri(cp->running_track));
+    err = climpd_player_play_uri(media_uri(_running_track));
     if(err < 0)
         climpd_log_e(tag, "encountered an error - stopping playback\n");
 }
@@ -190,9 +198,9 @@ static void handle_bus_error(GstMessage *msg)
     g_clear_error(&err);
 }
 
-static void handle_tag(struct climpd_player *__restrict cp, GstMessage *msg)
+static void handle_tag(GstMessage *msg)
 {
-    struct media *m = cp->running_track;
+    struct media *m = _running_track;
     GstTagList *tags;
     
     gst_message_parse_tag(msg, &tags);
@@ -214,19 +222,19 @@ out:
 
 static gboolean bus_watcher(GstBus *bus, GstMessage *msg, gpointer data)
 {
-    struct climpd_player *player = data;
     
     (void) bus;
+    (void) data;
     
     switch (GST_MESSAGE_TYPE(msg)) {
         case GST_MESSAGE_ERROR:
             handle_bus_error(msg);
             break;
         case GST_MESSAGE_EOS:
-            handle_end_of_stream(player);
+            handle_end_of_stream();
             break;
         case GST_MESSAGE_TAG:
-            handle_tag(player, msg);
+            handle_tag(msg);
             break;
         case GST_MESSAGE_STATE_CHANGED:
         case GST_MESSAGE_WARNING:
@@ -310,7 +318,7 @@ static void handle_discoverer_info(GstDiscoverer *disc,
     }
 }
 
-int parse_media(struct climpd_player *__restrict cp, struct media *m)
+int parse_media(struct media *m)
 {
     GstDiscovererInfo *info;
     GError *error;
@@ -319,7 +327,7 @@ int parse_media(struct climpd_player *__restrict cp, struct media *m)
     
     uri = media_uri(m);
     
-    info = gst_discoverer_discover_uri(cp->discoverer, uri, &error);
+    info = gst_discoverer_discover_uri(_gst_discoverer, uri, &error);
     if(!info) {
         err = -error->code;
         climpd_log_w(tag, "parsing '%s' failed - %s\n", uri, error->message);
@@ -327,17 +335,14 @@ int parse_media(struct climpd_player *__restrict cp, struct media *m)
         return err;
     }
     
-    handle_discoverer_info(cp->discoverer, info, error, m);
+    handle_discoverer_info(_gst_discoverer, info, error, m);
     
     gst_discoverer_info_unref(info);
     
     return 0;
 }
 
-static void print_media(struct climpd_player *__restrict cp,
-                        struct media *__restrict m,
-                        unsigned int index, 
-                        int fd) 
+static void print_media(struct media *__restrict m, unsigned int index, int fd) 
 {
     const char *color;
     const struct media_info *i;
@@ -345,7 +350,7 @@ static void print_media(struct climpd_player *__restrict cp,
     int err;
     
     if(!media_is_parsed(m)) {
-        err = parse_media(cp, m);
+        err = parse_media(m);
         if(err < 0) {
             dprintf(fd, "climpd: failed to parse %s\n", media_path(m));
             return;
@@ -357,13 +362,13 @@ static void print_media(struct climpd_player *__restrict cp,
     min = i->duration / 60;
     sec = i->duration % 60;
     
-    meta_len = cp->config.media_meta_length;
+    meta_len = climpd_config_media_meta_length();
     
     if (isatty(fd)) {
-        if (m == cp->running_track)
-            color = cp->config.media_active_color;
+        if (m == _running_track)
+            color = climpd_config_media_active_color();
         else
-            color = cp->config.media_passive_color;
+            color = climpd_config_media_passive_color();
         
         dprintf(fd, "%s ( %3u )    %2u:%02u   %-*.*s %-*.*s %-*.*s\n" 
                 COLOR_CODE_DEFAULT, color, index, min, sec,
@@ -379,8 +384,7 @@ static void print_media(struct climpd_player *__restrict cp,
     }
 }
 
-int climpd_player_init(struct climpd_player *__restrict cp,
-                       const struct climpd_config *config)
+void climpd_player_init(void)
 {
     static const char *elements[] = {
         "uridecodebin",         "gst_source",
@@ -394,148 +398,134 @@ int climpd_player_init(struct climpd_player *__restrict cp,
     bool ok;
     int err;
 
-    assert(config && "Invalid argument 'config' (null)");
-    
-    err = -ENOMEM;
-    
-    /* init gstreamer pipeline */
-    cp->pipeline = gst_pipeline_new(NULL);
-    if(!cp->pipeline) {
+    _gst_pipeline = gst_pipeline_new(NULL);
+    if(!_gst_pipeline) {
         climpd_log_e(tag, "creating gstreamer pipeline failed\n");
-        return err;
+        goto fail;
     }
     
     for(unsigned int i = 0; i < ARRAY_SIZE(elements); i += 2) {
         ele = gst_element_factory_make(elements[i], elements[i + 1]);
         if(!ele) {
             climpd_log_e(tag, "creating \"%s\" element failed\n", elements[i]);
-            goto cleanup1;
+            goto fail;
         }
         
-        ok = gst_bin_add(GST_BIN(cp->pipeline), ele);
+        ok = gst_bin_add(GST_BIN(_gst_pipeline), ele);
         if(!ok) {
             gst_object_unref(ele);
             climpd_log_e(tag, "adding \"%s\" element failed\n", elements[i]);
-            goto cleanup1;
+            goto fail;
         }
     }
     
-    cp->source  = gst_bin_get_by_name(GST_BIN(cp->pipeline), "gst_source");
-    cp->convert = gst_bin_get_by_name(GST_BIN(cp->pipeline), "gst_convert");
-    cp->volume  = gst_bin_get_by_name(GST_BIN(cp->pipeline), "gst_volume");
-    cp->sink    = gst_bin_get_by_name(GST_BIN(cp->pipeline), "gst_sink");
+    _gst_source  = gst_bin_get_by_name(GST_BIN(_gst_pipeline), "gst_source");
+    _gst_convert = gst_bin_get_by_name(GST_BIN(_gst_pipeline), "gst_convert");
+    _gst_volume  = gst_bin_get_by_name(GST_BIN(_gst_pipeline), "gst_volume");
+    _gst_sink    = gst_bin_get_by_name(GST_BIN(_gst_pipeline), "gst_sink");
     
-    g_signal_connect(cp->source, "pad-added", G_CALLBACK(&on_pad_added), cp);
+    g_signal_connect(_gst_source, "pad-added", G_CALLBACK(&on_pad_added), NULL);
     
-    ok = gst_element_link(cp->convert, cp->volume);
+    ok = gst_element_link(_gst_convert, _gst_volume);
     if(!ok) {
         climpd_log_e(tag, "linking gst_convert and gst_volume failed\n");
-        goto cleanup2;
+        goto fail;
     }
     
-    ok = gst_element_link(cp->volume, cp->sink);
+    ok = gst_element_link(_gst_volume, _gst_sink);
     if(!ok) {
         climpd_log_e(tag, "linking gst_volume and gst_sink failed\n");
-        goto cleanup2;
+        goto fail;
     }
     
-    bus = gst_element_get_bus(cp->pipeline);
-    gst_bus_add_watch(bus, &bus_watcher, cp);
+    bus = gst_element_get_bus(_gst_pipeline);
+    gst_bus_add_watch(bus, &bus_watcher, NULL);
     gst_object_unref(bus);
     
     /* init discoverer */
-    cp->discoverer = gst_discoverer_new(5 * GST_SECOND, &error);
-    if(!cp->discoverer) {
+    _gst_discoverer = gst_discoverer_new(5 * GST_SECOND, &error);
+    if(!_gst_discoverer) {
         err = -error->code;
         climpd_log_e(tag, "creating discoverer failed - %s\n", error->message);
         g_error_free(error);
-        goto cleanup2;
+        goto fail;
     }
     
-    err = playlist_init(&cp->playlist, config->shuffle, config->repeat);
+    bool shuffle = climpd_config_shuffle();
+    bool repeat  = climpd_config_repeat();
+    
+    err = playlist_init(&_playlist, shuffle, repeat);
     if (err < 0) {
         climpd_log_e(tag, "creating playlist failed - %s\n", strerr(-err));
-        goto cleanup3;
+        goto fail;
     }
     
-    cp->running_track = NULL;
+    _running_track = NULL;
     
-    cp->state = GST_STATE_NULL;
+    _gst_state = GST_STATE_NULL;
     
-    climpd_player_set_volume(cp, config->volume);
+    unsigned int vol = climpd_config_volume();
     
-    cp->config.media_active_color  = config->media_active_color;
-    cp->config.media_passive_color = config->media_passive_color;
-    cp->config.media_meta_length   = config->media_meta_length;
+    climpd_player_set_volume(vol);
     
-
     climpd_log_i(tag, "initialized\n");
     
-    return 0;
+    return;
 
-cleanup3:
-    gst_object_unref(cp->discoverer);
-cleanup2:
-    gst_object_unref(cp->sink);
-    gst_object_unref(cp->volume);
-    gst_object_unref(cp->convert);
-    gst_object_unref(cp->source);
-cleanup1:
-    gst_object_unref(cp->pipeline);
-    
-    return err;
+fail:
+    climpd_log_e(tag, "failed to initialize - aborting...\n");
+    exit(EXIT_FAILURE);
 }
 
-void climpd_player_destroy(struct climpd_player *__restrict cp)
+void climpd_player_destroy(void)
 {
     
-    if (cp->running_track)
-        media_unref(cp->running_track);
+    if (_running_track)
+        media_unref(_running_track);
     
-    climpd_player_stop(cp);
+    climpd_player_stop();
     
-    playlist_destroy(&cp->playlist);
+    playlist_destroy(&_playlist);
     
-    gst_object_unref(cp->discoverer);
-    gst_object_unref(cp->sink);
-    gst_object_unref(cp->volume);
-    gst_object_unref(cp->convert);
-    gst_object_unref(cp->source);
-    gst_object_unref(cp->pipeline);
+    gst_object_unref(_gst_discoverer);
+    gst_object_unref(_gst_sink);
+    gst_object_unref(_gst_volume);
+    gst_object_unref(_gst_convert);
+    gst_object_unref(_gst_source);
+    gst_object_unref(_gst_pipeline);
         
     climpd_log_i(tag, "destroyed\n");
 }
 
-int climpd_player_play_path(struct climpd_player *__restrict cp,
-                            const char *path)
+int climpd_player_play_path(const char *path)
 {
     struct media *m;
     unsigned int index;
     int err;
     
-    index = playlist_index_of_path(&cp->playlist, path);
+    index = playlist_index_of_path(&_playlist, path);
     if (index != (unsigned int) -1)
-        return climpd_player_play_track(cp, (int) index);
+        return climpd_player_play_track((int) index);
 
     m = media_new(path);
     if (!m)
         return -errno;
     
-    err = playlist_insert_back(&cp->playlist, m);
+    err = playlist_insert_back(&_playlist, m);
     if (err < 0)
         goto cleanup1;
     
-    if (cp->running_track)
-        media_unref(cp->running_track);
+    if (_running_track)
+        media_unref(_running_track);
     
-    cp->running_track = m;
+    _running_track = m;
     
     /* 
      * We don't need to update the index since it is at the last position
      * and after that song the playback would finish.
      */
     
-    err = climpd_player_play_uri(cp, media_uri(m));
+    err = climpd_player_play_uri(media_uri(m));
     if (err < 0)
         goto cleanup1;
     
@@ -546,32 +536,32 @@ cleanup1:
     return err;
 }
 
-int climpd_player_play_track(struct climpd_player *__restrict cp, int index)
+int climpd_player_play_track(int index)
 {
-    if ((unsigned int) abs(index) >= playlist_size(&cp->playlist))
+    if ((unsigned int) abs(index) >= playlist_size(&_playlist))
         return -EINVAL;
     
-    if (cp->running_track)
-        media_unref(cp->running_track);
+    if (_running_track)
+        media_unref(_running_track);
     
-    cp->running_track = playlist_at(&cp->playlist, index);
-    playlist_update_index(&cp->playlist, index);
+    _running_track = playlist_at(&_playlist, index);
+    playlist_update_index(&_playlist, index);
     
-    return climpd_player_play_uri(cp, media_uri(cp->running_track));
+    return climpd_player_play_uri(media_uri(_running_track));
 }
 
-int climpd_player_play(struct climpd_player *__restrict cp)
+int climpd_player_play(void)
 {
     const char *uri;
     int err;
     
-    switch (cp->state) {
+    switch (_gst_state) {
     case GST_STATE_PLAYING:
         break;
     case GST_STATE_PAUSED:
-        uri = media_uri(cp->running_track);
+        uri = media_uri(_running_track);
         
-        err = climpd_player_set_state(cp, GST_STATE_PLAYING);
+        err = climpd_player_set_state(GST_STATE_PLAYING);
         if(err < 0) {
             climpd_log_e(tag, "failed to resume '%s'.\n", uri);
             return err;
@@ -581,15 +571,15 @@ int climpd_player_play(struct climpd_player *__restrict cp)
         break;
     case GST_STATE_NULL:
     default:
-        if (cp->running_track)
-            media_unref(cp->running_track);
+        if (_running_track)
+            media_unref(_running_track);
         
-        cp->running_track = playlist_next(&cp->playlist);
-        if (!cp->running_track)
+        _running_track = playlist_next(&_playlist);
+        if (!_running_track)
             return -ENOENT;
         
-        uri = media_uri(cp->running_track);
-        err = climpd_player_play_uri(cp, uri);
+        uri = media_uri(_running_track);
+        err = climpd_player_play_uri(uri);
         if (err < 0) {
             climpd_log_e(tag, "failed to start playback - %s\n", strerr(-err));
             return err;
@@ -602,63 +592,62 @@ int climpd_player_play(struct climpd_player *__restrict cp)
     return 0;
 }
 
-void climpd_player_pause(struct climpd_player *__restrict cp)
+void climpd_player_pause(void)
 {
     int err;
     
-    if(cp->state == GST_STATE_PAUSED)
+    if(_gst_state == GST_STATE_PAUSED)
         return;
     
-    err = climpd_player_set_state(cp, GST_STATE_PAUSED);
+    err = climpd_player_set_state(GST_STATE_PAUSED);
     if(err < 0)
         climpd_log_e(tag, "unable to enter paused state.\n");
 }
 
-void climpd_player_stop(struct climpd_player *__restrict cp)
+void climpd_player_stop(void)
 {
     int err;
     
-    if(cp->state == GST_STATE_NULL)
+    if(_gst_state == GST_STATE_NULL)
         return;
     
-    err = climpd_player_set_state(cp, GST_STATE_NULL);
+    err = climpd_player_set_state(GST_STATE_NULL);
     if(err < 0)
         climpd_log_e(tag, "unable to enter stopped state.\n");
 }
 
-int climpd_player_next(struct climpd_player *__restrict cp)
+int climpd_player_next(void)
 {
-    if (cp->running_track)
-        media_unref(cp->running_track);
+    if (_running_track)
+        media_unref(_running_track);
     
-    cp->running_track = playlist_next(&cp->playlist);
+    _running_track = playlist_next(&_playlist);
 
-    if (!cp->running_track) {
-        climpd_player_stop(cp);
+    if (!_running_track) {
+        climpd_player_stop();
         
-        if (playlist_empty(&cp->playlist))
+        if (playlist_empty(&_playlist))
             return -ENOENT;
         else
             return 0;
     }
     
-    return climpd_player_play_uri(cp, media_uri(cp->running_track));
+    return climpd_player_play_uri(media_uri(_running_track));
 }
 
-int climpd_player_previous(struct climpd_player *__restrict cp)
+int climpd_player_previous(void)
 {
-    (void) cp;
     assert(0 && "NOT IMPLEMENTED");
     
     return 0;
 }
 
-int climpd_player_peek(struct climpd_player *__restrict cp)
+int climpd_player_peek(void)
 {
     bool ok;
     gint64 val;
 
-    ok = gst_element_query_position(cp->pipeline, GST_FORMAT_TIME, &val);
+    ok = gst_element_query_position(_gst_pipeline, GST_FORMAT_TIME, &val);
     if (!ok) {
         climpd_log_e(tag, "failed to query the position of the stream\n");
         return -ENOTSUP;
@@ -667,7 +656,7 @@ int climpd_player_peek(struct climpd_player *__restrict cp)
     return (int) (val / (int) 1e9);
 }
 
-int climpd_player_seek(struct climpd_player *__restrict cp, unsigned int val)
+int climpd_player_seek(unsigned int val)
 {
     const struct media_info *i;
     GstFormat format;
@@ -675,7 +664,7 @@ int climpd_player_seek(struct climpd_player *__restrict cp, unsigned int val)
     long time;
     bool ok;
         
-    i = media_info(cp->running_track);
+    i = media_info(_running_track);
     
     if (!i->seekable)
         return -ENOTSUP;
@@ -689,7 +678,7 @@ int climpd_player_seek(struct climpd_player *__restrict cp, unsigned int val)
     /* convert to nanoseconds */
     time = (long) val * (unsigned int) 1e9;
     
-    ok = gst_element_seek_simple(cp->pipeline, format, flags, time);
+    ok = gst_element_seek_simple(_gst_pipeline, format, flags, time);
     
     if(!ok) {
         climpd_log_e(tag, "seeking to position %d failed\n", val);
@@ -699,142 +688,134 @@ int climpd_player_seek(struct climpd_player *__restrict cp, unsigned int val)
     return 0;
 }
 
-int climpd_player_insert(struct climpd_player *__restrict cp, 
-                         const char *__restrict path)
+int climpd_player_insert(const char *__restrict path)
 {
-    return playlist_emplace_back(&cp->playlist, path);
+    return playlist_emplace_back(&_playlist, path);
 }
 
-void climpd_player_delete_index(struct climpd_player *__restrict cp, int index)
+void climpd_player_delete_index(int index)
 {
-    if ((unsigned int) abs(index) < playlist_size(&cp->playlist))
-        media_unref(playlist_take(&cp->playlist, index));
+    if ((unsigned int) abs(index) < playlist_size(&_playlist))
+        media_unref(playlist_take(&_playlist, index));
 }
 
-void climpd_player_delete_media(struct climpd_player *__restrict cp, 
-                                const struct media *__restrict m)
+void climpd_player_delete_media(const struct media *__restrict m)
 {
-    unsigned int index = playlist_index_of(&cp->playlist, m);
+    unsigned int index = playlist_index_of(&_playlist, m);
     if (index == (unsigned int) -1)
         return;
     
-    media_unref(playlist_take(&cp->playlist, (int) index));
+    media_unref(playlist_take(&_playlist, (int) index));
 }
 
-
-void climpd_player_set_volume(struct climpd_player *__restrict cp, 
-                              unsigned int vol)
+void climpd_player_set_volume(unsigned int vol)
 {
-    double volume;
+    double val;
     
     vol = max(vol, 0);
     vol = min(vol, 100);
     
-    cp->volume_val = vol;
+    _volume = vol;
 
-    volume = (100.0 - 50 * log10(101.0 - vol)) / 100;
+    val = (100.0 - 50 * log10(101.0 - vol)) / 100;
         
-    g_object_set(cp->volume, "volume", volume, NULL);
+    g_object_set(_gst_volume, "volume", val, NULL);
 }
 
-unsigned int climpd_player_volume(const struct climpd_player *__restrict cp)
+unsigned int climpd_player_volume(void)
 {
-    return cp->volume_val;
+    return _volume;
 }
 
-void climpd_player_set_muted(struct climpd_player *__restrict cp, bool mute)
+void climpd_player_set_muted(bool mute)
 {        
-    g_object_set(cp->volume, "mute", mute, NULL);
+    g_object_set(_gst_volume, "mute", mute, NULL);
 }
 
-bool climpd_player_muted(const struct climpd_player *__restrict cp)
+bool climpd_player_muted(void)
 {
     bool mute;
     
-    g_object_get(cp->volume, "mute", &mute, NULL);
+    g_object_get(_gst_volume, "mute", &mute, NULL);
     
     return mute;
 }
 
-bool climpd_player_toggle_muted(struct climpd_player *__restrict cp)
+bool climpd_player_toggle_muted(void)
 {
-    bool mute = !climpd_player_muted(cp);
+    bool mute = !climpd_player_muted();
     
-    climpd_player_set_muted(cp, mute);
+    climpd_player_set_muted(mute);
     
     return mute;
 }
 
-void climpd_player_set_repeat(struct climpd_player *__restrict cp, bool repeat)
+void climpd_player_set_repeat(bool repeat)
 {
-    playlist_set_repeat(&cp->playlist, repeat);
+    playlist_set_repeat(&_playlist, repeat);
 }
 
-bool climpd_player_repeat(const struct climpd_player *__restrict cp)
+bool climpd_player_repeat(void)
 {
-    return playlist_repeat(&cp->playlist);
+    return playlist_repeat(&_playlist);
 }
 
-bool climpd_player_toggle_repeat(struct climpd_player *__restrict cp)
+bool climpd_player_toggle_repeat(void)
 {
-    return playlist_toggle_repeat(&cp->playlist);
+    return playlist_toggle_repeat(&_playlist);
 }
 
-void climpd_player_set_shuffle(struct climpd_player *__restrict cp, 
-                               bool shuffle)
+void climpd_player_set_shuffle(bool shuffle)
 {
-    playlist_set_shuffle(&cp->playlist, shuffle);
+    playlist_set_shuffle(&_playlist, shuffle);
 }
 
-bool climpd_player_shuffle(const struct climpd_player *__restrict cp)
+bool climpd_player_shuffle(void)
 {
-    return playlist_shuffle(&cp->playlist);
+    return playlist_shuffle(&_playlist);
 }
 
-bool climpd_player_toggle_shuffle(struct climpd_player *__restrict cp)
+bool climpd_player_toggle_shuffle(void)
 {
-    return playlist_toggle_shuffle(&cp->playlist);
+    return playlist_toggle_shuffle(&_playlist);
 }
 
-enum climpd_player_state 
-climpd_player_state(const struct climpd_player *__restrict cp)
+enum climpd_player_state climpd_player_state(void)
 {
-    return cp->state;
+    return _gst_state;
 }
 
-bool climpd_player_is_playing(const struct climpd_player *__restrict cp)
+bool climpd_player_is_playing(void)
 {
-    return cp->state == GST_STATE_PLAYING;
+    return _gst_state == GST_STATE_PLAYING;
 }
 
-bool climpd_player_is_paused(const struct climpd_player *__restrict cp)
+bool climpd_player_is_paused(void)
 {
-    return cp->state == GST_STATE_PAUSED;
+    return _gst_state == GST_STATE_PAUSED;
 }
 
-bool climpd_player_is_stopped(const struct climpd_player *__restrict cp)
+bool climpd_player_is_stopped(void)
 {
-    return cp->state == GST_STATE_NULL;
+    return _gst_state == GST_STATE_NULL;
 }
 
-int climpd_player_add_media_list(struct climpd_player *__restrict cp,
-                                 struct media_list *__restrict ml)
+int climpd_player_add_media_list(struct media_list *__restrict ml)
 {
-    int err = playlist_add_media_list(&cp->playlist, ml);
+    int err = playlist_add_media_list(&_playlist, ml);
     if (err < 0)
         climpd_log_e(tag, "adding media list failed - %s\n", strerr(-err));
         
     return err;
 }
 
-int climpd_player_set_media_list(struct climpd_player *__restrict cp,
-                                 struct media_list *__restrict ml)
+int climpd_player_set_media_list(struct media_list *__restrict ml)
 {
     int err;
     
-    playlist_clear(&cp->playlist);
+    playlist_clear(&_playlist);
     
-    err = playlist_add_media_list(&cp->playlist, ml);
+    err = playlist_add_media_list(&_playlist, ml);
     if (err < 0) {
         climpd_log_e(tag, "setting new media list failed - %s :: playlist lost",
                     strerr(-err));
@@ -843,34 +824,24 @@ int climpd_player_set_media_list(struct climpd_player *__restrict cp,
     return err;
 }
 
-void climpd_player_remove_media_list(struct climpd_player *__restrict cp,
-                                     struct media_list *__restrict ml)
+void climpd_player_remove_media_list(struct media_list *__restrict ml)
 {
-    playlist_remove_media_list(&cp->playlist, ml);
+    playlist_remove_media_list(&_playlist, ml);
 }
 
-void climpd_player_clear_playlist(struct climpd_player *__restrict cp)
+void climpd_player_clear_playlist(void)
 {
-    playlist_clear(&cp->playlist);
+    playlist_clear(&_playlist);
 }
 
-void climpd_player_set_config(struct climpd_player *__restrict cp, 
-                              const struct climpd_config *__restrict conf)
+void climpd_player_print_playlist(int fd)
 {
-    cp->config.media_active_color  = conf->media_active_color;
-    cp->config.media_passive_color = conf->media_passive_color;
-    cp->config.media_meta_length   = conf->media_meta_length;
-}
-
-
-void climpd_player_print_playlist(struct climpd_player *__restrict cp, int fd)
-{
-    unsigned int size = playlist_size(&cp->playlist);
+    unsigned int size = playlist_size(&_playlist);
     
     for (unsigned int i = 0; i < size; ++i) {
-        struct media *m = playlist_at(&cp->playlist, i);
+        struct media *m = playlist_at(&_playlist, i);
         
-        print_media(cp, m, i, fd);
+        print_media(m, i, fd);
         
         media_unref(m);
     }
@@ -878,12 +849,12 @@ void climpd_player_print_playlist(struct climpd_player *__restrict cp, int fd)
     dprintf(fd, "\n");
 }
 
-void climpd_player_print_files(struct climpd_player *__restrict cp, int fd)
+void climpd_player_print_files(int fd)
 {
-    unsigned int size = playlist_size(&cp->playlist);
+    unsigned int size = playlist_size(&_playlist);
     
     for (unsigned int i = 0; i < size; ++i) {
-        struct media *m = playlist_at(&cp->playlist, i);
+        struct media *m = playlist_at(&_playlist, i);
         
         dprintf(fd, "%s\n", media_path(m));
         
@@ -893,26 +864,21 @@ void climpd_player_print_files(struct climpd_player *__restrict cp, int fd)
     dprintf(fd, "\n");
 }
 
-void climpd_player_print_running_track(struct climpd_player *__restrict cp, 
-                                       int fd)
+void climpd_player_print_running_track(int fd)
 {
     unsigned int index;
 
     
-    index = playlist_index_of(&cp->playlist, cp->running_track);
+    index = playlist_index_of(&_playlist, _running_track);
     if(index == (unsigned int) -1) {
-        const char *path = media_path(cp->running_track);
+        const char *path = media_path(_running_track);
         climpd_log_i("Current track %s not in playlist\n", path);
     }
     
-    print_media(cp, cp->running_track, index, fd);
+    print_media(_running_track, index, fd);
 }
 
-void climpd_player_print_volume(struct climpd_player *__restrict cp, int fd)
+void climpd_player_print_volume(int fd)
 {
-    unsigned int volume;
-    
-    volume = climpd_player_volume(cp);
-    
-    dprintf(fd, " Volume: %u\n", volume);
+    dprintf(fd, " Volume: %u\n", _volume);
 }

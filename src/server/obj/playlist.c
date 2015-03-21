@@ -30,13 +30,7 @@
 #include <libvci/error.h>
 #include <libvci/filesystem.h>
 
-#include <util/climpd-log.h>
-#include <core/playlist.h>
-#include <core/media.h>
-
-static const char *tag = "playlist";
-
-
+#include <obj/playlist.h>
 
 int playlist_init(struct playlist *__restrict pl, bool repeat, bool shuffle)
 {
@@ -64,8 +58,6 @@ int playlist_init(struct playlist *__restrict pl, bool repeat, bool shuffle)
     
     pl->repeat  = repeat;
     pl->shuffle = shuffle;
-    
-    climpd_log_i(tag, "initialized\n");
     
     return 0;
 }

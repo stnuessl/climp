@@ -17,13 +17,20 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 
 #include <libvci/map.h>
 #include <libvci/hash.h>
 #include <libvci/macro.h>
+#include <libvci/error.h>
 
+#include <core/climpd-log.h>
+#include <core/bool-map.h>
+
+const char *tag = "bool map";
 static struct map bool_map;
 
 bool yes = true;
@@ -50,7 +57,7 @@ static int string_compare(const void *a, const void *b)
     return strcasecmp(a, b);
 }
 
-int bool_map_init(void)
+void bool_map_init(void)
 {
     const struct map_config map_conf = {
         .size           = 32,
@@ -64,31 +71,43 @@ int bool_map_init(void)
     int err;
     
     err = map_init(&bool_map, &map_conf);
-    if(err < 0)
-        return err;
+    if(err < 0) {
+        climpd_log_e(tag, "failed to initialize map - %s\n", strerr(-err));
+        goto out;
+    }
     
     for(unsigned int i = 0; i < ARRAY_SIZE(t); ++i) {
         err = map_insert(&bool_map, t[i], &yes);
-        if(err < 0)
-            goto fail;
+        if(err < 0) {
+            climpd_log_e(tag, "failed to initialize value \"%s\"\n", t[i]);
+            goto cleanup1;
+        }
     }
     
     for(unsigned int i = 0; i < ARRAY_SIZE(f); ++i) {
         err = map_insert(&bool_map, f[i], &no);
-        if(err < 0)
-            goto fail;
+        if(err < 0) {
+            climpd_log_e(tag, "failed to initialize value \"%s\"\n", t[i]);
+            goto cleanup1;
+        }
     }
     
-    return 0;
+    climpd_log_i(tag, "initialized\n");
     
-fail:
+    return;
+    
+cleanup1:
     map_destroy(&bool_map);
-    return err;
+out:
+    climpd_log_i(tag, "failed to initialize - aborting...\n");
+    exit(EXIT_FAILURE);
 }
 
 void bool_map_destroy(void)
 {
     map_destroy(&bool_map);
+    
+    climpd_log_i(tag, "destroyed\n");
 }
 
 const bool *bool_map_value(const char *key)

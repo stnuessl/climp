@@ -21,28 +21,24 @@
 #ifndef _CLIMPD_CONFIG_H_
 #define _CLIMPD_CONFIG_H_
 
-#include <stdbool.h>
+void climpd_config_init(void);
 
-struct climpd_config {
-    const char *default_playlist;
-    
-    /* output options */
-    const char *media_active_color;
-    const char *media_passive_color;
-    unsigned int media_meta_length;
-    
-    /* media player options */
-    unsigned int volume;
-    bool repeat;
-    bool shuffle;
-};
+void climpd_config_destroy(void);
 
-struct climpd_config *climpd_config_new(const char *__restrict name);
+int climpd_config_reload(void);
 
-void climpd_config_delete(struct climpd_config *__restrict cc);
+void climpd_config_print(int fd);
 
-int climpd_config_reload(struct climpd_config *__restrict cc);
+unsigned int climpd_config_media_meta_length(void);
 
-void climpd_config_print(const struct climpd_config *__restrict cc, int fd);
+const char *climpd_config_media_active_color(void);
+
+const char *climpd_config_media_passive_color(void);
+
+unsigned int climpd_config_volume(void);
+
+bool climpd_config_repeat(void);
+
+bool climpd_config_shuffle(void);
 
 #endif /* _CLIMPD_CONFIG_H_ */

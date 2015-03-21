@@ -21,7 +21,7 @@
 #ifndef _CLIMPD_LOG_H_
 #define _CLIMPD_LOG_H_
 
-int climpd_log_init(void);
+void climpd_log_init(void);
 
 void climpd_log_destroy(void);
 

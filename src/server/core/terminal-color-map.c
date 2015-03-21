@@ -17,14 +17,18 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 
 #include <libvci/map.h>
 #include <libvci/hash.h>
 #include <libvci/macro.h>
+#include <libvci/error.h>
 
-#include "terminal-color-map.h"
+#include <core/climpd-log.h>
+#include <core/terminal-color-map.h>
 
 static char *color_table[] = {
     "default",          COLOR_CODE_DEFAULT,
@@ -37,6 +41,8 @@ static char *color_table[] = {
     "white",            COLOR_CODE_WHITE
 };
 
+static const char *tag = "terminal-color-map";
+
 static struct map color_map;
 
 static int string_compare(const void *a, const void *b)
@@ -44,7 +50,7 @@ static int string_compare(const void *a, const void *b)
     return strcasecmp(a, b);
 }
 
-int terminal_color_map_init(void)
+void terminal_color_map_init(void)
 {
     const struct map_config map_conf = {
         .size           = 32,
@@ -58,23 +64,36 @@ int terminal_color_map_init(void)
     int err;
     
     err = map_init(&color_map, &map_conf);
-    if(err < 0)
-        return err;
+    if(err < 0) {
+        climpd_log_e(tag, "failed to initialize map - %s\n", strerr(-err));
+        goto out;
+    }
     
     for(unsigned int i = 0; i < ARRAY_SIZE(color_table); i += 2) {
         err = map_insert(&color_map, color_table[i], color_table[i + 1]);
         if(err < 0) {
-            map_destroy(&color_map);
-            return err;
+            climpd_log_e(tag, "failed to initialize terminal color \"%s\" - "
+                         "%s\n", color_table[i], strerr(-err));
+            goto cleanup1;
         }
     }
     
-    return 0;
+    climpd_log_i(tag, "initialized\n");
+    
+    return;
+
+cleanup1:
+    map_destroy(&color_map);
+out:
+    climpd_log_e(tag, "failed to initialize - aborting...\n");
+    exit(EXIT_FAILURE);
 }
 
 void terminal_color_map_destroy(void)
 {
     map_destroy(&color_map);
+    
+    climpd_log_i(tag, "destroyed\n");
 }
 
 const char *terminal_color_map_color_code(const char *key)
