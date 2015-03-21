@@ -117,6 +117,40 @@ int playlist_emplace_back(struct playlist *__restrict pl, const char *path)
     return err;
 }
 
+int playlist_set_media_list(struct playlist *__restrict pl,
+                            struct media_list *__restrict ml)
+{
+    unsigned int ml_size;
+    int err;
+
+    ml_size = media_list_size(ml);
+
+    if (vector_size(&pl->vec_media) >= ml_size) {
+        while (vector_size(&pl->vec_media) > ml_size)
+            media_unref(vector_take_back(&pl->vec_media));
+        
+        for (unsigned int i = 0; i < ml_size; ++i) {
+            struct media **m = (struct media **) vector_at(&pl->vec_media, i);
+            
+            media_unref(*m);
+            *m = media_list_at(ml, i);
+        }
+        
+        return 0;
+    }
+    
+    err = vector_set_capacity(&pl->vec_media, ml_size);
+    if (err < 0)
+        return err;
+    
+    vector_clear(&pl->vec_media);
+    
+    for (unsigned int i = 0; i < ml_size; ++i)
+        vector_insert_back(&pl->vec_media, media_list_at(ml, i));
+    
+    return 0;
+}
+
 int playlist_add_media_list(struct playlist *__restrict pl, 
                             struct media_list *__restrict ml)
 {

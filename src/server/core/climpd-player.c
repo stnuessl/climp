@@ -811,17 +811,7 @@ int climpd_player_add_media_list(struct media_list *__restrict ml)
 
 int climpd_player_set_media_list(struct media_list *__restrict ml)
 {
-    int err;
-    
-    playlist_clear(&_playlist);
-    
-    err = playlist_add_media_list(&_playlist, ml);
-    if (err < 0) {
-        climpd_log_e(tag, "setting new media list failed - %s :: playlist lost",
-                    strerr(-err));
-    }
-    
-    return err;
+    return playlist_set_media_list(&_playlist, ml);
 }
 
 void climpd_player_remove_media_list(struct media_list *__restrict ml)

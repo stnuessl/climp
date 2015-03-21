@@ -48,6 +48,9 @@ int playlist_insert_back(struct playlist *__restrict pl, struct media *m);
 
 int playlist_emplace_back(struct playlist *__restrict pl, const char *path);
 
+int playlist_set_media_list(struct playlist *__restrict pl,
+                            struct media_list *__restrict ml);
+
 int playlist_add_media_list(struct playlist *__restrict pl, 
                             struct media_list *__restrict ml);
 

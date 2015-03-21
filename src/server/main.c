@@ -59,9 +59,7 @@
 #include <obj/media-list.h>
 
 /*
- * TODO:        playlist file filder under .config/tq/playlists
  * TODO:        autoload last playlist
- * TODO:        cleanup climpd-config
  */
 
 static int handle_add(const char **argv, int argc);
@@ -381,9 +379,8 @@ static int handle_playlist(const char **argv, int argc)
     
     err = climpd_player_set_media_list(&ml);
     if (err < 0) {
-        dprintf(fd_err, "climpd: setting new media list failed - %s :: "
-                "climpd-player might have lost all files\n", strerr(-err));
-        return err;
+        dprintf(fd_err, "climpd: setting new media list failed - %sfiles\n", 
+                strerr(-err));
     }
     
 cleanup1:
