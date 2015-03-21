@@ -120,12 +120,13 @@ int playlist_emplace_back(struct playlist *__restrict pl, const char *path)
 int playlist_set_media_list(struct playlist *__restrict pl,
                             struct media_list *__restrict ml)
 {
-    unsigned int ml_size;
+    unsigned int size, ml_size;
     int err;
 
+    size    = vector_size(&pl->vec_media);
     ml_size = media_list_size(ml);
 
-    if (vector_size(&pl->vec_media) >= ml_size) {
+    if (size >= ml_size) {
         while (vector_size(&pl->vec_media) > ml_size)
             media_unref(vector_take_back(&pl->vec_media));
         
@@ -136,6 +137,8 @@ int playlist_set_media_list(struct playlist *__restrict pl,
             *m = media_list_at(ml, i);
         }
         
+        kfy_remove(&pl->kfy, size - ml_size);
+        
         return 0;
     }
     
@@ -143,10 +146,16 @@ int playlist_set_media_list(struct playlist *__restrict pl,
     if (err < 0)
         return err;
     
+    
+    err = kfy_add(&pl->kfy, ml_size - size);
+    if (err < 0)
+        return err;
+    
     vector_clear(&pl->vec_media);
     
     for (unsigned int i = 0; i < ml_size; ++i)
         vector_insert_back(&pl->vec_media, media_list_at(ml, i));
+
     
     return 0;
 }
