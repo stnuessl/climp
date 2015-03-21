@@ -63,6 +63,8 @@ struct media *playlist_take(struct playlist *__restrict pl, int index);
 
 void playlist_update_index(struct playlist *__restrict pl, int index);
 
+unsigned int playlist_index(const struct playlist *__restrict pl);
+
 unsigned int playlist_index_of(const struct playlist *__restrict pl,
                                const struct media *__restrict m);
 

@@ -65,6 +65,7 @@
 static int handle_add(const char **argv, int argc);
 static int handle_clear(const char **argv, int argc);
 static int handle_config(const char **argv, int argc);
+static int handle_current(const char **argv, int argc);
 static int handle_discover(const char **argv, int argc);
 static int handle_files(const char **argv, int argc);
 static int handle_help(const char **argv, int argc);
@@ -105,6 +106,7 @@ static struct option options[] = {
     { "--add",          "-a",   &handle_add             },
     { "--clear",        "",     &handle_clear           },
     { "--config",       "",     &handle_config          },
+    { "--current",      "-c",   &handle_current         },
     { "--remove",       "",     &handle_remove          },
     { "--pause",        "",     &handle_pause           },
     { "--playlist",     "",     &handle_playlist        },
@@ -294,6 +296,15 @@ static int handle_config(const char **argv, int argc)
     
     /* TODO: reload config from 'argv[0]' */
         
+    return 0;
+}
+
+int handle_current(const char **argv, int argc)
+{
+    report_redundant_if_applicable(argv, argc);
+
+    climpd_player_print_current_track(fd_out);
+    
     return 0;
 }
 

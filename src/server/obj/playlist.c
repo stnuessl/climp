@@ -54,7 +54,7 @@ int playlist_init(struct playlist *__restrict pl, bool repeat, bool shuffle)
         return err;
     }
     
-    pl->index = 0;
+    pl->index = (unsigned int) -1;
     
     pl->repeat  = repeat;
     pl->shuffle = shuffle;
@@ -70,7 +70,7 @@ void playlist_destroy(struct playlist *__restrict pl)
 
 void playlist_clear(struct playlist *__restrict pl)
 {
-    pl->index = 0;
+    pl->index = (unsigned int) -1;
     kfy_destroy(&pl->kfy);
     kfy_init(&pl->kfy, 0);
     vector_clear(&pl->vec_media);
@@ -248,7 +248,12 @@ void playlist_update_index(struct playlist *__restrict pl, int index)
      * the right next track. Note how playlist_next() will handle 
      * an invalid index.
      */
-    pl->index = (unsigned int) index + 1;
+    pl->index = (unsigned int) index;
+}
+
+unsigned int playlist_index(const struct playlist *__restrict pl)
+{
+    return pl->index;
 }
 
 unsigned int playlist_index_of(const struct playlist *__restrict pl,
@@ -299,16 +304,19 @@ struct media *playlist_next(struct playlist *__restrict pl)
         
         return media_ref(*vector_at(&pl->vec_media, pl->index));
     }
-   
-    if (pl->index < vector_size(&pl->vec_media))
-        return media_ref(*vector_at(&pl->vec_media, pl->index++));
     
-    pl->index = 0;
+    ++pl->index;
     
-    if (pl->repeat)
-        return media_ref(*vector_at(&pl->vec_media, pl->index++));
+    if (pl->index >= vector_size(&pl->vec_media)) {
+        if (!pl->repeat) {
+            pl->index = (unsigned int) -1;
+            return NULL;
+        }
+        
+        pl->index = 0;
+    }
     
-    return NULL;
+    return media_ref(*vector_at(&pl->vec_media, pl->index));
 }
 
 bool playlist_toggle_shuffle(struct playlist *__restrict pl)

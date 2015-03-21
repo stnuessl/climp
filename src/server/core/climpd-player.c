@@ -824,6 +824,12 @@ void climpd_player_clear_playlist(void)
     playlist_clear(&_playlist);
 }
 
+void climpd_player_print_current_track(int fd)
+{
+    if (_running_track)
+        print_media(_running_track, playlist_index(&_playlist), fd);
+}
+
 void climpd_player_print_playlist(int fd)
 {
     unsigned int size = playlist_size(&_playlist);
@@ -852,20 +858,6 @@ void climpd_player_print_files(int fd)
     }
     
     dprintf(fd, "\n");
-}
-
-void climpd_player_print_running_track(int fd)
-{
-    unsigned int index;
-
-    
-    index = playlist_index_of(&_playlist, _running_track);
-    if(index == (unsigned int) -1) {
-        const char *path = media_path(_running_track);
-        climpd_log_i("Current track %s not in playlist\n", path);
-    }
-    
-    print_media(_running_track, index, fd);
 }
 
 void climpd_player_print_volume(int fd)
