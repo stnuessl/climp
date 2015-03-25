@@ -115,11 +115,11 @@ int media_list_add_from_file(struct media_list *__restrict ml,
         if(n == 0)
             continue;
         
-        if(line[0] == '#')
+        if(line[0] == '#' || line[0] == '\n')
             continue;
         
         line[n - 1] = '\0';
-        
+                
         if(!path_is_absolute(line)) {
             err = -ENOTSUP;
             climpd_log_e(tag, "\"%s\" - no absolute path\n", line);

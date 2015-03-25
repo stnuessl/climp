@@ -33,6 +33,9 @@ set(SOURCE_CLIMPD
     src/server/core/climpd-paths.c
     src/server/core/media-loader.c
     src/server/core/terminal-color-map.c
+    src/server/core/socket.c
+    src/server/core/util.c
+    src/server/core/mainloop.c
     src/server/obj/playlist.c
     src/server/obj/media-list.c
     src/server/obj/media.c

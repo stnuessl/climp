@@ -18,17 +18,17 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef _CLIMPD_PATHS_H_
-#define _CLIMPD_PATHS_H_
+#ifndef _MAINLOOP_H_
+#define _MAINLOOP_H_
 
-void climpd_paths_init(void);
+#include <stdbool.h>
 
-void climpd_paths_destroy(void);
+void mainloop_init(bool no_daemon);
 
-const char *climpd_paths_config(void);
+void mainloop_destroy(void);
 
-const char *climpd_paths_media_list_loader(void);
+void mainloop_run(void);
 
-const char *climpd_paths_last_playlist(void);
+void mainloop_quit(void);
 
-#endif /* _CLIMPD_PATHS_H_ */
+#endif /* _MAINLOOP_H_ */

@@ -32,6 +32,7 @@
 #include <core/climpd-paths.h>
 #include <core/media-loader.h>
 #include <core/media-discoverer.h>
+#include <core/util.h>
 
 #include <core/climpd-log.h>
 
@@ -79,8 +80,7 @@ void media_loader_init(void)
     return;
 
 fail:
-    climpd_log_e(tag, "failed to initialize - aborting...\n");
-    exit(EXIT_FAILURE);
+    die_failed_init(tag);
 }
 
 void media_loader_destroy(void)

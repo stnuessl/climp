@@ -36,6 +36,7 @@
 #include <core/bool-map.h>
 #include <core/climpd-paths.h>
 #include <core/climpd-config.h>
+#include <core/util.h>
 
 #include "../../shared/util.h"
 #include "../../shared/constants.h"
@@ -258,8 +259,7 @@ void climpd_config_init(void)
     return;
 
 fail:
-    climpd_log_e(tag, "initialization failed - aborting...\n");
-    exit(EXIT_FAILURE);
+    die_failed_init(tag);
 }
 
 void climpd_config_destroy(void)

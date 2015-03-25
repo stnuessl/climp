@@ -18,17 +18,13 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef _CLIMPD_PATHS_H_
-#define _CLIMPD_PATHS_H_
+#ifndef _SOCKET_H_
+#define _SOCKET_H_
 
-void climpd_paths_init(void);
+#include <gst/gst.h>
 
-void climpd_paths_destroy(void);
+void socket_init(int (*func)(int));
 
-const char *climpd_paths_config(void);
+void socket_destroy(void);
 
-const char *climpd_paths_media_list_loader(void);
-
-const char *climpd_paths_last_playlist(void);
-
-#endif /* _CLIMPD_PATHS_H_ */
+#endif /* _SOCKET_H_ */

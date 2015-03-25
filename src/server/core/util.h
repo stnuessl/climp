@@ -18,17 +18,16 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef _CLIMPD_PATHS_H_
-#define _CLIMPD_PATHS_H_
+#ifndef _UTIL_H_
+#define _UTIL_H_
 
-void climpd_paths_init(void);
+void die(const char *__restrict tag, const char *__restrict msg);
 
-void climpd_paths_destroy(void);
+void die_errno(const char *__restrict tag, const char *__restrict msg, int err);
 
-const char *climpd_paths_config(void);
+void die_fmt(const char *__restrict tag, const char *__restrict fmt, ...)
+                                            __attribute__((format(printf,2,3)));
 
-const char *climpd_paths_media_list_loader(void);
+void die_failed_init(const char *__restrict tag);
 
-const char *climpd_paths_last_playlist(void);
-
-#endif /* _CLIMPD_PATHS_H_ */
+#endif /* _UTIL_H_ */

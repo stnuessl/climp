@@ -25,14 +25,27 @@
 #include <libvci/error.h>
 
 #include <core/climpd-log.h>
+#include <core/util.h>
 
-static const char *tag = "climpd_paths";
+static const char *tag = "climpd-paths";
 
 static char *_config_path;
-static char *media_loader_path;
+static char *_media_loader_path;
+static char *_last_playlist_path;
 
 #define CONFIG_PATH ".config/climp/climpd.conf"
 #define MEDIA_LOADER_PATH ".config/climp/playlists/"
+#define LAST_PLAYLIST_PATH ".config/climp/playlists/__last_playlist.m3u"
+
+
+static void set_path(char *__restrict dst, 
+                     const char *__restrict home,
+                     const char *__restrict path)
+{
+    strcpy(dst, home);
+    strcat(dst, "/");
+    strcat(dst, path);
+}
 
 void climpd_paths_init(void)
 {
@@ -42,7 +55,7 @@ void climpd_paths_init(void)
     home = getenv("HOME");
     if (!home) {
         climpd_log_e(tag, "no home directory for user %d\n", getuid());
-        goto out;
+        goto fail;
     }
     
     len = strlen(home);
@@ -50,36 +63,38 @@ void climpd_paths_init(void)
     _config_path = malloc(sizeof(CONFIG_PATH) + len);
     if (!_config_path) {
         climpd_log_e(tag, "failed to set up config path - %s\n", errstr);
-        goto out;
+        goto fail;
     }
     
-    strcpy(_config_path, home);
-    strcat(_config_path, "/");
-    strcat(_config_path, CONFIG_PATH);
+    set_path(_config_path, home, CONFIG_PATH);
     
-    media_loader_path = malloc(sizeof(MEDIA_LOADER_PATH) + len);
-    if (!media_loader_path) {
-        climpd_log_e(tag, "failed to set up media list loader path - %s\n", errstr);
-        goto cleanup1;
+    _media_loader_path = malloc(sizeof(MEDIA_LOADER_PATH) + len);
+    if (!_media_loader_path) {
+        climpd_log_e(tag, "failed to set up media loader path - %s\n", errstr);
+        goto fail;
     }
 
-    strcpy(media_loader_path, home);
-    strcat(media_loader_path, "/");
-    strcat(media_loader_path, MEDIA_LOADER_PATH);
+    set_path(_media_loader_path, home, MEDIA_LOADER_PATH);
+    
+    _last_playlist_path = malloc(sizeof(LAST_PLAYLIST_PATH) + len);
+    if (!_last_playlist_path) {
+        climpd_log_e(tag, "failed to set up last playlist path - %s\n", errstr);
+        goto fail;
+    }
+
+    set_path(_last_playlist_path, home, LAST_PLAYLIST_PATH);
     
     climpd_log_i(tag, "initialized\n");
     return;
 
-cleanup1:
-    free(_config_path);
-out:
-    climpd_log_e(tag, "failed to initialize - aborting...\n");
-    exit(EXIT_FAILURE);
+fail:
+    die_failed_init(tag);
 }
 
 void climpd_paths_destroy(void)
 {
-    free(media_loader_path);
+    free(_last_playlist_path);
+    free(_media_loader_path);
     free(_config_path);
     
     climpd_log_i(tag, "destroyed\n");
@@ -92,5 +107,10 @@ const char *climpd_paths_config(void)
 
 const char *climpd_paths_media_list_loader(void)
 {
-    return media_loader_path;
+    return _media_loader_path;
+}
+
+const char *climpd_paths_last_playlist(void)
+{
+    return _last_playlist_path;
 }

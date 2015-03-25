@@ -21,6 +21,8 @@
 #ifndef _CLIMPD_LOG_H_
 #define _CLIMPD_LOG_H_
 
+#include <stdarg.h>
+
 void climpd_log_init(void);
 
 void climpd_log_destroy(void);
@@ -36,6 +38,18 @@ void climpd_log_w(const char *__restrict tag, const char *fmt, ...)
 
 void climpd_log_e(const char *__restrict tag, const char *fmt, ...)
                                             __attribute__((format(printf,2,3)));
+
+void climpd_log_v_d(const char *__restrict tag, const char *__restrict fmt, 
+                    va_list vargs);
+
+void climpd_log_v_i(const char *__restrict tag, const char *__restrict fmt, 
+                    va_list vargs);
+
+void climpd_log_v_w(const char *__restrict tag, const char *__restrict fmt, 
+                    va_list vargs);
+
+void climpd_log_v_e(const char *__restrict tag, const char *__restrict fmt, 
+                    va_list vargs);
 
 void climpd_log_append(const char *fmt, ...)
                                             __attribute__((format(printf,1,2)));

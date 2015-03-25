@@ -21,6 +21,8 @@
 #ifndef _CLIMPD_CONFIG_H_
 #define _CLIMPD_CONFIG_H_
 
+#include <stdbool.h>
+
 void climpd_config_init(void);
 
 void climpd_config_destroy(void);

@@ -29,8 +29,9 @@
 
 #include <core/climpd-log.h>
 #include <core/bool-map.h>
+#include <core/util.h>
 
-const char *tag = "bool map";
+const char *tag = "bool-map";
 static struct map bool_map;
 
 bool yes = true;
@@ -73,14 +74,14 @@ void bool_map_init(void)
     err = map_init(&bool_map, &map_conf);
     if(err < 0) {
         climpd_log_e(tag, "failed to initialize map - %s\n", strerr(-err));
-        goto out;
+        goto fail;
     }
     
     for(unsigned int i = 0; i < ARRAY_SIZE(t); ++i) {
         err = map_insert(&bool_map, t[i], &yes);
         if(err < 0) {
             climpd_log_e(tag, "failed to initialize value \"%s\"\n", t[i]);
-            goto cleanup1;
+            goto fail;
         }
     }
     
@@ -88,7 +89,7 @@ void bool_map_init(void)
         err = map_insert(&bool_map, f[i], &no);
         if(err < 0) {
             climpd_log_e(tag, "failed to initialize value \"%s\"\n", t[i]);
-            goto cleanup1;
+            goto fail;
         }
     }
     
@@ -96,11 +97,8 @@ void bool_map_init(void)
     
     return;
     
-cleanup1:
-    map_destroy(&bool_map);
-out:
-    climpd_log_i(tag, "failed to initialize - aborting...\n");
-    exit(EXIT_FAILURE);
+fail:
+    die_failed_init(tag);
 }
 
 void bool_map_destroy(void)

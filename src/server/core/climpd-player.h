@@ -113,4 +113,5 @@ void climpd_player_print_files(int fd);
 
 void climpd_player_print_volume(int fd);
 
+
 #endif /* _CLIMPD_PLAYER_H_ */

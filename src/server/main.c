@@ -24,18 +24,10 @@
 #include <string.h>
 #include <errno.h>
 #include <stdbool.h>
-#include <signal.h>
-#include <fcntl.h>
 #include <stdint.h>
-#include <limits.h>
 #include <locale.h>
-#include <sys/socket.h>
-#include <sys/un.h>
-#include <sys/stat.h>
-#include <execinfo.h>
+#include <stdarg.h>
 #include <assert.h>
-
-#include <gst/gst.h>
 
 #include <libvci/map.h>
 #include <libvci/hash.h>
@@ -55,6 +47,8 @@
 #include <core/media-loader.h>
 #include <core/media-discoverer.h>
 #include <core/climpd-config.h>
+#include <core/socket.h>
+#include <core/mainloop.h>
 
 #include <obj/media-list.h>
 
@@ -85,11 +79,6 @@ static int handle_stop(const char **argv, int argc);
 static int handle_volume(const char **argv, int argc);
 
 static const char *tag = "main";
-
-static bool no_daemon;
-struct clock timer;
-GMainLoop *main_loop;
-GIOChannel *io_server;
 
 static int fd_out;
 static int fd_err;
@@ -152,14 +141,34 @@ static const char help[] = {
     "      --stop      \t\n"
 };
 
+__attribute__((format(printf,1,2)))
+static void print(const char *__restrict fmt, ...)
+{
+    va_list vargs;
+    
+    va_start(vargs, fmt);
+    vdprintf(fd_out, fmt, vargs);
+    va_end(vargs);
+}
+
+__attribute__((format(printf,1,2)))
+static void eprint(const char *__restrict fmt, ...)
+{
+    va_list vargs;
+    
+    va_start(vargs, fmt);
+    vdprintf(fd_err, fmt, vargs);
+    va_end(vargs);
+}
+
 static void report_invalid_boolean(const char *__restrict invalid_val)
 {
-    dprintf(fd_err, "climpd: unrecognized boolean value '%s'\n", invalid_val);
+    eprint("climpd: unrecognized boolean value '%s'\n", invalid_val);
 }
 
 static void report_invalid_integer(const char *__restrict invalid_val)
 {
-    dprintf(fd_err, "climpd: unrecognized integer value '%s'\n", invalid_val);
+    eprint("climpd: unrecognized integer value '%s'\n", invalid_val);
 }
 
 // static void report_invalid_path(const char *__restrict path, int err)
@@ -358,7 +367,7 @@ static int handle_help(const char **argv, int argc)
 {
     report_redundant_if_applicable(argv, argc);
     
-    dprintf(fd_out, "%s\n", help);
+    print("%s\n", help);
     
     return 0;
 }
@@ -375,8 +384,7 @@ static int handle_playlist(const char **argv, int argc)
     
     err = media_list_init(&ml);
     if (err < 0) {
-        dprintf(fd_err, "climpd: creating media list failed - %s\n", 
-                strerr(-err));
+        eprint("climpd: creating media list failed - %s\n", strerr(-err));
         return err;
     }
     
@@ -389,10 +397,8 @@ static int handle_playlist(const char **argv, int argc)
     }
     
     err = climpd_player_set_media_list(&ml);
-    if (err < 0) {
-        dprintf(fd_err, "climpd: setting new media list failed - %sfiles\n", 
-                strerr(-err));
-    }
+    if (err < 0)
+        eprint("climpd: setting new media list failed - %s\n", strerr(-err));
     
 cleanup1:
     media_list_destroy(&ml);
@@ -442,7 +448,7 @@ static int handle_next(const char **argv, int argc)
     }
     
     if (climpd_player_is_stopped())
-        dprintf(fd_out, "climpd: --next: finished playback\n");
+        print("climpd: --next: finished playback\n");
     
     return 0;
 }
@@ -465,7 +471,7 @@ static int handle_pause(const char **argv, int argc)
         }
         break;
     case CLIMPD_PLAYER_STOPPED:
-        dprintf(fd_out, "climpd: --pause: player is stopped - done\n");
+        print("climpd: --pause: player is stopped - done\n");
         break;
     default:
         break;
@@ -558,7 +564,7 @@ static int handle_quit(const char **argv, int argc)
 {
     report_redundant_if_applicable(argv, argc);
     
-    g_main_loop_quit(main_loop);
+    mainloop_quit();
     
     return 0;
 }
@@ -733,24 +739,23 @@ static int handle_argv(const char **argv, int argc)
     for (int i = 0 ; i < argc; ++i) {
         struct option *opt = map_retrieve(&options_map, argv[i]);
         
-        if (opt) {
-            int j = i + 1;
-            
-            while (j < argc && !map_contains(&options_map, argv[j]))
-                j++;
-            
-            j--;
-            
-            err = opt->handler(argv + i + 1, j - i);
-            if (err < 0) { 
-                climpd_log_w(tag, "handling option \"%s\" failed - %s\n",
-                             argv[i], strerr(-err));
-            }
-            
-            i = j;
-        } else {
+        if (!opt) {
             dprintf(fd_err, "climpd: invalid option \"%s\"\n", argv[i]);
+            continue;
         }
+        
+        int j = i + 1;
+        
+        while (j < argc && !map_contains(&options_map, argv[j]))
+            j++;
+        
+        j--;
+        
+        err = opt->handler(argv + i + 1, j - i);
+        if (err < 0)
+            climpd_log_w(tag, "\"%s\" failed - %s\n", argv[i], strerr(-err));
+        
+        i = j;
     }
     
     return 0;
@@ -775,8 +780,7 @@ static int handle_connection(int fd)
     
     err = chdir(cwd);
     if (err < 0) {
-        climpd_log_w(tag, "changing working directory to '%s' failed - %s\n", 
-                     cwd, errstr);
+        climpd_log_w(tag, "chdir() to \"%s\" failed - %s\n", cwd, errstr);
     }
     
     err = handle_argv((const char **) argv, argc);
@@ -800,281 +804,6 @@ cleanup1:
     close(fd_out);
     
     return err;
-}
-
-static gboolean handle_server_fd(GIOChannel *src, GIOCondition cond, void *data)
-{
-    struct ucred creds;
-    socklen_t cred_len;
-    int fd, err;
-    
-    (void) src;
-    (void) data;
-    (void) cond;
-    
-    clock_reset(&timer);
-    
-    fd = accept(g_io_channel_unix_get_fd(io_server), NULL, NULL);
-    if(fd < 0) {
-        err = -errno;
-        goto out;
-    }
-    
-    cred_len = sizeof(creds);
-    
-    err = getsockopt(fd, SOL_SOCKET, SO_PEERCRED, &creds, &cred_len);
-    if(err < 0) {
-        err = -errno;
-        climpd_log_e(tag, "getsockopt(): %s\n", strerr(errno));
-        goto out;
-    }
-    
-    if(creds.uid != getuid()) {
-        climpd_log_w(tag, "non-authorized user %d connected -> closing "
-        "connection\n", creds.uid);
-        err = -EPERM;
-        goto out;
-    }
-    
-    climpd_log_i(tag, "user %d connected on socket %d\n", creds.uid, fd);
-    
-    err = handle_connection(fd);
-    if (err < 0) {
-        climpd_log_e(tag, "handling connection on socket %d failed - %s\n",
-                     fd, strerr(-err));
-        goto out;
-    }
-    
-out:
-    close(fd);
-    
-    climpd_log_i(tag, "served connection on socket %d in %lu ms\n", fd, 
-                 clock_elapsed_ms(&timer));
-    
-    return true;
-}
-
-static void handle_error_signal(int sig)
-{
-#define STACKTRACE_BUFFER_SIZE 32
-    static void *buffer[STACKTRACE_BUFFER_SIZE];
-    int size;
-    
-    climpd_log_e(tag, "received signal \"%s\"\nbacktrace:\n", strsignal(sig));
-    
-    size = backtrace(buffer, STACKTRACE_BUFFER_SIZE);
-    if(size <= 0)
-        return;
-    
-    backtrace_symbols_fd(buffer, size, climpd_log_fd());
-    
-    exit(EXIT_FAILURE);
-}
-
-static void handle_signal(int sig)
-{
-    const char *str;
-    
-    str = strsignal(sig);
-    
-    switch(sig) {
-    case SIGTERM:
-        climpd_log_i(tag, "terminating process on signal \"%s\"\n", str);
-        g_main_loop_quit(main_loop);
-        break;
-    case SIGHUP:
-        climpd_log_i(tag, "reloading config on signal \"%s\"\n", str);
-        climpd_config_reload();
-        break;
-    default:
-        climpd_log_i(tag, "ignoring signal \"%s\"\n", str);
-        break;
-    }
-}
-
-static void close_std_streams(void)
-{
-    int streams[] = { STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO };
-    int fd, err;
-    
-    fd = open("/dev/null", O_RDWR);
-    if(fd < 0) {
-        climpd_log_w(tag, "failed to open \"/dev/null\" for redirecting - %s - "
-                     "falling back to closing standard streams\n", errstr);
-        goto backup;
-    }
-    
-    for(unsigned int i = 0; i < ARRAY_SIZE(streams); ++i) {
-        err = dup2(fd, streams[i]);
-        if(err < 0) {
-            climpd_log_w(tag, "failed to redirect standard stream %d - %s - "
-                         "falling back to closing standard streams\n", 
-                         streams[i], errstr);
-            goto backup;
-        }
-    }
-    
-    close(fd);
-    
-    return;
-    
-backup:
-    close(fd);
-    
-    for (unsigned int i = 0; i < ARRAY_SIZE(streams); ++i)
-        close(streams[i]);
-}
-
-static void init_signal_handlers(void)
-{
-    struct sigaction sa;
-    static const int error_signals[] = { 
-        SIGILL, SIGBUS, SIGSEGV, SIGFPE, SIGPIPE, SIGSYS 
-    };
-    static const int signals[] = { 
-        SIGQUIT, SIGTERM, SIGHUP, SIGINT, SIGTSTP, SIGTTIN, SIGTTOU 
-    };
-    int err;
-    
-    memset(&sa, 0, sizeof(sa));
-    
-    sa.sa_handler = &handle_error_signal;
-    sigemptyset(&sa.sa_mask);
-    
-    for(unsigned int i = 0; i < ARRAY_SIZE(error_signals); ++i) {
-        err = sigaction(error_signals[i], &sa, NULL);
-        if(err < 0) {
-            climpd_log_e(tag, "failed to set up signal handler for \"%s\" - "
-                         "%s\n", strsignal(error_signals[i]), errstr);
-            goto out;
-        }
-    }
-    
-    sa.sa_handler = &handle_signal;
-    sigfillset(&sa.sa_mask);
-    
-    for(unsigned int i = 0; i < ARRAY_SIZE(signals); ++i) {
-        err = sigaction(signals[i], &sa, NULL);
-        if(err < 0) {
-            climpd_log_e(tag, "failed to set up signal handler for \"%s\" - "
-                         "%s\n", strsignal(error_signals[i]), errstr);
-            goto out;
-        }
-    }
-    
-    climpd_log_i(tag, "initialized signal handlers\n");
-    
-    return;
-    
-out:
-    climpd_log_e(tag, "failed to initialize signal handlers - aborting...\n");
-    exit(EXIT_FAILURE);
-}
-
-static int daemonize(void)
-{
-    int err;
-    pid_t pid, sid;
-    
-    pid = fork();
-    if(pid < 0)
-        return -errno;
-    
-    if(pid > 0)
-        _exit(EXIT_SUCCESS);
-    
-    /*
-     * We don't want to get closed when our tty is closed.
-     * Creating our own session will prevent this.
-     */
-    sid = setsid();
-    if(sid < 0)
-        return -errno;
-    
-    /* 
-     * Exit session leading process:
-     * Only a session leading process is able to acquire
-     * a controlling terminal
-     */
-    pid = fork();
-    if(pid < 0)
-        return -errno;
-    
-    if(pid > 0)
-        _exit(EXIT_SUCCESS);
-    
-    umask(0);
-    
-    err = chdir("/");
-    if(err < 0)
-        return -errno;
-    
-    init_signal_handlers();
-    close_std_streams();
-
-    return 0;
-}
-
-static void server_fd_init(void)
-{
-    struct sockaddr_un addr;
-    int fd, err;
-    
-    /* Setup Unix Domain Socket */
-    err = unlink(IPC_SOCKET_PATH);
-    if(err < 0 && errno != ENOENT) {
-        climpd_log_e(tag, "failed to remove old server socket \"%s\" - %s\n",
-                     IPC_SOCKET_PATH, strerr(errno));
-        goto out;
-    }
-    
-    fd = socket(AF_UNIX, SOCK_STREAM, 0);
-    if(fd < 0) {
-        climpd_log_e(tag, "creating server socket failed - %s\n", errstr);
-        goto out;
-    }
-    
-    memset(&addr, 0, sizeof(addr));
-    
-    addr.sun_family = AF_UNIX;
-    strncpy(addr.sun_path, IPC_SOCKET_PATH, sizeof(addr.sun_path));
-    
-    err = bind(fd, (struct sockaddr *) &addr, sizeof(addr));
-    if(err < 0) {
-        climpd_log_e(tag, "binding server socket failed - %s\n", errstr);
-        goto cleanup1;
-    }
-    
-    err = listen(fd, 5);
-    if(err < 0) {
-        climpd_log_e(tag, "listening on server socket failed - %s\n", errstr);
-        goto cleanup1;
-    }
-    
-    io_server = g_io_channel_unix_new(fd);
-    if (!io_server) {
-        climpd_log_e(tag, "initializing io channel for server socket failed\n");
-        goto cleanup1;
-    }
-    
-    g_io_add_watch(io_server, G_IO_IN, &handle_server_fd, NULL);
-    g_io_channel_set_close_on_unref(io_server, true);
-    
-    climpd_log_i(tag, "initialized server socket\n");
-
-    return;
-
-cleanup1:
-    close(fd);
-out:
-    climpd_log_e(tag, "failed to initialize server socket - aborting...\n");
-    exit(EXIT_FAILURE);
-}
-
-static void server_fd_destroy(void)
-{
-    g_io_channel_unref(io_server);
-    unlink(IPC_SOCKET_PATH);
 }
 
 static void options_init(void)
@@ -1131,7 +860,7 @@ void options_destroy(void)
 
 int main(int argc, char *argv[])
 {
-    int err;
+    bool no_daemon = false;
     
     for (int i = 1; i < argc; ++i) {
         if (strcmp("--no-daemon", argv[i]) == 0 || strcmp("-n", argv[i]) == 0)
@@ -1147,20 +876,12 @@ int main(int argc, char *argv[])
     climpd_log_init();
     
     climpd_log_i(tag, "starting initialization...\n");
-    
-    if (!no_daemon) {
-        err = daemonize();
-        if(err < 0) {
-            climpd_log_e(tag, "failed to daemonize - %s - aborting...\n", 
-                         strerr(-err));
-            exit(EXIT_FAILURE);
-        }
-    }
-    
+
     terminal_color_map_init();
     bool_map_init();
     climpd_paths_init();
-    server_fd_init();
+    mainloop_init(no_daemon);
+    socket_init(&handle_connection);
     
     /* needs climpd_paths */
     climpd_config_init();
@@ -1172,35 +893,18 @@ int main(int argc, char *argv[])
     /* needs climpd_paths */
     media_loader_init();
     options_init();
-    
-    err = clock_init(&timer, CLOCK_MONOTONIC);
-    if (err < 0) {
-        climpd_log_e(tag, "failed to initialize timer - %s - aborting...\n", 
-                     strerr(-err));
-        exit(EXIT_FAILURE);
-    }
-    
-    clock_start(&timer);
-    
-    main_loop = g_main_loop_new(NULL, false);
-    if (!main_loop) {
-        climpd_log_e(tag, "failed to initialize main loop - aborting...\n");
-        exit(EXIT_FAILURE);
-    }
-    
 
     climpd_log_i(tag, "initialization successful\n");
-
-    g_main_loop_run(main_loop);
-
-    g_main_loop_unref(main_loop);
-    clock_destroy(&timer);
+    
+    mainloop_run();
+    
     options_destroy();
     media_loader_destroy();
     climpd_player_destroy();
     media_discoverer_destroy();
     climpd_config_destroy();
-    server_fd_destroy();
+    socket_destroy();
+    mainloop_destroy();
     climpd_paths_destroy();
     bool_map_destroy();
     terminal_color_map_destroy();

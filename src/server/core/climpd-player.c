@@ -25,6 +25,10 @@
 #include <errno.h>
 #include <stdbool.h>
 #include <math.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
 #include <assert.h>
 
 #include <gst/gst.h>
@@ -38,6 +42,8 @@
 #include <core/climpd-log.h>
 #include <core/terminal-color-map.h>
 #include <core/climpd-player.h>
+#include <core/climpd-paths.h>
+#include <core/util.h>
 
 #include <obj/playlist.h>
 
@@ -384,6 +390,52 @@ static void print_media(struct media *__restrict m, unsigned int index, int fd)
     }
 }
 
+static void load_last_playlist(void)
+{
+    const char *path = climpd_paths_last_playlist();
+    struct media_list ml;
+    int err;
+
+    err = media_list_init(&ml);
+    if (err < 0) {
+        climpd_log_w(tag, "failed to initialize last played playlist\n");
+        return;
+    }
+    
+    err = media_list_add_from_file(&ml, path);
+    if (err < 0 && err != -ENOENT) {
+        climpd_log_w(tag, "failed to load last playlist elements from \"%s\" - "
+                     "%s\n", path, strerr(-err));
+        goto cleanup;
+    }
+    
+    err = playlist_add_media_list(&_playlist, &ml);
+    if (err < 0) {
+        climpd_log_w(tag, "failed to add last playlist elements - %s\n", 
+                     strerr(-err));
+        goto cleanup;
+    }
+
+cleanup:
+    media_list_destroy(&ml);
+}
+
+static void save_playlist(void)
+{
+    const char *path = climpd_paths_last_playlist();
+    int fd;
+    
+    fd = open(path, O_WRONLY | O_CLOEXEC | O_CREAT | O_TRUNC, 0644);
+    if (fd < 0) {
+        climpd_log_e(tag, "failed to save playlist to \"%s\" - %s\n", path, 
+                     errstr);
+        return;
+    } 
+    
+    climpd_player_print_files(fd);
+    close(fd);
+}
+
 void climpd_player_init(void)
 {
     static const char *elements[] = {
@@ -397,6 +449,7 @@ void climpd_player_init(void)
     GError *error;
     bool ok;
     int err;
+    
 
     _gst_pipeline = gst_pipeline_new(NULL);
     if(!_gst_pipeline) {
@@ -468,17 +521,19 @@ void climpd_player_init(void)
     
     climpd_player_set_volume(vol);
     
+    load_last_playlist();
+    
     climpd_log_i(tag, "initialized\n");
     
     return;
 
 fail:
-    climpd_log_e(tag, "failed to initialize - aborting...\n");
-    exit(EXIT_FAILURE);
+    die_failed_init(tag);
 }
 
 void climpd_player_destroy(void)
 {
+    save_playlist();
     
     if (_running_track)
         media_unref(_running_track);

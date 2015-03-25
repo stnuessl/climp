@@ -29,6 +29,7 @@
 
 #include <core/climpd-log.h>
 #include <core/terminal-color-map.h>
+#include <core/util.h>
 
 static char *color_table[] = {
     "default",          COLOR_CODE_DEFAULT,
@@ -66,7 +67,7 @@ void terminal_color_map_init(void)
     err = map_init(&color_map, &map_conf);
     if(err < 0) {
         climpd_log_e(tag, "failed to initialize map - %s\n", strerr(-err));
-        goto out;
+        goto fail;
     }
     
     for(unsigned int i = 0; i < ARRAY_SIZE(color_table); i += 2) {
@@ -74,7 +75,7 @@ void terminal_color_map_init(void)
         if(err < 0) {
             climpd_log_e(tag, "failed to initialize terminal color \"%s\" - "
                          "%s\n", color_table[i], strerr(-err));
-            goto cleanup1;
+            goto fail;
         }
     }
     
@@ -82,11 +83,8 @@ void terminal_color_map_init(void)
     
     return;
 
-cleanup1:
-    map_destroy(&color_map);
-out:
-    climpd_log_e(tag, "failed to initialize - aborting...\n");
-    exit(EXIT_FAILURE);
+fail:
+    die_failed_init(tag);
 }
 
 void terminal_color_map_destroy(void)

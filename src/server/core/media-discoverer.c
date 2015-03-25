@@ -33,6 +33,7 @@
 #include <libvci/filesystem.h>
 #include <libvci/error.h>
 
+#include <core/util.h>
 #include <core/media-discoverer.h>
 #include <core/climpd-log.h>
 
@@ -140,8 +141,7 @@ void media_discoverer_init(void)
     return;
 
 fail:
-    climpd_log_e(tag, "failed to initialize - aborting...\n");
-    exit(EXIT_FAILURE);
+    die_failed_init(tag);
 }
 
 void media_discoverer_destroy(void)
