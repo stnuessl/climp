@@ -680,11 +680,7 @@ int climpd_player_next(void)
 
     if (!_running_track) {
         climpd_player_stop();
-        
-        if (playlist_empty(&_playlist))
-            return -ENOENT;
-        else
-            return 0;
+        return 0;
     }
     
     return climpd_player_play_uri(media_uri(_running_track));

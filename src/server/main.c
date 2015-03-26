@@ -35,6 +35,7 @@
 #include <libvci/clock.h>
 #include <libvci/macro.h>
 #include <libvci/error.h>
+#include <libvci/filesystem.h>
 
 #include "../shared/ipc.h"
 #include "../shared/constants.h"
@@ -49,6 +50,7 @@
 #include <core/climpd-config.h>
 #include <core/socket.h>
 #include <core/mainloop.h>
+#include <core/util.h>
 
 #include <obj/media-list.h>
 
@@ -118,27 +120,39 @@ static struct option options[] = {
 static const char help[] = {
     "Usage:\n"
     "climp --cmd1 [[arg1] ...] --cmd2 [[arg1] ...]\n\n"
-    "  -a, --add       \tadd a directory, .m3u, .txt and / or media file to\n"
-    "                  \tthe playlist\n"
-    "      --clear     \tclear the current playlist\n"
-    "      --config    \tprint the climpd configuration\n"
-    "      --remove    \tremove a media file from the playlist\n"
-    "      --pause     \t\n" 
-    "      --playlist  \t\n"
-    "      --repeat    \t\n"
-    "      --shuffle   \t\n"
-    "  -v, --volume    \t\n"
-    "  -q, --quit      \t\n"
-    "      --help      \t\n"
-    "      --previous  \t\n"
-    "      --next      \t\n"
-    "  -p, --play      \t\n"
-    "      --files     \t\n"
-    "      --log       \t\n"
-    "      --mute      \t\n"
-    "      --seek      \t\n"
-    "      --discover  \t\n"
-    "      --stop      \t\n"
+    "  -a, --add [args]       Add a directory, .m3u/.txt and / or media file\n"
+    "                         to the playlist\n"
+    "      --clear            Clear the current playlist.\n"
+    "      --config           Print the climpd configuration.\n"
+    "      --remove [args]    Remove media files from the playlist.\n"
+    "                         .m3u / .txt - or media files are accepted\n"
+    "                         arguments.\n"
+    "      --pause            Pause / unpause the player. This has no effect \n"
+    "                         if the player is stopped.\n" 
+    "      --playlist [args]  Print or set the current playlist. Directories,\n"
+    "                         files or .m3u / .txt - files are accepted as\n"
+    "                         arguments.\n"
+    "      --repeat           Toggle repeat playlist.\n"
+    "      --shuffle          Toggle shuffle.\n"
+    "  -v, --volume [arg]     Set or get the volume of the climpd-player.\n"
+    "  -q, --quit             Quit the climpd application.\n"
+    "      --help             Print this help message\n"
+    "      --previous         not implemented yet\n"
+    "      --next             Play the next track in the playlist.\n"
+    "  -p, --play [args]      Start playback, or set a playlist and start\n"
+    "                         playback immediatley, or jump to a track in the\n"
+    "                         playlist. Pass numbers, directories, .m3u/.txt\n"
+    "                         or media files to this option\n"
+    "      --files            Print all files in the current playlist\n"
+    "      --log              Print the log of the daemon\n"
+    "      --mute             Mute or unmute the player\n"
+    "      --seek [arg]       Get current position or jump to a position \n"
+    "                         in the current track.\n"
+    "                         Accepted time formats: m:ss - or just - s\n"
+    "      --discover [args]  Search recursivley for files which can be\n"
+    "                         played by the climpd-player. Arguments must be\n"
+    "                         directories\n"
+    "      --stop             Stop the playback\n"
 };
 
 __attribute__((format(printf,1,2)))
@@ -188,14 +202,14 @@ static void report_arg_error(const char *__restrict cmd,
                              const char *__restrict arg, 
                              int err)
 {
-    dprintf(fd_err, "climpd: %s: \"%s\" - %s\n", cmd, arg, strerr(-err));
+    dprintf(fd_err, "climpd: %s: \"%s\" - %s\n", cmd, arg, strerr(abs(err)));
 }
 
 static void report_error(const char *__restrict cmd, 
                          const char *__restrict msg,
                          int err)
 {
-    dprintf(fd_err, "climpd: %s: %s - %s\n", cmd, msg, strerr(-err));
+    dprintf(fd_err, "climpd: %s: %s - %s\n", cmd, msg, strerr(abs(err)));
 }
 
 static void report_invalid_time_format(const char *__restrict cmd, 
@@ -216,22 +230,6 @@ static void report_redundant_if_applicable(const char **argv, int argc)
         dprintf(fd_err, "%s ", argv[i]);
     
     dprintf(fd_err, "\n");
-}
-
-static int string_to_integer(const char *s, int *i)
-{
-    char *end;
-    
-    errno = 0;
-    *i = (int) strtol(s, &end, 10);
-    
-    if (errno != 0)
-        return -errno;
-    
-    if (*end != '\0')
-        return -EINVAL;
-    
-    return 0;
 }
 
 // static int make_arg_insertion(struct media_list *__restrict ml, 
@@ -277,7 +275,9 @@ static int handle_add(const char **argv, int argc)
         }
     }
     
-    /* TODO: finish function */
+    err = climpd_player_add_media_list(&ml);
+    if (err < 0)
+        report_error("--add", "failed to add items to playlist", err);
     
 cleanup1:
     media_list_destroy(&ml);
@@ -499,50 +499,47 @@ static int handle_play(const char **argv, int argc)
     valid_index = false;
     
     for (int i = 0; i < argc; ++i) {
-        err = string_to_integer(argv[i], &index);
+        err = str_to_int(argv[i], &index);
         if (err == 0) {
             valid_index = true;
             continue;
         }
         
         err = media_loader_load(argv[i], &ml);
-        if (err < 0) {
-            report_arg_error("--play", argv[i], err);
-            goto cleanup1;
-        }
+        if (err == 0)
+            continue;
+        
+        report_arg_error("--play", argv[i], err);
+        goto cleanup1;
     }
     
-    if (!media_list_empty(&ml)) {
-        /* 
-         * Run this first so a wider range of indices become valid
-         * especially usefull if loading first playlist, e.g.:
-         * 
-         *     climp --clear --play my_playlist.m3u 10
-         */
-        err = climpd_player_add_media_list(&ml);
-        if (err < 0) {
-            report_error("--play", "adding files to player failed", err);
-            goto cleanup1;
-        }    
+    /* 
+     * Run this first so indices become valid especially usefull 
+     * if loading playlist and jumping directly  to a track, e.g.:
+     * 
+     *     climp --clear --play my_playlist.m3u 10
+     */
+    err = climpd_player_set_media_list(&ml);
+    if (err < 0) {
+        report_error("--play", "adding files to player failed", err);
+        goto cleanup1;
     }
-    
+
     if (valid_index) {
         err = climpd_player_play_track(index);
-        if (err < 0)
-            report_error("--play", "failed to play specified index", err);
-    } else if (!media_list_empty(&ml)) {
-        struct media *m = media_list_at(&ml, 0);
-        
-        err = climpd_player_play_path(media_path(m));
         if (err < 0) {
-            report_error("--play", "failed to play first file of added "
-                         "playlist", err);
+            eprint("climpd: --play: failed to play track \"%d\" - %s\n", index,
+                   strerr(err));
+        }
+    } else {
+        if (media_list_empty(&ml)) {
+            eprint("climpd: --play: loaded empty playlist - nothing to do\n");
+            goto cleanup1;
         }
         
-        media_unref(m);
-    } else {
-        dprintf(fd_err, "climpd: --play: nothing to do - maybe an empty "
-                "playlist file was loaded\n");
+        err = climpd_player_next();
+        if (err < 0)
+            report_error("--play", "failed to play track", err);
     }
     
 cleanup1:
@@ -579,7 +576,7 @@ static int handle_remove(const char **argv, int argc)
     for (int i = 0; i < argc; ++i) {
         int index;
         
-        err = string_to_integer(argv[i], &index);
+        err = str_to_int(argv[i], &index);
         if (err == 0) {
             climpd_player_delete_index(index);
             continue;
@@ -624,9 +621,7 @@ static int handle_repeat(const char **argv, int argc)
 
 static int handle_seek(const char **argv, int argc)
 {
-    char *r;
-    long val;
-    int err;
+    int sec, err;
  
     report_redundant_if_applicable(argv + 1, argc - 1);
     
@@ -636,39 +631,17 @@ static int handle_seek(const char **argv, int argc)
         int min = val / 60;
         int sec = val % 60;
         
-        dprintf(fd_out, "  %d:%02d\n", min, sec);
+        print("  %d:%02d\n", min, sec);
         return 0;
     }
-
-    errno = 0;
-    val = strtol(argv[0], &r, 10);
-    if (errno) {
-        err = -errno;
-        report_arg_error("--seek", argv[0], err);
+    
+    err = str_to_sec(argv[0], &sec);
+    if (err < 0) {
+        report_invalid_time_format("--seek", argv[0]);
         return err;
     }
-    
-    if (*r != '\0') {
-        if (*r != ':' && *r != '.' && *r != ',' && *r != ' ') {
-            report_invalid_time_format("--seek", argv[0]);
-            return -EINVAL;
-        }
-        
-        val *= 60;
-        errno = 0;
-        
-        val += strtol(r + 1, &r, 10);
-        if (errno) {
-            err = -errno;
-            report_arg_error("--seek", argv[0], err);
-            return err;
-        } else if (*r != '\0') {
-            report_invalid_time_format("--seek", argv[0]);
-            return -EINVAL;
-        }
-    }
-    
-    err = climpd_player_seek(val);
+
+    err = climpd_player_seek((unsigned int) sec);
     if(err < 0) {
         report_error("--seek", "seeking to position failed", err);
         return err;
@@ -721,7 +694,7 @@ static int handle_volume(const char **argv, int argc)
         return 0;
     }
     
-    err = string_to_integer(argv[0], &vol);
+    err = str_to_int(argv[0], &vol);
     if (err < 0) {
         report_invalid_integer(argv[0]);
         return -EINVAL;
@@ -887,7 +860,7 @@ int main(int argc, char *argv[])
     climpd_config_init();
     media_discoverer_init();
     
-    /* needs climpd_config */
+    /* needs climpd_config and climpd_paths */
     climpd_player_init();
     
     /* needs climpd_paths */

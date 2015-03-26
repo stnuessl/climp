@@ -75,9 +75,7 @@ static void config_text_init(int fd, void *arg)
                 "# Play tracks in the playlist in random order\n"
                 "Shuffle = %s\n\n",
             _media_meta_length, _media_active_color, _media_passive_color, 
-            _volume, 
-            (_repeat) ? "true" : "false", 
-            (_shuffle) ? "true" : "false");
+            _volume,  true_false(_repeat), true_false(_shuffle));
 }
 
 

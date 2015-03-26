@@ -21,6 +21,8 @@
 #ifndef _UTIL_H_
 #define _UTIL_H_
 
+#include <stdbool.h>
+
 void die(const char *__restrict tag, const char *__restrict msg);
 
 void die_errno(const char *__restrict tag, const char *__restrict msg, int err);
@@ -29,5 +31,13 @@ void die_fmt(const char *__restrict tag, const char *__restrict fmt, ...)
                                             __attribute__((format(printf,2,3)));
 
 void die_failed_init(const char *__restrict tag);
+
+const char *yes_no(bool val);
+
+const char *true_false(bool val);
+
+int str_to_int(const char *__restrict s, int *__restrict i);
+
+int str_to_sec(const char *__restrict s, int *__restrict sec);
 
 #endif /* _UTIL_H_ */
