@@ -28,6 +28,7 @@
 #include <execinfo.h>
 
 #include <gst/gst.h>
+#include <glib-unix.h>
 
 #include <libvci/error.h>
 #include <libvci/macro.h>
@@ -42,40 +43,43 @@ static GMainLoop *mloop;
 
 static void handle_error_signal(int sig)
 {
-    #define STACKTRACE_BUFFER_SIZE 32
+#define STACKTRACE_BUFFER_SIZE 32
     static void *buffer[STACKTRACE_BUFFER_SIZE];
     int size;
     
     climpd_log_e(tag, "received signal \"%s\"\nbacktrace:\n", strsignal(sig));
     
     size = backtrace(buffer, STACKTRACE_BUFFER_SIZE);
-    if(size <= 0)
-        return;
-    
-    backtrace_symbols_fd(buffer, size, climpd_log_fd());
+    if(size > 0)
+        backtrace_symbols_fd(buffer, size, climpd_log_fd());
     
     exit(EXIT_FAILURE);
 }
 
-static void handle_signal(int sig)
+static gboolean handle_signal(void *data)
 {
+    int sig, err;
     const char *str;
     
+    sig = (int)(long) data;
     str = strsignal(sig);
     
     switch(sig) {
-        case SIGTERM:
-            climpd_log_i(tag, "terminating process on signal \"%s\"\n", str);
-            g_main_loop_quit(mloop);
-            break;
-        case SIGHUP:
-            climpd_log_i(tag, "reloading config on signal \"%s\"\n", str);
-            climpd_config_reload();
-            break;
-        default:
-            climpd_log_i(tag, "ignoring signal \"%s\"\n", str);
-            break;
+    case SIGTERM:
+        climpd_log_i(tag, "terminating on signal \"%s\"\n", str);
+        g_main_loop_quit(mloop);
+        break;
+    case SIGHUP:
+        climpd_log_i(tag, "reloading config on signal \"%s\"\n", str);
+        err = climpd_config_reload();
+        if (err < 0)
+            climpd_log_w(tag, "failed to reload config - %s\n", strerr(-err));
+        break;
+    default:
+        break;
     }
+    
+    return true;
 }
 
 static void close_std_streams(void)
@@ -111,14 +115,41 @@ backup:
         close(streams[i]);
 }
 
-static void init_signal_handlers(void)
+static void init_signal_handlers_glib(void)
+{
+    struct {
+        int id;
+        gboolean (*handler)(void *);
+    } sig[] = {
+        { SIGTERM,      &handle_signal  },
+        { SIGHUP,       &handle_signal  },
+    };
+    
+    for (unsigned int i = 0; i < ARRAY_SIZE(sig); ++i) {
+        int id = sig[i].id;
+        
+        guint eid = g_unix_signal_add(id, sig[i].handler, (void *)(long) id);
+        if (eid == 0) {
+            climpd_log_e(tag, "\"%s\" - failed to setup signal handler\n", 
+                         strsignal(sig[i].id));
+            goto fail;
+        }
+    }
+    
+    return;
+    
+fail:
+    die_failed_init(tag);
+}
+
+static void init_signal_handlers_unix(void)
 {
     struct sigaction sa;
-    static const int error_signals[] = { 
+    const int error_signals[] = { 
         SIGILL, SIGBUS, SIGSEGV, SIGFPE, SIGPIPE, SIGSYS 
     };
     static const int signals[] = { 
-        SIGQUIT, SIGTERM, SIGHUP, SIGINT, SIGTSTP, SIGTTIN, SIGTTOU 
+        SIGQUIT, SIGINT, SIGTSTP, SIGTTIN, SIGTTOU 
     };
     int err;
     
@@ -136,14 +167,11 @@ static void init_signal_handlers(void)
         }
     }
     
-    sa.sa_handler = &handle_signal;
-    sigfillset(&sa.sa_mask);
-    
     for(unsigned int i = 0; i < ARRAY_SIZE(signals); ++i) {
-        err = sigaction(signals[i], &sa, NULL);
+        err = sigignore(signals[i]);
         if(err < 0) {
             climpd_log_e(tag, "failed to set up signal handler for \"%s\" - "
-                        "%s\n", strsignal(error_signals[i]), errstr);
+                         "%s\n", strsignal(error_signals[i]), errstr);
             goto fail;
         }
     }
@@ -152,6 +180,13 @@ static void init_signal_handlers(void)
     
 fail:
     die_failed_init(tag);
+}
+
+
+static void init_signal_handlers(void)
+{
+    init_signal_handlers_unix();
+    init_signal_handlers_glib();
 }
 
 static int daemonize(void)

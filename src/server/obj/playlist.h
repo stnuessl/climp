@@ -54,7 +54,7 @@ int playlist_set_media_list(struct playlist *__restrict pl,
 int playlist_add_media_list(struct playlist *__restrict pl, 
                             struct media_list *__restrict ml);
 
-void playlist_remove_media_list(struct playlist *__restrict pl, 
+void playlist_remove_media_list(struct playlist *__restrict pl,
                                 struct media_list *__restrict ml);
 
 struct media *playlist_at(struct playlist *__restrict pl, int index);

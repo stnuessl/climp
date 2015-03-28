@@ -148,7 +148,7 @@ static const char help[] = {
     "      --mute             Mute or unmute the player\n"
     "      --seek [arg]       Get current position or jump to a position \n"
     "                         in the current track.\n"
-    "                         Accepted time formats: m:ss - or just - s\n"
+    "                         Accepted time formats: [m:ss] - or just - [s]\n"
     "      --discover [args]  Search recursivley for files which can be\n"
     "                         played by the climpd-player. Arguments must be\n"
     "                         directories\n"
@@ -519,27 +519,26 @@ static int handle_play(const char **argv, int argc)
      * 
      *     climp --clear --play my_playlist.m3u 10
      */
-    err = climpd_player_set_media_list(&ml);
-    if (err < 0) {
-        report_error("--play", "adding files to player failed", err);
-        goto cleanup1;
+    if (!media_list_empty(&ml)) {
+        err = climpd_player_set_media_list(&ml);
+        if (err < 0) {
+            report_error("--play", "adding files to player failed", err);
+            goto cleanup1;
+        }
+        
+        if (!valid_index) {
+            err = climpd_player_next();
+            if (err < 0)
+                report_error("--play", "failed to play track", err);
+        }
     }
-
+    
     if (valid_index) {
         err = climpd_player_play_track(index);
         if (err < 0) {
             eprint("climpd: --play: failed to play track \"%d\" - %s\n", index,
-                   strerr(err));
+                   strerr(-err));
         }
-    } else {
-        if (media_list_empty(&ml)) {
-            eprint("climpd: --play: loaded empty playlist - nothing to do\n");
-            goto cleanup1;
-        }
-        
-        err = climpd_player_next();
-        if (err < 0)
-            report_error("--play", "failed to play track", err);
     }
     
 cleanup1:
