@@ -270,7 +270,7 @@ unsigned int playlist_index_of_path(struct playlist *__restrict pl,
     for (unsigned int i = 0; i < size; ++i) {
         struct media *m = *vector_at(&pl->vec_media, i);
         
-        if (media_path_compare(m, path) == 0)
+        if (media_hierarchical_compare(m, path) == 0)
             return i;
     }
     

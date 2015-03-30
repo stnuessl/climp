@@ -29,6 +29,7 @@
 
 #include <core/climpd-log.h>
 #include <obj/media-list.h>
+#include <obj/uri.h>
 
 static const char *tag = "media-list";
 
@@ -109,25 +110,25 @@ int media_list_add_from_file(struct media_list *__restrict ml,
     
     while(1) {
         n = getline(&line, &size, file);
-        if(n < 0)
+        if (n < 0)
             break;
         
-        if(n == 0)
+        if (n == 0)
             continue;
         
-        if(line[0] == '#' || line[0] == '\n')
+        if (line[0] == '#' || line[0] == '\n')
             continue;
         
         line[n - 1] = '\0';
                 
-        if(!path_is_absolute(line)) {
+        if (!path_is_absolute(line) && !uri_ok(line)) {
             err = -ENOTSUP;
-            climpd_log_e(tag, "\"%s\" - no absolute path\n", line);
+            climpd_log_e(tag, "\"%s\" - no absolute path or valid uri\n", line);
             goto cleanup1;
         }
         
         err = media_list_emplace_back(ml, line);
-        if(err < 0) {
+        if (err < 0) {
             climpd_log_w(tag, "failed to initialize media file '%s' - %s\n", 
                          line, strerr(-err));
             goto cleanup1;
@@ -143,7 +144,7 @@ int media_list_add_from_file(struct media_list *__restrict ml,
     return 0;
     
 cleanup1:
-    while(vector_size(&ml->media_vec) != old_size)
+    while (vector_size(&ml->media_vec) != old_size)
         media_unref(vector_take_back(&ml->media_vec));
     
     free(line);

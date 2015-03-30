@@ -40,6 +40,7 @@ set(SOURCE_CLIMPD
     src/server/obj/media-list.c
     src/server/obj/media.c
     src/server/obj/kfy.c
+    src/server/obj/uri.c
     src/shared/ipc.c
     src/shared/util.c
     )

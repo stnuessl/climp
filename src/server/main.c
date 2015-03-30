@@ -56,6 +56,7 @@
 
 /*
  * TODO:        autoload last playlist
+ * TODO:        climp --playlist <file> --play --play <file> seems buggy
  */
 
 static int handle_add(const char **argv, int argc);
@@ -78,6 +79,7 @@ static int handle_repeat(const char **argv, int argc);
 static int handle_seek(const char **argv, int argc);
 static int handle_shuffle(const char **argv, int argc);
 static int handle_stop(const char **argv, int argc);
+static int handle_uris(const char **argv, int argc);
 static int handle_volume(const char **argv, int argc);
 
 static const char *tag = "main";
@@ -115,6 +117,7 @@ static struct option options[] = {
     { "--seek",         "",     &handle_seek            },
     { "--discover",     "",     &handle_discover        },
     { "--stop",         "",     &handle_stop            },
+    { "--uris",         "",     &handle_uris            },
 };
 
 static const char help[] = {
@@ -343,7 +346,7 @@ static int handle_discover(const char **argv, int argc)
     for (unsigned int i = 0, size = media_list_size(&ml); i < size; ++i) {
         struct media *m = media_list_at(&ml, i);
         
-        dprintf(fd_out, "%s\n", media_path(m));
+        dprintf(fd_out, "%s\n", media_hierarchical(m));
         
         media_unref(m);
     }
@@ -649,8 +652,6 @@ static int handle_seek(const char **argv, int argc)
     return 0;
 }
 
-
-
 static int handle_shuffle(const char **argv, int argc)
 {
     report_redundant_if_applicable(argv + 1, argc - 1);
@@ -681,6 +682,16 @@ static int handle_stop(const char **argv, int argc)
     
     return 0;
 }
+
+int handle_uris(const char **argv, int argc)
+{
+    report_redundant_if_applicable(argv, argc);
+    
+    climpd_player_print_uris(fd_out);
+    
+    return 0;
+}
+
 
 static int handle_volume(const char **argv, int argc)
 {

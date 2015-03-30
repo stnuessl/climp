@@ -46,6 +46,7 @@
 #include <core/util.h>
 
 #include <obj/playlist.h>
+#include <obj/uri.h>
 
 static const char *tag = "climpd-player";
 
@@ -128,40 +129,6 @@ cleanup1:
     gst_object_unref(sink_pad);
 }
 
-static void parse_tags(const GstTagList *list, const gchar *tag, void *data)
-{
-    struct media_info *m_info = data;
-    const GValue *val;
-    const char *s;
-    int i, num;
-    
-    num = gst_tag_list_get_tag_size(list, tag);
-    
-    for (i = 0; i < num; ++i) {
-        val = gst_tag_list_get_value_index(list, tag, i);
-        
-        if(strcmp(GST_TAG_TITLE, tag) == 0) {
-            s = g_value_get_string(val);
-            strncpy(m_info->title, s, MEDIA_META_ELEMENT_SIZE);
-            
-            m_info->title[MEDIA_META_ELEMENT_SIZE - 1] = '\0';
-        } else if(strcmp(GST_TAG_ALBUM, tag) == 0) {
-            s = g_value_get_string(val);
-            strncpy(m_info->album, s, MEDIA_META_ELEMENT_SIZE);
-            
-            m_info->album[MEDIA_META_ELEMENT_SIZE - 1] = '\0';
-        } else if(strcmp(GST_TAG_ARTIST, tag) == 0) {
-            s = g_value_get_string(val);
-            strncpy(m_info->artist, s, MEDIA_META_ELEMENT_SIZE);
-            
-            m_info->artist[MEDIA_META_ELEMENT_SIZE - 1] = '\0';
-        } else if(strcmp(GST_TAG_TRACK_NUMBER, tag) == 0) {
-            m_info->track = g_value_get_uint(val);
-            
-        }
-    }
-}
-
 static void handle_end_of_stream(void)
 {
     int err;
@@ -193,37 +160,14 @@ static void handle_bus_error(GstMessage *msg)
     
     name = GST_OBJECT_NAME(msg->src);
     
-    climpd_log_e(tag, "Error received from element %s: %s\n", name, 
-                 err->message);
+    climpd_log_e(tag, "received error from \"%s\": %s\n", name, err->message);
     
     if(debug_info) {
-        climpd_log_i(tag, "Debugging information: %s\n", debug_info);
+        climpd_log_i(tag, "debugging information: %s\n", debug_info);
         g_free(debug_info);
     }
     
     g_clear_error(&err);
-}
-
-static void handle_tag(GstMessage *msg)
-{
-    struct media *m = _running_track;
-    GstTagList *tags;
-    
-    gst_message_parse_tag(msg, &tags);
-    
-    if(!tags)
-        return;
-
-    if(!m)
-        goto out;
-    
-    if(media_is_parsed(m))
-        goto out;
-    
-    gst_tag_list_foreach(tags, &parse_tags, media_info(m));
-    
-out:
-    gst_tag_list_free(tags);
 }
 
 static gboolean bus_watcher(GstBus *bus, GstMessage *msg, gpointer data)
@@ -240,8 +184,6 @@ static gboolean bus_watcher(GstBus *bus, GstMessage *msg, gpointer data)
             handle_end_of_stream();
             break;
         case GST_MESSAGE_TAG:
-            handle_tag(msg);
-            break;
         case GST_MESSAGE_STATE_CHANGED:
         case GST_MESSAGE_WARNING:
         case GST_MESSAGE_INFO:
@@ -270,100 +212,35 @@ static gboolean bus_watcher(GstBus *bus, GstMessage *msg, gpointer data)
     return TRUE;
 }
 
-static void handle_discoverer_info(GstDiscoverer *disc, 
-                                   GstDiscovererInfo *info, 
-                                   GError *error, 
-                                   void *data)
-{
-    GstDiscovererResult result;
-    struct media *m;
-    struct media_info *m_info;
-    const char *uri;
-    const GstTagList *tags;
-    
-    (void) disc;
-    (void) error;
-    
-    uri    = gst_discoverer_info_get_uri(info);
-    result = gst_discoverer_info_get_result(info);
-    
-    switch(result) {
-        case GST_DISCOVERER_URI_INVALID:
-            climpd_log_w(tag, "invalid uri '%s'\n", uri);
-            break;
-        case GST_DISCOVERER_ERROR:
-            break;
-        case GST_DISCOVERER_TIMEOUT:
-            climpd_log_w(tag, "timeout for uri '%s'\n", uri);
-            break;
-        case GST_DISCOVERER_BUSY:
-            climpd_log_w(tag, "busy\n");
-            break;
-        case GST_DISCOVERER_MISSING_PLUGINS:
-            climpd_log_w(tag, "plugins are missing for '%s'\n", uri);
-            break;
-        case GST_DISCOVERER_OK:
-            m      = data;
-            m_info = media_info(m);
-            
-            m_info->seekable = gst_discoverer_info_get_seekable(info);
-            m_info->duration = gst_discoverer_info_get_duration(info) / 1e9;
-            
-            tags = gst_discoverer_info_get_tags(info);
-            if(!tags) {
-                climpd_log_w(tag, "no tags for discovered uri '%s'\n", uri);
-                break;
-            }
-            
-            gst_tag_list_foreach(tags, &parse_tags, m_info);
-            
-            media_set_parsed(m);
-            break;
-        default:
-            break;
-    }
-}
-
-int parse_media(struct media *m)
-{
-    GstDiscovererInfo *info;
-    GError *error;
-    const char *uri;
-    int err;
-    
-    uri = media_uri(m);
-    
-    info = gst_discoverer_discover_uri(_gst_discoverer, uri, &error);
-    if(!info) {
-        err = -error->code;
-        climpd_log_w(tag, "parsing '%s' failed - %s\n", uri, error->message);
-        g_error_free(error);
-        return err;
-    }
-    
-    handle_discoverer_info(_gst_discoverer, info, error, m);
-    
-    gst_discoverer_info_unref(info);
-    
-    return 0;
-}
-
 static void print_media(struct media *__restrict m, unsigned int index, int fd) 
 {
-    const char *color;
+    GstDiscovererResult result;
     const struct media_info *i;
     unsigned int min, sec, meta_len;
-    int err;
+    const char *color, *title, *artist, *album;
+    char *err_msg;
     
-    if(!media_is_parsed(m)) {
-        err = parse_media(m);
-        if(err < 0) {
-            dprintf(fd, "climpd: failed to parse %s\n", media_path(m));
-            return;
-        }
+    result = media_parse(m, _gst_discoverer, &err_msg);
+    if (result != GST_DISCOVERER_OK) {
+        const char *uri = media_uri(m);
+        
+        climpd_log_e(tag, "failed to parse \"%s\" - %s\n", uri, err_msg);
+        dprintf(fd, "climpd: failed to parse %s - %s\n\n", uri, err_msg);
+        
+        free(err_msg);
+        return;
     }
-    
+
     i = media_info(m);
+    
+    title    = i->title;
+    artist   = i->artist;
+    album    = i->album;
+
+    if (m == _running_track)
+        color = climpd_config_media_active_color();
+    else
+        color = climpd_config_media_passive_color();
     
     min = i->duration / 60;
     sec = i->duration % 60;
@@ -371,22 +248,17 @@ static void print_media(struct media *__restrict m, unsigned int index, int fd)
     meta_len = climpd_config_media_meta_length();
     
     if (isatty(fd)) {
-        if (m == _running_track)
-            color = climpd_config_media_active_color();
-        else
-            color = climpd_config_media_passive_color();
-        
-        dprintf(fd, "%s ( %3u )    %2u:%02u   %-*.*s %-*.*s %-*.*s\n" 
+        dprintf(fd, "%s ( %3u )    %2u:%02u   %-*.*s %-*.*s %-*.*s\n"
                 COLOR_CODE_DEFAULT, color, index, min, sec,
-                meta_len, meta_len, i->title, 
-                meta_len, meta_len, i->artist, 
-                meta_len, meta_len, i->album);
+                meta_len, meta_len, title, 
+                meta_len, meta_len, artist, 
+                meta_len, meta_len, album);
     } else {
         dprintf(fd, " ( %3u )    %2u:%02u   %-*.*s %-*.*s %-*.*s\n", 
                 index, min, sec,
-                meta_len, meta_len, i->title, 
-                meta_len, meta_len, i->artist, 
-                meta_len, meta_len, i->album);
+                meta_len, meta_len, title, 
+                meta_len, meta_len, artist, 
+                meta_len, meta_len, album);
     }
 }
 
@@ -432,7 +304,7 @@ static void save_playlist(void)
         return;
     } 
     
-    climpd_player_print_files(fd);
+    climpd_player_print_uris(fd);
     close(fd);
 }
 
@@ -903,7 +775,22 @@ void climpd_player_print_files(int fd)
     for (unsigned int i = 0; i < size; ++i) {
         struct media *m = playlist_at(&_playlist, i);
         
-        dprintf(fd, "%s\n", media_path(m));
+        dprintf(fd, "%s\n", media_hierarchical(m));
+        
+        media_unref(m);
+    }
+    
+    dprintf(fd, "\n");
+}
+
+void climpd_player_print_uris(int fd)
+{
+    unsigned int size = playlist_size(&_playlist);
+    
+    for (unsigned int i = 0; i < size; ++i) {
+        struct media *m = playlist_at(&_playlist, i);
+        
+        dprintf(fd, "%s\n", media_uri(m));
         
         media_unref(m);
     }

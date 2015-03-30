@@ -33,8 +33,9 @@
 #include <core/media-loader.h>
 #include <core/media-discoverer.h>
 #include <core/util.h>
-
 #include <core/climpd-log.h>
+
+#include <obj/uri.h>
 
 static const char *tag = "media-loader";
 static char *_dir_path;
@@ -90,18 +91,21 @@ void media_loader_destroy(void)
     climpd_log_i(tag, "destroyed\n");
 }
 
-int media_loader_load(const char *__restrict path,
-                           struct media_list *__restrict ml)
+int media_loader_load(const char *__restrict arg, 
+                      struct media_list *__restrict ml)
 {
     struct stat st;
     int err;
     
-    err = stat(path, &st);
+    if (uri_is_http(arg))
+        return media_list_emplace_back(ml, arg);
+    
+    err = stat(arg, &st);
     if (err < 0) {
         if (errno != ENOENT)
             return -errno;
         
-        if (_dir_path_len + strlen(path) + 2 >= PATH_MAX) {
+        if (_dir_path_len + strlen(arg) + 2 >= PATH_MAX) {
             climpd_log_w(tag, "encountered too long path variable\n");
             return -ENAMETOOLONG;
         }
@@ -111,23 +115,23 @@ int media_loader_load(const char *__restrict path,
         if (_file_path[_dir_path_len] != '/')
             strcat(_file_path, "/");
         
-        strcat(_file_path, path);
+        strcat(_file_path, arg);
         
         err = stat(_file_path, &st);
         if (err < 0)
             return -errno;
         
-        path = _file_path;
+        arg = _file_path;
     }
     
     switch (st.st_mode & S_IFMT) {
     case S_IFREG:
-        if (media_discoverer_file_is_playable(path))
-            return media_list_emplace_back(ml, path);
+        if (media_discoverer_file_is_playable(arg))
+            return media_list_emplace_back(ml, arg);
         else 
-            return media_list_add_from_file(ml, path);
+            return media_list_add_from_file(ml, arg);
     case S_IFDIR:
-        return media_discoverer_scan_dir(path, ml);
+        return media_discoverer_scan_dir(arg, ml);
     default:
         return -EMEDIUMTYPE;
     }

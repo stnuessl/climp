@@ -109,6 +109,8 @@ void climpd_player_print_current_track(int fd);
 
 void climpd_player_print_playlist(int fd);
 
+void climpd_player_print_uris(int fd);
+
 void climpd_player_print_files(int fd);
 
 void climpd_player_print_volume(int fd);
