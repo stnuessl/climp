@@ -129,8 +129,8 @@ int media_list_add_from_file(struct media_list *__restrict ml,
         
         err = media_list_emplace_back(ml, line);
         if (err < 0) {
-            climpd_log_w(tag, "failed to initialize media file '%s' - %s\n", 
-                         line, strerr(-err));
+            climpd_log_w(tag, "failed to emplace \"%s\" - %s\n", line, 
+                         strerr(-err));
             goto cleanup1;
         }
     }

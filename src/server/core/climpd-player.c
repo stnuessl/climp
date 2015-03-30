@@ -88,6 +88,8 @@ static int climpd_player_play_uri(const char *__restrict uri)
         return err;
     }
     
+    climpd_log_i(tag, "now  playing \"%s\"\n", uri);
+    
     return 0;
 }
 
@@ -133,10 +135,8 @@ static void handle_end_of_stream(void)
 {
     int err;
     
-    if (_running_track) {
-        climpd_log_i(tag, "finished '%s'\n", media_uri(_running_track));
+    if (_running_track)
         media_unref(_running_track);
-    }
     
     _running_track = playlist_next(&_playlist);
     if(!_running_track) {
@@ -162,8 +162,13 @@ static void handle_bus_error(GstMessage *msg)
     
     climpd_log_e(tag, "received error from \"%s\": %s\n", name, err->message);
     
+    if (_running_track) {
+        climpd_log_e(tag, "encountered this error while \"%s\" was played\n", 
+                     media_uri(_running_track));
+    }
+    
     if(debug_info) {
-        climpd_log_i(tag, "debugging information: %s\n", debug_info);
+        climpd_log_i(tag, "additional debugging information: %s\n", debug_info);
         g_free(debug_info);
     }
     
@@ -225,7 +230,7 @@ static void print_media(struct media *__restrict m, unsigned int index, int fd)
         const char *uri = media_uri(m);
         
         climpd_log_e(tag, "failed to parse \"%s\" - %s\n", uri, err_msg);
-        dprintf(fd, "climpd: failed to parse %s - %s\n\n", uri, err_msg);
+        dprintf(fd, "climpd: failed to parse %s - %s\n", uri, err_msg);
         
         free(err_msg);
         return;
