@@ -67,6 +67,55 @@ static void parse_tags(const GstTagList *list, const gchar *tag, void *data)
     }
 }
 
+static GstDiscovererResult media_parse_info(struct media *__restrict m, 
+                                            GstDiscovererInfo *__restrict info,
+                                            char **err_msg)
+{
+    struct media_info *m_info;
+    const GstTagList *tags;
+    GstDiscovererResult result;
+    
+    if (m->parsed)
+        return GST_DISCOVERER_OK;
+    
+    result = gst_discoverer_info_get_result(info);
+    
+    switch(result) {
+        case GST_DISCOVERER_URI_INVALID:
+            if (err_msg)
+                *err_msg = strdup("invalid media uri"); 
+            break;
+        case GST_DISCOVERER_ERROR:
+            if (err_msg)
+                *err_msg = strdup("discoverer error");
+            break;
+        case GST_DISCOVERER_TIMEOUT:
+            if (err_msg)
+                *err_msg = strdup("received timeout");
+            break;
+        case GST_DISCOVERER_MISSING_PLUGINS:
+            if (err_msg)
+                *err_msg = strdup("missing plugins");
+            break;
+        case GST_DISCOVERER_OK:
+            m_info = media_info(m);
+            
+            m_info->seekable = gst_discoverer_info_get_seekable(info);
+            m_info->duration = gst_discoverer_info_get_duration(info) / 1e9;
+            
+            tags = gst_discoverer_info_get_tags(info);
+            
+            if (tags)
+                gst_tag_list_foreach(tags, &parse_tags, m_info);
+            
+            m->parsed = true;
+            break;
+        default:
+            break;
+    }
+    
+    return result;
+}
 
 struct media *media_new(const char *__restrict arg)
 {
@@ -80,9 +129,9 @@ struct media *media_new(const char *__restrict arg)
     if(!media->uri)
         goto cleanup1;
     
-    strncpy(media->info.title, media->uri, MEDIA_META_ELEMENT_SIZE);
-    strncpy(media->info.artist, "", MEDIA_META_ELEMENT_SIZE);
-    strncpy(media->info.album, "", MEDIA_META_ELEMENT_SIZE);
+    strncpy(media->info.title,  media->uri, MEDIA_META_ELEMENT_SIZE);
+    strncpy(media->info.artist, "",         MEDIA_META_ELEMENT_SIZE);
+    strncpy(media->info.album,  "",         MEDIA_META_ELEMENT_SIZE);
     
     media->info.track = 0;
     media->info.duration = 0;
@@ -170,58 +219,24 @@ GstDiscovererResult media_parse(struct media *__restrict m,
 {
     GstDiscovererResult result;
     GstDiscovererInfo *info;
-    const GstTagList *tags;
-    struct media_info *m_info;
     GError *error;
     
     if (m->parsed)
         return GST_DISCOVERER_OK;
 
-    info = gst_discoverer_discover_uri(disc, media_uri(m), &error);
+    info = gst_discoverer_discover_uri(disc, m->uri, &error);
     if(!info) {
-        if (err_msg)
-            *err_msg = strdup(error->message);
-    
-        g_error_free(error);
+        if (error) {
+            if (err_msg)
+                *err_msg = strdup(error->message);
+            
+            g_error_free(error);
+        }
         
         return GST_DISCOVERER_ERROR;
     }
 
-    result = gst_discoverer_info_get_result(info);
-    
-    switch(result) {
-    case GST_DISCOVERER_URI_INVALID:
-        if (err_msg)
-            asprintf(err_msg, "invalid media uri");
-        break;
-    case GST_DISCOVERER_ERROR:
-        if (err_msg)
-            asprintf(err_msg, "discoverer error");
-        break;
-    case GST_DISCOVERER_TIMEOUT:
-        if (err_msg)
-            asprintf(err_msg, "received timeout");
-        break;
-    case GST_DISCOVERER_MISSING_PLUGINS:
-        if (err_msg)
-            asprintf(err_msg, "missing plugins");
-        break;
-    case GST_DISCOVERER_OK:
-        m_info = media_info(m);
-        
-        m_info->seekable = gst_discoverer_info_get_seekable(info);
-        m_info->duration = gst_discoverer_info_get_duration(info) / 1e9;
-
-        tags = gst_discoverer_info_get_tags(info);
-        
-        if (tags)
-            gst_tag_list_foreach(tags, &parse_tags, m_info);
-        
-        m->parsed = true;
-        break;
-    default:
-        break;
-    }
+    result = media_parse_info(m, info, err_msg);
     
     gst_discoverer_info_unref(info);
     

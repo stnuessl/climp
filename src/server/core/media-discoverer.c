@@ -46,11 +46,6 @@ static GstDiscoverer *_gst_discoverer;
 static char _rpath_buf[PATH_MAX];
 static char _uri_buf[URI_MAX];
 
-static inline const char *uri_get_path(const char *__restrict uri)
-{
-    return uri + sizeof(URI_PREFIX) - 1;
-}
-
 static const char *set_uri_buf(const char *__restrict path, 
                                size_t len, 
                                const char *__restrict name)
@@ -200,9 +195,9 @@ int media_discoverer_scan_dir(const char *__restrict path,
         if (!media_discoverer_uri_is_playable(_uri_buf))
             continue;
         
-        err = media_list_emplace_back(ml, uri_get_path(_uri_buf));
+        err = media_list_emplace_back(ml, _uri_buf);
         if (err < 0) {
-            report_insertion_fail(err, uri_get_path(_uri_buf));
+            report_insertion_fail(err, _uri_buf);
             goto cleanup1;
         }
     }
@@ -281,9 +276,9 @@ int media_discoverer_scan_all(const char *__restrict path,
             if (!media_discoverer_uri_is_playable(_uri_buf))
                 continue;
             
-            err = media_list_emplace_back(ml, uri_get_path(_uri_buf));
+            err = media_list_emplace_back(ml, _uri_buf;
             if (err < 0) {
-                report_insertion_fail(err, uri_get_path(_uri_buf));
+                report_insertion_fail(err, _uri_buf);
                 goto cleanup1;
             }
             
@@ -321,7 +316,7 @@ int media_discoverer_scan_all(const char *__restrict path,
     return 0;
     
 cleanup1:
-    while(media_list_size(ml) != old_size)
+    while(media_list_size(ml) > old_size)
         media_unref(media_list_take_back(ml));
     
     closedir(dir);

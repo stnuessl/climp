@@ -146,10 +146,10 @@ static void init_signal_handlers_unix(void)
 {
     struct sigaction sa;
     const int error_signals[] = { 
-        SIGILL, SIGBUS, SIGSEGV, SIGFPE, SIGPIPE, SIGSYS 
+        SIGILL, SIGBUS, SIGSEGV, SIGFPE, SIGSYS 
     };
     static const int signals[] = { 
-        SIGQUIT, SIGINT, SIGTSTP, SIGTTIN, SIGTTOU 
+        SIGQUIT, SIGINT, SIGTSTP, SIGTTIN, SIGTTOU, SIGPIPE
     };
     int err;
     

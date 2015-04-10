@@ -74,5 +74,9 @@ GstDiscovererResult media_parse(struct media *__restrict m,
                                 GstDiscoverer *__restrict disc,
                                 char **err_msg);
 
+GstDiscovererResult media_parse_info(struct media *__restrict m, 
+                                     GstDiscovererInfo *__restrict info,
+                                     char **err_msg);
+
 
 #endif /* _MEDIA_H_ */

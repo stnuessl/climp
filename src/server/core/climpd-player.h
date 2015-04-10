@@ -105,6 +105,8 @@ void climpd_player_remove_media_list(struct media_list *__restrict ml);
 
 void climpd_player_clear_playlist(void);
 
+void climpd_player_sort_playlist(void);
+
 void climpd_player_print_current_track(int fd);
 
 void climpd_player_print_playlist(int fd);

@@ -75,6 +75,8 @@ unsigned int playlist_size(const struct playlist *__restrict pl);
 
 bool playlist_empty(const struct playlist *__restrict pl);
 
+void playlist_sort(struct playlist *__restrict pl);
+
 struct media *playlist_next(struct playlist *__restrict pl);
 
 bool playlist_toggle_shuffle(struct playlist *__restrict pl);

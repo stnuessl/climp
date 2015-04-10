@@ -144,7 +144,7 @@ int media_list_add_from_file(struct media_list *__restrict ml,
     return 0;
     
 cleanup1:
-    while (vector_size(&ml->media_vec) != old_size)
+    while (vector_size(&ml->media_vec) > old_size)
         media_unref(vector_take_back(&ml->media_vec));
     
     free(line);

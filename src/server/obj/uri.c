@@ -26,11 +26,6 @@
 #include <libvci/filesystem.h>
 
 
-bool has_scheme(const char *__restrict s)
-{
-    return strstr(s, "://") != NULL;
-}
-
 char *uri_new(const char *__restrict arg)
 {
     static __thread char rpath[PATH_MAX];
@@ -38,10 +33,10 @@ char *uri_new(const char *__restrict arg)
     char *uri;
     size_t len;
     
-    if (has_scheme(arg))
+    if (uri_ok(arg))
         return strdup(arg);
     
-    /* if no scheme was specified we assume 's' points to a local file */
+    /* if no valid uri was passed we assume 'arg' points to a local file */
     arg = realpath(arg, rpath);
     if (!arg)
         return NULL;

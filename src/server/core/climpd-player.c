@@ -177,41 +177,40 @@ static void handle_bus_error(GstMessage *msg)
 
 static gboolean bus_watcher(GstBus *bus, GstMessage *msg, gpointer data)
 {
-    
     (void) bus;
     (void) data;
     
     switch (GST_MESSAGE_TYPE(msg)) {
-        case GST_MESSAGE_ERROR:
-            handle_bus_error(msg);
-            break;
-        case GST_MESSAGE_EOS:
-            handle_end_of_stream();
-            break;
-        case GST_MESSAGE_TAG:
-        case GST_MESSAGE_STATE_CHANGED:
-        case GST_MESSAGE_WARNING:
-        case GST_MESSAGE_INFO:
-        case GST_MESSAGE_BUFFERING:
-        case GST_MESSAGE_STEP_DONE:
-        case GST_MESSAGE_CLOCK_PROVIDE:
-        case GST_MESSAGE_CLOCK_LOST:
-        case GST_MESSAGE_NEW_CLOCK:
-        case GST_MESSAGE_STRUCTURE_CHANGE:
-        case GST_MESSAGE_STREAM_STATUS:
-        case GST_MESSAGE_APPLICATION:
-        case GST_MESSAGE_ELEMENT:
-        case GST_MESSAGE_SEGMENT_START:
-        case GST_MESSAGE_SEGMENT_DONE:
-        case GST_MESSAGE_LATENCY:
-        case GST_MESSAGE_ASYNC_START:
-        case GST_MESSAGE_ASYNC_DONE:
-        case GST_MESSAGE_REQUEST_STATE:
-        case GST_MESSAGE_STEP_START:
-        case GST_MESSAGE_QOS:
-        case GST_MESSAGE_PROGRESS:
-        default:
-            break;
+    case GST_MESSAGE_ERROR:
+        handle_bus_error(msg);
+        break;
+    case GST_MESSAGE_EOS:
+        handle_end_of_stream();
+        break;
+    case GST_MESSAGE_TAG:
+    case GST_MESSAGE_STATE_CHANGED:
+    case GST_MESSAGE_WARNING:
+    case GST_MESSAGE_INFO:
+    case GST_MESSAGE_BUFFERING:
+    case GST_MESSAGE_STEP_DONE:
+    case GST_MESSAGE_CLOCK_PROVIDE:
+    case GST_MESSAGE_CLOCK_LOST:
+    case GST_MESSAGE_NEW_CLOCK:
+    case GST_MESSAGE_STRUCTURE_CHANGE:
+    case GST_MESSAGE_STREAM_STATUS:
+    case GST_MESSAGE_APPLICATION:
+    case GST_MESSAGE_ELEMENT:
+    case GST_MESSAGE_SEGMENT_START:
+    case GST_MESSAGE_SEGMENT_DONE:
+    case GST_MESSAGE_LATENCY:
+    case GST_MESSAGE_ASYNC_START:
+    case GST_MESSAGE_ASYNC_DONE:
+    case GST_MESSAGE_REQUEST_STATE:
+    case GST_MESSAGE_STEP_START:
+    case GST_MESSAGE_QOS:
+    case GST_MESSAGE_PROGRESS:
+    default:
+        break;
     }
     
     return TRUE;
@@ -329,20 +328,20 @@ void climpd_player_init(void)
     
 
     _gst_pipeline = gst_pipeline_new(NULL);
-    if(!_gst_pipeline) {
+    if (!_gst_pipeline) {
         climpd_log_e(tag, "creating gstreamer pipeline failed\n");
         goto fail;
     }
     
-    for(unsigned int i = 0; i < ARRAY_SIZE(elements); i += 2) {
+    for (unsigned int i = 0; i < ARRAY_SIZE(elements); i += 2) {
         ele = gst_element_factory_make(elements[i], elements[i + 1]);
-        if(!ele) {
+        if (!ele) {
             climpd_log_e(tag, "creating \"%s\" element failed\n", elements[i]);
             goto fail;
         }
         
         ok = gst_bin_add(GST_BIN(_gst_pipeline), ele);
-        if(!ok) {
+        if (!ok) {
             gst_object_unref(ele);
             climpd_log_e(tag, "adding \"%s\" element failed\n", elements[i]);
             goto fail;
@@ -357,13 +356,13 @@ void climpd_player_init(void)
     g_signal_connect(_gst_source, "pad-added", G_CALLBACK(&on_pad_added), NULL);
     
     ok = gst_element_link(_gst_convert, _gst_volume);
-    if(!ok) {
+    if (!ok) {
         climpd_log_e(tag, "linking gst_convert and gst_volume failed\n");
         goto fail;
     }
     
     ok = gst_element_link(_gst_volume, _gst_sink);
-    if(!ok) {
+    if (!ok) {
         climpd_log_e(tag, "linking gst_volume and gst_sink failed\n");
         goto fail;
     }
@@ -374,7 +373,7 @@ void climpd_player_init(void)
     
     /* init discoverer */
     _gst_discoverer = gst_discoverer_new(5 * GST_SECOND, &error);
-    if(!_gst_discoverer) {
+    if (!_gst_discoverer) {
         err = -error->code;
         climpd_log_e(tag, "creating discoverer failed - %s\n", error->message);
         g_error_free(error);
@@ -750,6 +749,11 @@ void climpd_player_remove_media_list(struct media_list *__restrict ml)
 void climpd_player_clear_playlist(void)
 {
     playlist_clear(&_playlist);
+}
+
+void climpd_player_sort_playlist(void)
+{
+    playlist_sort(&_playlist);
 }
 
 void climpd_player_print_current_track(int fd)

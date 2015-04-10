@@ -155,7 +155,6 @@ int playlist_set_media_list(struct playlist *__restrict pl,
     
     for (unsigned int i = 0; i < ml_size; ++i)
         vector_insert_back(&pl->vec_media, media_list_at(ml, i));
-
     
     return 0;
 }
@@ -187,7 +186,7 @@ int playlist_add_media_list(struct playlist *__restrict pl,
     return 0;
     
 cleanup1:
-    while (vector_size(&pl->vec_media) != old_size)
+    while (vector_size(&pl->vec_media) > old_size)
         media_unref(vector_take_back(&pl->vec_media));
     
     return err;
@@ -285,6 +284,14 @@ unsigned int playlist_size(const struct playlist *__restrict pl)
 bool playlist_empty(const struct playlist *__restrict pl)
 {
     return vector_empty(&pl->vec_media);
+}
+
+void playlist_sort(struct playlist *__restrict pl)
+{
+    vector_sort(&pl->vec_media);
+    kfy_reset(&pl->kfy);
+    
+    pl->index = 0;
 }
 
 struct media *playlist_next(struct playlist *__restrict pl)
