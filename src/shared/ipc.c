@@ -69,25 +69,22 @@ again:
     return 0;
 }
 
-int ipc_send_setup(int sock, int fd_out, int fd_err, const char *cwd)
+int ipc_send_setup(int sock, int fd_in,int fd_out, int fd_err, 
+                   const char *__restrict wd)
 {
+    static __thread char wd_buf[PATH_MAX];
     struct msghdr msghdr;
     struct iovec iov;
     struct cmsghdr *cmsg;
-    char fd_data[CMSG_SPACE(sizeof(fd_out) + sizeof(fd_err))], *data;
+    char data[CMSG_SPACE(sizeof(fd_in) + sizeof(fd_out) + sizeof(fd_err))];
     int *fds;
-    size_t len = PATH_MAX * sizeof(*data);
     ssize_t err;
+
+    iov.iov_base = strncpy(wd_buf, wd, PATH_MAX);
+    iov.iov_len  = PATH_MAX;
     
-    data = malloc(len);
-    if (!data)
-        return -errno;
-    
-    iov.iov_base = strncpy(data, cwd, len);
-    iov.iov_len  = len;
-    
-    msghdr.msg_control    = fd_data;
-    msghdr.msg_controllen = sizeof(fd_data);
+    msghdr.msg_control    = data;
+    msghdr.msg_controllen = sizeof(data);
     msghdr.msg_iov        = &iov;
     msghdr.msg_iovlen     = 1;
     msghdr.msg_name       = NULL;
@@ -100,30 +97,28 @@ int ipc_send_setup(int sock, int fd_out, int fd_err, const char *cwd)
     cmsg->cmsg_type  = SCM_RIGHTS;
     
     fds = (int *) CMSG_DATA(cmsg);
-    fds[0] = fd_out;
-    fds[1] = fd_err;
+    fds[0] = fd_in;
+    fds[1] = fd_out;
+    fds[2] = fd_err;
     
 again:
     err = sendmsg(sock, &msghdr, MSG_NOSIGNAL);
     if (err < 0) {
         if (errno == EINTR)
             goto again;
-        
-        free(data);
+
         return -errno;
     }
-    
-    free(data);
-    
+
     return 0;
 }
 
-int ipc_recv_setup(int sock, int *fd_out, int *fd_err, char **cwd)
+int ipc_recv_setup(int sock, int *fd_in, int *fd_out, int *fd_err, char **cwd)
 {
     struct msghdr msghdr;
     struct iovec iov;
     struct cmsghdr *cmsg;
-    char fd_data[CMSG_SPACE(sizeof(*fd_out) + sizeof(*fd_err))];
+    char data[CMSG_SPACE(sizeof(*fd_in) + sizeof(*fd_out) + sizeof(*fd_err))];
     int *fds;
     ssize_t err;
     size_t len = PATH_MAX * sizeof(**cwd);
@@ -135,8 +130,8 @@ int ipc_recv_setup(int sock, int *fd_out, int *fd_err, char **cwd)
     iov.iov_base = *cwd;
     iov.iov_len  = len;
     
-    msghdr.msg_control    = fd_data;
-    msghdr.msg_controllen = sizeof(fd_data);
+    msghdr.msg_control    = data;
+    msghdr.msg_controllen = sizeof(data);
     msghdr.msg_iov        = &iov;
     msghdr.msg_iovlen     = 1;
     msghdr.msg_name       = NULL;
@@ -164,8 +159,9 @@ again:
     }
     
     fds = (int *) CMSG_DATA(cmsg);
-    *fd_out = fds[0];
-    *fd_err = fds[1];
+    *fd_in  = fds[0];
+    *fd_out = fds[1];
+    *fd_err = fds[2];
 
     return 0;
 }
@@ -187,7 +183,7 @@ int ipc_send_argv(int sock, const char **argv, int argc)
     if (err < 0)
         return err;
     
-    buffer_write_int(&buf, argc);
+    buffer_write(&buf, &argc, sizeof(argc));
     buffer_write(&buf, &buf_size, sizeof(buf_size));
     
     for (i = 0; i < argc; ++i)

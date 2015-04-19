@@ -23,9 +23,10 @@
 
 #define IPC_SOCKET_PATH "/tmp/.climp-unix"
 
-int ipc_send_setup(int sock, int fd_out, int fd_err, const char *cwd);
+int ipc_send_setup(int sock, int fd_in, int fd_out, int fd_err,
+                   const char *__restrict wd);
 
-int ipc_recv_setup(int sock, int *fd_out, int *fd_err, char **cwd);
+int ipc_recv_setup(int sock, int *fd_in, int *fd_out, int *fd_err, char **wd);
 
 int ipc_send_argv(int sock, const char **argv, int argc);
 

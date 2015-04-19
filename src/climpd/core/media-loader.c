@@ -26,6 +26,9 @@
 #include <sys/stat.h>
 #include <linux/limits.h>
 
+#include <gst/gst.h>
+#include <gst/pbutils/pbutils.h>
+
 #include <libvci/filesystem.h>
 #include <libvci/error.h>
 
@@ -75,7 +78,7 @@ void media_loader_init(void)
     }
     
     _file_path[0] = '\0';
-    
+
     climpd_log_i(tag, "initialized\n");
     
     return;
@@ -129,7 +132,7 @@ int media_loader_load(const char *__restrict arg,
         if (media_discoverer_file_is_playable(arg))
             return media_list_emplace_back(ml, arg);
         else 
-            return media_list_add_from_file(ml, arg);
+            return media_list_add_from_path(ml, arg);
     case S_IFDIR:
         return media_discoverer_scan_dir(arg, ml);
     default:

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014  Steffen Nüssle
+ * Copyright (C) 2015  Steffen Nüssle
  * climp - Command Line Interface Music Player
  *
  * This file is part of climp.
@@ -18,10 +18,28 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef _CONSTANTS_H_
-#define _CONSTANTS_H_
+#ifndef _MEDIA_HISTORY_H_
+#define _MEDIA_HISTORY_H_
 
-#define DEFAULT_FILE_MODE      (S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)
-#define DEFAULT_DIR_MODE       (S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH)
+#include <libvci/link.h>
 
-#endif /* _CONSTANTS_H_ */
+#include <obj/media.h>
+
+struct media_history {
+    struct link list;
+    
+    unsigned int size;
+    unsigned int max_size;
+};
+
+void media_history_init(struct media_history *__restrict mh, 
+                        unsigned int max_size);
+
+void media_history_destroy(struct media_history *__restrict mh);
+
+void media_history_insert(struct media_history *__restrict mh, 
+                          struct media *m);
+
+struct media *media_history_take(struct media_history *__restrict mh);
+
+#endif /* _MEDIA_HISTORY_H_ */

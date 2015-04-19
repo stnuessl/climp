@@ -18,31 +18,30 @@ set(TARGET_INSTALL_DIR bin)
 set(CMAKE_LIBRARY_PATH /usr/local/lib)
 
 set(SOURCE_CLIMP
-    src/client/main.c
-    src/client/climpd.c
+    src/climp/main.c
     src/shared/ipc.c
     )
     
+set(SOURCE_CLIMP_DISCOVERER src/climp-discoverer/main.c)
+    
 set(SOURCE_CLIMPD
-    src/server/main.c
-    src/server/core/bool-map.c
-    src/server/core/climpd-log.c
-    src/server/core/climpd-player.c
-    src/server/core/climpd-config.c
-    src/server/core/media-discoverer.c
-    src/server/core/climpd-paths.c
-    src/server/core/media-loader.c
-    src/server/core/terminal-color-map.c
-    src/server/core/socket.c
-    src/server/core/util.c
-    src/server/core/mainloop.c
-    src/server/obj/playlist.c
-    src/server/obj/media-list.c
-    src/server/obj/media.c
-    src/server/obj/kfy.c
-    src/server/obj/uri.c
+    src/climpd/main.c
+    src/climpd/core/climpd-log.c
+    src/climpd/core/climpd-player.c
+    src/climpd/core/climpd-config.c
+    src/climpd/core/media-discoverer.c
+    src/climpd/core/climpd-paths.c
+    src/climpd/core/media-loader.c
+    src/climpd/core/terminal-color-map.c
+    src/climpd/core/socket.c
+    src/climpd/core/util.c
+    src/climpd/core/mainloop.c
+    src/climpd/obj/playlist.c
+    src/climpd/obj/media-list.c
+    src/climpd/obj/media.c
+    src/climpd/obj/kfy.c
+    src/climpd/obj/uri.c
     src/shared/ipc.c
-    src/shared/util.c
     )
 
 find_package(Threads REQUIRED)
@@ -62,7 +61,7 @@ pkg_check_modules(GSTREAMER_PBUTILS gstreamer-pbutils-1.0)
 # <XPREFIX>_CFLAGS         ... all required cflags
 # <XPREFIX>_CFLAGS_OTHER   ... the other compiler flags
                     
-include_directories(src/server/)
+include_directories(src/climpd/)
 include_directories(src/shared/)
 include_directories(${GSTREAMER_INCLUDE_DIRS})
 include_directories(${GSTREAMER_PBUTILS_INCLUDE_DIRS})
@@ -76,6 +75,13 @@ link_directories(${GSTREAMER_PBUTILS_LIBRARY_DIRS})
 add_executable(climp ${SOURCE_CLIMP})
 target_link_libraries(climp vci)
 
+add_executable(climp-discoverer ${SOURCE_CLIMP_DISCOVERER})
+target_link_libraries(climp-discoverer ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(climp-discoverer ${GLIB_LIBRARIES})
+target_link_libraries(climp-discoverer ${GSTREAMER_LIBRARIES})
+target_link_libraries(climp-discoverer ${GSTREAMER_PBUTILS_LIBRARIES})
+target_link_libraries(climp-discoverer vci)
+
 add_executable(climpd ${SOURCE_CLIMPD})
 target_link_libraries(climpd ${CMAKE_THREAD_LIBS_INIT})
 target_link_libraries(climpd ${GLIB_LIBRARIES})
@@ -84,6 +90,10 @@ target_link_libraries(climpd ${GSTREAMER_PBUTILS_LIBRARIES})
 target_link_libraries(climpd vci)
 target_link_libraries(climpd m)
 
-install(PROGRAMS ${CMAKE_BINARY_DIR}/climp ${CMAKE_BINARY_DIR}/climpd 
-        DESTINATION ${TARGET_INSTALL_DIR}
+install(PROGRAMS 
+        ${CMAKE_BINARY_DIR}/climp
+        ${CMAKE_BINARY_DIR}/climp-discoverer
+        ${CMAKE_BINARY_DIR}/climpd 
+        DESTINATION 
+        ${TARGET_INSTALL_DIR}
         )

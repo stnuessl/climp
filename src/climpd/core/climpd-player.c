@@ -278,7 +278,7 @@ static void load_last_playlist(void)
         return;
     }
     
-    err = media_list_add_from_file(&ml, path);
+    err = media_list_add_from_path(&ml, path);
     if (err < 0 && err != -ENOENT) {
         climpd_log_w(tag, "failed to load last playlist elements from \"%s\" - "
                      "%s\n", path, strerr(-err));
@@ -314,6 +314,7 @@ static void save_playlist(void)
 
 void climpd_player_init(void)
 {
+    
     static const char *elements[] = {
         "uridecodebin",         "gst_source",
         "audioconvert",         "gst_convert",
@@ -325,7 +326,6 @@ void climpd_player_init(void)
     GError *error;
     bool ok;
     int err;
-    
 
     _gst_pipeline = gst_pipeline_new(NULL);
     if (!_gst_pipeline) {
@@ -390,12 +390,9 @@ void climpd_player_init(void)
     }
     
     _running_track = NULL;
-    
-    _gst_state = GST_STATE_NULL;
-    
-    unsigned int vol = climpd_config_volume();
-    
-    climpd_player_set_volume(vol);
+    _gst_state     = GST_STATE_NULL;
+
+    climpd_player_set_volume(climpd_config_volume());
     
     load_last_playlist();
     

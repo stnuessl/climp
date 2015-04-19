@@ -21,6 +21,7 @@
 #ifndef _MEDIA_LIST_H_
 #define _MEDIA_LIST_H_
 
+#include <stdio.h>
 #include <stdbool.h>
 
 #include <libvci/vector.h>
@@ -39,8 +40,12 @@ int media_list_insert_back(struct media_list *__restrict ml, struct media *m);
 
 int media_list_emplace_back(struct media_list *__restrict ml, const char *path);
 
-int media_list_add_from_file(struct media_list *__restrict ml, 
+int media_list_add_from_path(struct media_list *__restrict ml, 
                              const char *__restrict path);
+
+int media_list_add_from_file(struct media_list *__restrict ml, FILE *file);
+
+int media_list_add_from_fd(struct media_list *__restrict ml, int fd);
 
 struct media *media_list_at(struct media_list *__restrict ml, 
                             unsigned int index);

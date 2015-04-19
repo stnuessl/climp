@@ -18,36 +18,21 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <unistd.h>
-#include <string.h>
-#include <errno.h>
-#include <stdbool.h>
+#ifndef _MEDIA_DISCOVERER_H_
+#define _MEDIA_DISCOVERER_H_
 
-#include <libvci/error.h>
+#include <obj/media-list.h>
 
-#include "../shared/ipc.h"
-#include "climpd.h"
+void media_discoverer_init(void);
 
-int main(int argc, char *argv[])
-{
-    int err;
-    
-    if(getuid() == 0) {
-        fprintf(stderr, "climp: run as root\n");
-        exit(EXIT_FAILURE);
-    }
+void media_discoverer_destroy(void);
 
-    err = climpd_init();
-    if(err < 0) {
-        fprintf(stderr, "climp: climpd_init(): %s\n", strerror(-err));
-        exit(EXIT_FAILURE);
-    }
-    
-    climpd_handle_args(argc - 1, (const char **) argv + 1);
-    
-    climpd_destroy();
-    
-    return EXIT_SUCCESS;
-}
+int media_discoverer_scan_dir(const char *__restrict path,
+                              struct media_list *__restrict ml);
+
+// int media_discoverer_scan_all(const char *__restrict path,
+//                               struct media_list *__restrict ml);
+
+bool media_discoverer_file_is_playable(const char *__restrict path);
+
+#endif /* _MEDIA_DISCOVERER_H_ */

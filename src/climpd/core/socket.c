@@ -35,10 +35,10 @@
 
 static const char *tag = "socket";
 
-static GIOChannel *io_chan;
-static struct clock timer;
+static GIOChannel *_io_chan;
+static struct clock _timer;
 
-static int (*connection_handler)(int);
+static int (*_connection_handler)(int);
 
 static gboolean handle_socket(GIOChannel *src, GIOCondition cond, void *data)
 {
@@ -50,9 +50,9 @@ static gboolean handle_socket(GIOChannel *src, GIOCondition cond, void *data)
     (void) cond;
     (void) data;
     
-    clock_reset(&timer);
+    clock_reset(&_timer);
     
-    fd = accept(g_io_channel_unix_get_fd(io_chan), NULL, NULL);
+    fd = accept(g_io_channel_unix_get_fd(_io_chan), NULL, NULL);
     if(fd < 0) {
         err = -errno;
         goto out;
@@ -76,7 +76,7 @@ static gboolean handle_socket(GIOChannel *src, GIOCondition cond, void *data)
     
     climpd_log_i(tag, "user %d connected on socket %d\n", creds.uid, fd);
     
-    err = connection_handler(fd);
+    err = _connection_handler(fd);
     if (err < 0) {
         climpd_log_e(tag, "handling connection on socket %d failed - %s\n",
                      fd, strerr(-err));
@@ -87,7 +87,7 @@ out:
     close(fd);
     
     climpd_log_i(tag, "served connection on socket %d in %lu ms\n", fd, 
-                 clock_elapsed_ms(&timer));
+                 clock_elapsed_ms(&_timer));
     
     return true;
 }
@@ -128,24 +128,24 @@ void socket_init(int (*func)(int))
         goto fail;
     }
     
-    io_chan = g_io_channel_unix_new(fd);
-    if (!io_chan) {
+    _io_chan = g_io_channel_unix_new(fd);
+    if (!_io_chan) {
         climpd_log_e(tag, "initializing io channel for server socket failed\n");
         goto fail;
     }
     
-    g_io_add_watch(io_chan, G_IO_IN, &handle_socket, NULL);
-    g_io_channel_set_close_on_unref(io_chan, true);
+    g_io_add_watch(_io_chan, G_IO_IN, &handle_socket, NULL);
+    g_io_channel_set_close_on_unref(_io_chan, true);
     
-    err = clock_init(&timer, CLOCK_MONOTONIC);
+    err = clock_init(&_timer, CLOCK_MONOTONIC);
     if (err < 0) {
         climpd_log_e(tag, "failed to initialize timer - %s\n", strerr(-err));
         goto fail;
     }
     
-    clock_start(&timer);
+    clock_start(&_timer);
     
-    connection_handler = func;
+    _connection_handler = func;
     
     climpd_log_i(tag, "initialized\n");
     
@@ -158,8 +158,8 @@ fail:
 
 void socket_destroy(void)
 {
-    clock_destroy(&timer);
-    g_io_channel_unref(io_chan);
+    clock_destroy(&_timer);
+    g_io_channel_unref(_io_chan);
     unlink(IPC_SOCKET_PATH);
     
     climpd_log_i(tag, "destroyed\n");

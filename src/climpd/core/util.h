@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014  Steffen Nüssle
+ * Copyright (C) 2015  Steffen Nüssle
  * climp - Command Line Interface Music Player
  *
  * This file is part of climp.
@@ -18,15 +18,28 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef _BOOL_MAP_H_
-#define _BOOL_MAP_H_
+#ifndef _UTIL_H_
+#define _UTIL_H_
 
-void bool_map_init(void);
+#include <stdbool.h>
 
-void bool_map_destroy(void);
+void die(const char *__restrict tag, const char *__restrict msg);
 
-const bool *bool_map_value(const char *key);
+void die_errno(const char *__restrict tag, const char *__restrict msg, int err);
 
-void bool_map_print(int fd);
+void die_fmt(const char *__restrict tag, const char *__restrict fmt, ...)
+                                            __attribute__((format(printf,2,3)));
 
-#endif /* _BOOL_MAP_H_ */
+void die_failed_init(const char *__restrict tag);
+
+const char *yes_no(bool val);
+
+const char *true_false(bool val);
+
+int str_to_int(const char *__restrict s, int *__restrict i);
+
+int str_to_sec(const char *__restrict s, int *__restrict sec);
+
+int str_to_bool(const char *__restrict s, bool *__restrict val);
+
+#endif /* _UTIL_H_ */

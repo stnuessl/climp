@@ -33,13 +33,9 @@
 
 #include <core/climpd-log.h>
 #include <core/terminal-color-map.h>
-#include <core/bool-map.h>
 #include <core/climpd-paths.h>
 #include <core/climpd-config.h>
 #include <core/util.h>
-
-#include "../../shared/util.h"
-#include "../../shared/constants.h"
 
 #define DEFAULT_VAL_MEDIA_META_LENGTH   24
 #define DEFAULT_VAL_MEDIA_ACTIVE_COLOR  COLOR_CODE_GREEN
@@ -177,36 +173,26 @@ static void set_volume(const char *key, const char *val, void *arg)
 
 static void set_repeat(const char *key, const char *val, void *arg)
 {
-    const bool *bval;
-    
     (void) key;
     (void) arg;
     
-    bval = bool_map_value(val);
-    if(!bval) {
+    if(str_to_bool(val, &_repeat) < 0) {
         climpd_log_w(tag, "invalid Repeat \"%s\"\n", val);
         _repeat = DEFAULT_VAL_REPEAT;
         return;
     }
-    
-    _repeat = *bval;
 }
 
 static void set_shuffle(const char *key, const char *val, void *arg)
 {
-    const bool *bval;
-    
     (void) key;
     (void) arg;
     
-    bval = bool_map_value(val);
-    if(!bval) {
+    if(str_to_bool(val, &_shuffle) < 0) {
         climpd_log_w(tag, "invalid Shuffle \"%s\"\n", val);
         _shuffle = DEFAULT_VAL_SHUFFLE;
         return;
     }
-    
-    _shuffle = *bval;
 }
 
 static struct config_handle handles[] = {
@@ -220,8 +206,10 @@ static struct config_handle handles[] = {
 
 void climpd_config_init(void)
 {
-    const char *path = climpd_paths_config();
+    const char *path;
     int err;
+
+    path = climpd_paths_config();
     
     _media_meta_length   = DEFAULT_VAL_MEDIA_META_LENGTH;
     _media_active_color  = DEFAULT_VAL_MEDIA_ACTIVE_COLOR;

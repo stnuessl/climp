@@ -19,6 +19,7 @@
  */
 
 #include <stdlib.h>
+#include <string.h>
 #include <stdarg.h>
 #include <errno.h>
 
@@ -113,4 +114,21 @@ int str_to_sec(const char *__restrict s, int *__restrict sec)
     *sec = val;
     
     return 0;
+}
+
+int str_to_bool(const char *__restrict s, bool *__restrict val)
+{
+    if (!strcasecmp(s, "true") || !strcasecmp(s, "yes") || !strcasecmp(s, "on") 
+        || !strcasecmp(s, "y") || !strcasecmp(s, "1")) {
+        *val = true;
+        return 0;
+    } 
+    
+    if (!strcasecmp(s, "false") || !strcasecmp(s, "no") || !strcasecmp(s, "off")
+        || !strcasecmp(s, "n")  || !strcasecmp(s, "0")) {
+        *val = false;
+        return 0;
+    }
+    
+    return -EINVAL;
 }

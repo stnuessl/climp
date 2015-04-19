@@ -209,14 +209,14 @@ int media_discoverer_scan_dir(const char *__restrict path,
     return err;
     
 cleanup1:
-    while (media_list_size(ml) != old_size)
+    while (media_list_size(ml) > old_size)
         media_unref(media_list_take_back(ml));
 
     closedir(dir);
 
     return err;
 }
-
+/*
 int media_discoverer_scan_all(const char *__restrict path,
                               struct media_list *__restrict ml)
 {
@@ -276,7 +276,7 @@ int media_discoverer_scan_all(const char *__restrict path,
             if (!media_discoverer_uri_is_playable(_uri_buf))
                 continue;
             
-            err = media_list_emplace_back(ml, _uri_buf;
+            err = media_list_emplace_back(ml, _uri_buf);
             if (err < 0) {
                 report_insertion_fail(err, _uri_buf);
                 goto cleanup1;
@@ -322,7 +322,7 @@ cleanup1:
     closedir(dir);
     
     return err;
-}
+}*/
 
 bool media_discoverer_file_is_playable(const char *__restrict path)
 {

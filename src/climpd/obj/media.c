@@ -81,37 +81,37 @@ static GstDiscovererResult media_parse_info(struct media *__restrict m,
     result = gst_discoverer_info_get_result(info);
     
     switch(result) {
-        case GST_DISCOVERER_URI_INVALID:
-            if (err_msg)
-                *err_msg = strdup("invalid media uri"); 
-            break;
-        case GST_DISCOVERER_ERROR:
-            if (err_msg)
-                *err_msg = strdup("discoverer error");
-            break;
-        case GST_DISCOVERER_TIMEOUT:
-            if (err_msg)
-                *err_msg = strdup("received timeout");
-            break;
-        case GST_DISCOVERER_MISSING_PLUGINS:
-            if (err_msg)
-                *err_msg = strdup("missing plugins");
-            break;
-        case GST_DISCOVERER_OK:
-            m_info = media_info(m);
-            
-            m_info->seekable = gst_discoverer_info_get_seekable(info);
-            m_info->duration = gst_discoverer_info_get_duration(info) / 1e9;
-            
-            tags = gst_discoverer_info_get_tags(info);
-            
-            if (tags)
-                gst_tag_list_foreach(tags, &parse_tags, m_info);
-            
-            m->parsed = true;
-            break;
-        default:
-            break;
+    case GST_DISCOVERER_URI_INVALID:
+        if (err_msg)
+            *err_msg = strdup("invalid media uri"); 
+        break;
+    case GST_DISCOVERER_ERROR:
+        if (err_msg)
+            *err_msg = strdup("discoverer error");
+        break;
+    case GST_DISCOVERER_TIMEOUT:
+        if (err_msg)
+            *err_msg = strdup("received timeout");
+        break;
+    case GST_DISCOVERER_MISSING_PLUGINS:
+        if (err_msg)
+            *err_msg = strdup("missing plugins");
+        break;
+    case GST_DISCOVERER_OK:
+        m_info = media_info(m);
+        
+        m_info->seekable = gst_discoverer_info_get_seekable(info);
+        m_info->duration = gst_discoverer_info_get_duration(info) / 1e9;
+        
+        tags = gst_discoverer_info_get_tags(info);
+        
+        if (tags)
+            gst_tag_list_foreach(tags, &parse_tags, m_info);
+        
+        m->parsed = true;
+        break;
+    default:
+        break;
     }
     
     return result;

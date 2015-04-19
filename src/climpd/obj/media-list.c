@@ -21,6 +21,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
+#include <unistd.h>
 #include <string.h>
 #include <assert.h>
 
@@ -80,15 +81,11 @@ int media_list_emplace_back(struct media_list *__restrict ml, const char *path)
     return err;
 }
 
-int media_list_add_from_file(struct media_list *__restrict ml, 
+int media_list_add_from_path(struct media_list *__restrict ml, 
                              const char *__restrict path)
 {
     FILE *file;
-    char *line;
     const char *ext;
-    size_t size;
-    ssize_t n;
-    unsigned int old_size;
     int err;
     
     ext = strrchr(path, '.');
@@ -102,9 +99,23 @@ int media_list_add_from_file(struct media_list *__restrict ml,
     if(!file)
         return -errno;
     
+    err = media_list_add_from_file(ml, file);
+    
+    fclose(file);
+    
+    return err;
+}
+
+int media_list_add_from_file(struct media_list *__restrict ml, FILE *file)
+{
+    char *line;
+    size_t size;
+    ssize_t n;
+    unsigned int old_size;
+    int err;
+    
     line = NULL;
     size = 0;
-    err  = 0;
     
     old_size = vector_size(&ml->media_vec);
     
@@ -120,7 +131,7 @@ int media_list_add_from_file(struct media_list *__restrict ml,
             continue;
         
         line[n - 1] = '\0';
-                
+        
         if (!path_is_absolute(line) && !uri_ok(line)) {
             err = -ENOTSUP;
             climpd_log_e(tag, "\"%s\" - no absolute path or valid uri\n", line);
@@ -136,18 +147,36 @@ int media_list_add_from_file(struct media_list *__restrict ml,
     }
     
     free(line);
-    fclose(file);
-    
-    if (vector_size(&ml->media_vec) == old_size)
-        climpd_log_i(tag, "loaded empty playlist file \"%s\"\n", path);
-    
+
     return 0;
-    
+
 cleanup1:
     while (vector_size(&ml->media_vec) > old_size)
         media_unref(vector_take_back(&ml->media_vec));
     
     free(line);
+    
+    return err;
+}
+
+int media_list_add_from_fd(struct media_list *__restrict ml, int fd)
+{
+    FILE *file;
+    int fd_dup, err;
+    
+    fd_dup = dup(fd);
+    if (!fd_dup)
+        return -errno;
+    
+    file = fdopen(fd_dup, "r");
+    if (!file) {
+        err = -errno;
+        close(fd_dup);
+        return err;
+    }
+    
+    err = media_list_add_from_file(ml, file);
+    
     fclose(file);
     
     return err;

@@ -38,10 +38,8 @@
 #include <libvci/filesystem.h>
 
 #include "../shared/ipc.h"
-#include "../shared/constants.h"
 
 #include <core/climpd-log.h>
-#include <core/bool-map.h>
 #include <core/terminal-color-map.h>
 #include <core/climpd-paths.h>
 #include <core/climpd-player.h>
@@ -56,6 +54,7 @@
 
 static const char *tag = "main";
 
+static int fd_in;
 static int fd_out;
 static int fd_err;
 
@@ -93,9 +92,6 @@ static const char help[] = {
     "      --seek [arg]       Get current position or jump to a position \n"
     "                         in the current track.\n"
     "                         Accepted time formats: [m:ss] - or just - [s]\n"
-    "      --discover [args]  Search recursivley for files which can be\n"
-    "                         played by the climpd-player. Arguments must be\n"
-    "                         directories\n"
     "      --sort             Sort the playlist. /some/file01 will be before\n"
     "                         /some/file02 and so on. Useful if playlist was\n"
     "                         loaded from a directory (not a playlist file\n"
@@ -242,43 +238,6 @@ int handle_current(const char **argv, int argc)
     return 0;
 }
 
-static int handle_discover(const char **argv, int argc)
-{
-    struct media_list ml;
-    int err;
-    
-    if (argc == 0) {
-        report_missing_arg("--discover");
-        return -EINVAL;
-    }
-    
-    err = media_list_init(&ml);
-    if (err < 0)
-        return err;
-    
-    for (int i = 0; i < argc; ++i) {
-        err = media_discoverer_scan_all(argv[i], &ml);
-        if (err < 0) {
-            dprintf(fd_err, "climpd: failed to scan \"%s\" - %s\n", argv[i], 
-                    strerr(-err));
-            goto cleanup1;
-        }
-    }
-    
-    for (unsigned int i = 0, size = media_list_size(&ml); i < size; ++i) {
-        struct media *m = media_list_at(&ml, i);
-        
-        dprintf(fd_out, "%s\n", media_hierarchical(m));
-        
-        media_unref(m);
-    }
-    
-cleanup1:
-    media_list_destroy(&ml);
-    
-    return err;
-}
-
 static int handle_files(const char **argv, int argc)
 {
     report_redundant_if_applicable(argv, argc);
@@ -342,20 +301,21 @@ static int handle_log(const char **argv, int argc)
 
 static int handle_mute(const char **argv, int argc)
 {
+    bool muted;
+    
     report_redundant_if_applicable(argv + 1, argc - 1);
     
     if (argc == 0) {
         climpd_player_toggle_muted();        
         return 0;
     }
-    
-    const bool *muted = bool_map_value(argv[0]);
-    if (!muted) {
+
+    if (str_to_bool(argv[0], &muted)) {
         report_invalid_boolean(argv[0]);
         return -EINVAL;
     }
     
-    climpd_player_set_muted(*muted);
+    climpd_player_set_muted(muted);
     
     return 0;
 }
@@ -523,22 +483,23 @@ cleanup1:
 
 static int handle_repeat(const char **argv, int argc)
 {
+    bool repeat;
+    
     report_redundant_if_applicable(argv + 1, argc - 1);
     
     if (argc == 0) {
-        bool repeat = climpd_player_toggle_repeat();
+        bool val = climpd_player_toggle_repeat();
         
-        dprintf(fd_out, "  Repeating is now %s\n", (repeat) ? "ON" : "OFF");
+        dprintf(fd_out, "  Repeating is now %s\n", (val) ? "ON" : "OFF");
         return 0;
     }
     
-    const bool *repeat = bool_map_value(argv[0]);
-    if (!repeat) {
+    if (str_to_bool(argv[0], &repeat) < 0) {
         report_invalid_boolean(argv[0]);
         return -EINVAL;
     }
     
-    climpd_player_set_repeat(*repeat);
+    climpd_player_set_repeat(repeat);
     
     return 0;
 }
@@ -576,6 +537,8 @@ static int handle_seek(const char **argv, int argc)
 
 static int handle_shuffle(const char **argv, int argc)
 {
+    bool shuffle;
+    
     report_redundant_if_applicable(argv + 1, argc - 1);
     
     if (argc == 0) {
@@ -584,14 +547,13 @@ static int handle_shuffle(const char **argv, int argc)
         dprintf(fd_out, "  Shuffling is now %s\n", (shuffle) ? "ON" : "OFF");
         return 0;
     } 
-    
-    const bool *shuffle = bool_map_value(argv[0]);
-    if (!shuffle) {
+
+    if (str_to_bool(argv[0], &shuffle) < 0) {
         report_invalid_boolean(argv[0]);
         return -EINVAL;
     }
     
-    climpd_player_set_shuffle(*shuffle);
+    climpd_player_set_shuffle(shuffle);
     
     return 0;
 }
@@ -603,6 +565,37 @@ static int handle_sort(const char **argv, int argc)
     climpd_player_sort_playlist();
     
     return 0;
+}
+
+static int handle_stdin(const char **argv, int argc)
+{
+    struct media_list ml;
+    int err;
+    
+    report_redundant_if_applicable(argv, argc);
+    
+    err = media_list_init(&ml);
+    if (err < 0) {
+        report_error("--stdin", "failed to initialize media-list", err);
+        return err;
+    }
+    
+    err = media_list_add_from_fd(&ml, fd_in);
+    if (err < 0) {
+        report_error("--stdin", "failed to load files from stdin", err);
+        goto cleanup1;
+    }
+    
+    err = climpd_player_set_media_list(&ml);
+    if (err < 0) {
+        report_error("--stdin", "failed to set player media-list", err);
+        goto cleanup1;
+    }
+    
+cleanup1:
+    media_list_destroy(&ml);
+    
+    return err;
 }
 
 static int handle_stop(const char **argv, int argc)
@@ -666,8 +659,8 @@ static struct option options[] = {
     { "--log",          "",     &handle_log             },
     { "--mute",         "-m",   &handle_mute            },
     { "--seek",         "",     &handle_seek            },
-    { "--discover",     "",     &handle_discover        },
     { "--sort",         "",     &handle_sort            },
+    { "--stdin",        "-i",   &handle_stdin           },
     { "--stop",         "",     &handle_stop            },
     { "--uris",         "",     &handle_uris            },
 };
@@ -707,7 +700,7 @@ static int handle_connection(int fd)
     char **argv, *cwd;
     int argc, err;
     
-    err = ipc_recv_setup(fd, &fd_out, &fd_err, &cwd);
+    err = ipc_recv_setup(fd, &fd_in, &fd_out, &fd_err, &cwd);
     if (err < 0) {
         climpd_log_e(tag, "receiving client's fds failed - %s\n", strerr(-err));
         return err;
@@ -743,6 +736,7 @@ cleanup1:
     free(cwd);
     close(fd_err);
     close(fd_out);
+    close(fd_in);
     
     return err;
 }
@@ -813,12 +807,13 @@ int main(int argc, char *argv[])
     setlocale(LC_ALL, "");
     
     gst_init(NULL, NULL);
+    
+    /* the log has to be the first thing to be initialized */
     climpd_log_init();
     
     climpd_log_i(tag, "starting initialization...\n");
 
     terminal_color_map_init();
-    bool_map_init();
     climpd_paths_init();
     mainloop_init(no_daemon);
     socket_init(&handle_connection);
@@ -846,7 +841,6 @@ int main(int argc, char *argv[])
     socket_destroy();
     mainloop_destroy();
     climpd_paths_destroy();
-    bool_map_destroy();
     terminal_color_map_destroy();
     
     climpd_log_i(tag, "destroyed\n");
