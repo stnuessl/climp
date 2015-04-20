@@ -573,23 +573,10 @@ static int handle_sort(const char **argv, int argc)
 static int handle_stdin(const char **argv, int argc)
 {
     static const char *cmd = "--stdin";
-    struct stat st;
     struct media_list ml;
     int err;
     
     report_redundant_if_applicable(argv, argc);
-    
-    err = fstat(fd_in,  &st);
-    if (err < 0) {
-        err = -errno;
-        report_error(cmd, "failed to check stdin for data", err);
-        return err;
-    }
-    
-    if (st.st_size <= 0) {
-        report_error(cmd, "no data to read on stdin", -ENODATA);
-        return -ENODATA;
-    }
     
     err = media_list_init(&ml);
     if (err < 0) {
@@ -603,10 +590,14 @@ static int handle_stdin(const char **argv, int argc)
         goto cleanup1;
     }
     
-    err = climpd_player_set_media_list(&ml);
-    if (err < 0) {
-        report_error(cmd, "failed to set player media-list", err);
-        goto cleanup1;
+    if (!media_list_empty(&ml)) {
+        err = climpd_player_set_media_list(&ml);
+        if (err < 0) {
+            report_error(cmd, "failed to set player media-list", err);
+            goto cleanup1;
+        }
+    } else {
+        report_error(cmd, "no (valid) data to read from stdin", -ENODATA);
     }
     
 cleanup1:
