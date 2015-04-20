@@ -7,7 +7,7 @@
     * [Debian](https://github.com/stnuessl/climp#debian-jessie)
 * [Installation](https://github.com/stnuessl/climp#installation)
 * [Usage](https://github.com/stnuessl/climp#usage)
-    * [Play media file(s)](https://github.com/stnuessl/climp#play-media-file(s))
+    * [Play media file(s)](https://github.com/stnuessl/climp#play-media-files)
     * [Play a webradio](https://github.com/stnuessl/climp#play-a-webradio)
     * [Play a specific track](https://github.com/stnuessl/climp#play-a-specific-track)
     * [Compose a playlist](https://github.com/stnuessl/climp#compose-a-playlist)
@@ -104,7 +104,7 @@ or using an URI:
 
     climp --play http://what.ever.com/where/ever
     
-### Play a specific track in the playlist
+### Play a specific track
 
     climp --play <position in playlist>
     
@@ -122,6 +122,8 @@ Notice that the first track is at index zero.
 ### Print current playlist
 
     climp --playlist
+    
+climp will parse each media file for its meta-data, so this may take a while on the first run.
 
 ### Load a playlist and start playback
 
@@ -148,6 +150,8 @@ or:
 
     climp --add my-playlist.m3u
 
+without specifying a relativ or absolute path. If there is a collision with a file
+in the current working directory the file in the current working directory will be loaded.
 
 ### Quitting climp
 
