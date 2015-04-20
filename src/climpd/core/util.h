@@ -42,4 +42,6 @@ int str_to_sec(const char *__restrict s, int *__restrict sec);
 
 int str_to_bool(const char *__restrict s, bool *__restrict val);
 
+bool is_playlist_file(const char *__restrict s);
+
 #endif /* _UTIL_H_ */

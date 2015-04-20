@@ -29,6 +29,7 @@
 #include <libvci/error.h>
 
 #include <core/climpd-log.h>
+#include <core/util.h>
 #include <obj/media-list.h>
 #include <obj/uri.h>
 
@@ -85,13 +86,10 @@ int media_list_add_from_path(struct media_list *__restrict ml,
                              const char *__restrict path)
 {
     FILE *file;
-    const char *ext;
     int err;
     
-    ext = strrchr(path, '.');
-    if (!ext || (strcmp(ext, ".txt") != 0 && strcmp(ext, ".m3u") != 0)) {
-        climpd_log_e(tag, "invalid file extension \"%s\" of playlist \"%s\" - "
-                     "must be .txt or .m3u\n", ext, path);
+    if (!is_playlist_file(path)) {
+        climpd_log_e(tag, "file \"%s\" must be .m3u or .txt\n", path);
         return -EINVAL;
     }
     

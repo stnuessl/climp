@@ -29,7 +29,6 @@ set(SOURCE_CLIMPD
     src/climpd/core/climpd-log.c
     src/climpd/core/climpd-player.c
     src/climpd/core/climpd-config.c
-    src/climpd/core/media-discoverer.c
     src/climpd/core/climpd-paths.c
     src/climpd/core/media-loader.c
     src/climpd/core/terminal-color-map.c

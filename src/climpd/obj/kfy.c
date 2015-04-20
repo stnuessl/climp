@@ -113,8 +113,8 @@ int kfy_add(struct kfy *__restrict k, unsigned int cnt)
 {
     unsigned int new_size, new_cap, new_end, *a;
     
+    new_end  = k->end  + cnt;
     new_size = k->size + cnt;
-    new_end  = k->end + cnt;
     
     if (new_size < k->capacity) {
         for (unsigned int i = k->end; i < new_end; ++i)
@@ -147,8 +147,10 @@ int kfy_add(struct kfy *__restrict k, unsigned int cnt)
 
 void kfy_remove(struct kfy *__restrict k, unsigned int cnt)
 {
+    assert(cnt <= k->size && "ARGUMENT 'CNT' TOO BIG");
+    
     if (cnt > 0) {
-        k->end  -= cnt;
+        k->end = (k->end >= cnt) ? k->end - cnt : 0;
         k->size -= cnt;
         
         for (unsigned int i = 0; i < k->end; ++i)

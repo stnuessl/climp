@@ -132,3 +132,10 @@ int str_to_bool(const char *__restrict s, bool *__restrict val)
     
     return -EINVAL;
 }
+
+bool is_playlist_file(const char *__restrict path)
+{
+    const char *p = strrchr(path, '.');
+    
+    return (p) ? strcmp(p, ".m3u") == 0 || strcmp(p, ".txt") == 0: false; 
+}

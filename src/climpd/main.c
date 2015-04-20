@@ -44,7 +44,6 @@
 #include <core/climpd-paths.h>
 #include <core/climpd-player.h>
 #include <core/media-loader.h>
-#include <core/media-discoverer.h>
 #include <core/climpd-config.h>
 #include <core/socket.h>
 #include <core/mainloop.h>
@@ -63,7 +62,7 @@ static struct map options_map;
 static const char help[] = {
     "Usage:\n"
     "climp --cmd1 [[arg1] ...] --cmd2 [[arg1] ...]\n\n"
-    "  -a, --add [args]       Add a directory, .m3u/.txt and / or media file\n"
+    "  -a, --add [args]       Add a .m3u/.txt and / or media file\n"
     "                         to the playlist\n"
     "      --clear            Clear the current playlist.\n"
     "      --config           Print the climpd configuration.\n"
@@ -72,9 +71,8 @@ static const char help[] = {
     "                         arguments.\n"
     "      --pause            Pause / unpause the player. This has no effect \n"
     "                         if the player is stopped.\n" 
-    "      --playlist [args]  Print or set the current playlist. Directories,\n"
-    "                         files or .m3u / .txt - files are accepted as\n"
-    "                         arguments.\n"
+    "      --playlist [args]  Print or set the current playlist. Pass\n"
+    "                         media files\ and / or .m3u / .txt - files.\n"
     "      --repeat           Toggle repeat playlist.\n"
     "      --shuffle          Toggle shuffle.\n"
     "  -v, --volume [arg]     Set or get the volume of the climpd-player.\n"
@@ -84,8 +82,8 @@ static const char help[] = {
     "      --next             Play the next track in the playlist.\n"
     "  -p, --play [args]      Start playback, or set a playlist and start\n"
     "                         playback immediatley, or jump to a track in the\n"
-    "                         playlist. Pass numbers, directories, .m3u/.txt\n"
-    "                         or media files to this option\n"
+    "                         playlist. Possible arguments are media files,\n"
+    "                         .m3u / .txt files or numbers.\n"
     "      --files            Print all files in the current playlist\n"
     "      --log              Print the log of the daemon\n"
     "      --mute             Mute or unmute the player\n"
@@ -93,9 +91,9 @@ static const char help[] = {
     "                         in the current track.\n"
     "                         Accepted time formats: [m:ss] - or just - [s]\n"
     "      --sort             Sort the playlist. /some/file01 will be before\n"
-    "                         /some/file02 and so on. Useful if playlist was\n"
-    "                         loaded from a directory (not a playlist file\n"
-    "                         which can easily sorted by using sort in bash)\n"
+    "                         /some/file02 and so on. Useful if you forgot to
+    "                         sort the file in bash (use: sort -V).\n"
+    "  -i, --stdin            Read playlist from stdin.\n"
     "      --stop             Stop the playback\n"
     "      --uris             Print for each file in the playlist the\n"
     "                         corresponding URI\n"
@@ -178,11 +176,12 @@ static void report_redundant_if_applicable(const char **argv, int argc)
 
 static int handle_add(const char **argv, int argc)
 {
+    static const char *cmd = "--add";
     struct media_list ml;
     int err;
     
     if (argc == 0) {
-        report_missing_arg("--add");
+        report_missing_arg(cmd);
         return -EINVAL;
     }
     
@@ -191,14 +190,14 @@ static int handle_add(const char **argv, int argc)
     for (int i = 0; i < argc; ++i) {
         err = media_loader_load(argv[i], &ml);
         if (err < 0) {
-            report_arg_error("--add", argv[i], err);
+            report_arg_error(cmd, argv[i], err);
             goto cleanup1;
         }
     }
     
     err = climpd_player_add_media_list(&ml);
     if (err < 0)
-        report_error("--add", "failed to add items to playlist", err);
+        report_error(cmd, "failed to add items to playlist", err);
     
 cleanup1:
     media_list_destroy(&ml);
@@ -258,6 +257,7 @@ static int handle_help(const char **argv, int argc)
 
 static int handle_playlist(const char **argv, int argc)
 {
+    static const char *cmd = "--playlist";
     struct media_list ml;
     int err;
     
@@ -275,7 +275,7 @@ static int handle_playlist(const char **argv, int argc)
     for (int i = 0; i < argc; ++i) {
         err = media_loader_load(argv[i], &ml);
         if (err < 0) {
-            report_arg_error("--playlist", argv[i], err);
+            report_arg_error(cmd, argv[i], err);
             goto cleanup1;
         }
     }
@@ -322,18 +322,19 @@ static int handle_mute(const char **argv, int argc)
 
 static int handle_next(const char **argv, int argc)
 {
+    static const char *cmd = "--next";
     int err;
     
     report_redundant_if_applicable(argv, argc);
     
     err = climpd_player_next();
     if (err < 0) {
-        report_error("--next", "failed to play next track", err);
+        report_error(cmd, "failed to play next track", err);
         return err;
     }
     
     if (climpd_player_is_stopped())
-        print("climpd: --next: finished playback\n");
+        print("climpd: %s: finished playback\n", cmd);
     
     return 0;
 }
@@ -345,21 +346,21 @@ static int handle_pause(const char **argv, int argc)
     report_redundant_if_applicable(argv, argc);
     
     switch (climpd_player_state()) {
-        case CLIMPD_PLAYER_PLAYING:
-            climpd_player_pause();
-            break;
-        case CLIMPD_PLAYER_PAUSED:
-            err = climpd_player_play();
-            if (err < 0) {
-                report_error("--pause", "unable to resume playing", err);
-                return err;
-            }
-            break;
-        case CLIMPD_PLAYER_STOPPED:
-            print("climpd: --pause: player is stopped - done\n");
-            break;
-        default:
-            break;
+    case CLIMPD_PLAYER_PLAYING:
+        climpd_player_pause();
+        break;
+    case CLIMPD_PLAYER_PAUSED:
+        err = climpd_player_play();
+        if (err < 0) {
+            report_error("--pause", "unable to resume playing", err);
+            return err;
+        }
+        break;
+    case CLIMPD_PLAYER_STOPPED:
+        print("climpd: --pause: player is stopped - done\n");
+        break;
+    default:
+        break;
     }
     
     return 0;
@@ -367,6 +368,7 @@ static int handle_pause(const char **argv, int argc)
 
 static int handle_play(const char **argv, int argc)
 {
+    static const char *cmd = "--play";
     struct media_list ml;
     int index;
     bool valid_index;
@@ -377,7 +379,7 @@ static int handle_play(const char **argv, int argc)
     
     err = media_list_init(&ml);
     if (err < 0) {
-        report_arg_error("--play", argv[0], err);
+        report_arg_error(cmd, argv[0], err);
         return err;
     }
     
@@ -394,7 +396,7 @@ static int handle_play(const char **argv, int argc)
         if (err == 0)
             continue;
         
-        report_arg_error("--play", argv[i], err);
+        report_arg_error(cmd, argv[i], err);
         goto cleanup1;
     }
     
@@ -407,21 +409,21 @@ static int handle_play(const char **argv, int argc)
     if (!media_list_empty(&ml)) {
         err = climpd_player_set_media_list(&ml);
         if (err < 0) {
-            report_error("--play", "adding files to player failed", err);
+            report_error(cmd, "adding files to player failed", err);
             goto cleanup1;
         }
         
         if (!valid_index) {
             err = climpd_player_next();
             if (err < 0)
-                report_error("--play", "failed to play track", err);
+                report_error(cmd, "failed to play track", err);
         }
     }
     
     if (valid_index) {
         err = climpd_player_play_track(index);
         if (err < 0) {
-            eprint("climpd: --play: failed to play track \"%d\" - %s\n", index,
+            eprint("climpd: %s: failed to play track \"%d\" - %s\n", cmd, index,
                    strerr(-err));
         }
     }
@@ -452,6 +454,7 @@ static int handle_quit(const char **argv, int argc)
 
 static int handle_remove(const char **argv, int argc)
 {
+    static const char *cmd = "--remove";
     struct media_list ml;
     int err;
     
@@ -468,7 +471,7 @@ static int handle_remove(const char **argv, int argc)
         
         err = media_loader_load(argv[i], &ml);
         if (err < 0) {
-            report_arg_error("--remove", argv[i], err);
+            report_arg_error(cmd, argv[i], err);
             goto cleanup1;
         }
     }
@@ -569,26 +572,40 @@ static int handle_sort(const char **argv, int argc)
 
 static int handle_stdin(const char **argv, int argc)
 {
+    static const char *cmd = "--stdin";
+    struct stat st;
     struct media_list ml;
     int err;
     
     report_redundant_if_applicable(argv, argc);
     
+    err = fstat(fd_in,  &st);
+    if (err < 0) {
+        err = -errno;
+        report_error(cmd, "failed to check stdin for data", err);
+        return err;
+    }
+    
+    if (st.st_size <= 0) {
+        report_error(cmd, "no data to read on stdin", -ENODATA);
+        return -ENODATA;
+    }
+    
     err = media_list_init(&ml);
     if (err < 0) {
-        report_error("--stdin", "failed to initialize media-list", err);
+        report_error(cmd, "failed to initialize media-list", err);
         return err;
     }
     
     err = media_list_add_from_fd(&ml, fd_in);
     if (err < 0) {
-        report_error("--stdin", "failed to load files from stdin", err);
+        report_error(cmd, "failed to load files from stdin", err);
         goto cleanup1;
     }
     
     err = climpd_player_set_media_list(&ml);
     if (err < 0) {
-        report_error("--stdin", "failed to set player media-list", err);
+        report_error(cmd, "failed to set player media-list", err);
         goto cleanup1;
     }
     
@@ -820,7 +837,6 @@ int main(int argc, char *argv[])
     
     /* needs climpd_paths */
     climpd_config_init();
-    media_discoverer_init();
     
     /* needs climpd_config and climpd_paths */
     climpd_player_init();
@@ -836,7 +852,6 @@ int main(int argc, char *argv[])
     options_destroy();
     media_loader_destroy();
     climpd_player_destroy();
-    media_discoverer_destroy();
     climpd_config_destroy();
     socket_destroy();
     mainloop_destroy();

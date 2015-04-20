@@ -146,7 +146,6 @@ int playlist_set_media_list(struct playlist *__restrict pl,
     if (err < 0)
         return err;
     
-    
     err = kfy_add(&pl->kfy, ml_size - size);
     if (err < 0)
         return err;

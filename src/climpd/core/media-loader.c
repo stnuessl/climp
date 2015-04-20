@@ -34,7 +34,6 @@
 
 #include <core/climpd-paths.h>
 #include <core/media-loader.h>
-#include <core/media-discoverer.h>
 #include <core/util.h>
 #include <core/climpd-log.h>
 
@@ -127,15 +126,11 @@ int media_loader_load(const char *__restrict arg,
         arg = _file_path;
     }
     
-    switch (st.st_mode & S_IFMT) {
-    case S_IFREG:
-        if (media_discoverer_file_is_playable(arg))
-            return media_list_emplace_back(ml, arg);
-        else 
-            return media_list_add_from_path(ml, arg);
-    case S_IFDIR:
-        return media_discoverer_scan_dir(arg, ml);
-    default:
+    if (!S_ISREG(st.st_mode))
         return -EMEDIUMTYPE;
-    }
+    
+    if (is_playlist_file(arg))
+        return media_list_add_from_path(ml, arg);
+    
+    return media_list_emplace_back(ml, arg);
 }
