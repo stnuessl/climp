@@ -72,7 +72,7 @@ static const char help[] = {
     "      --pause            Pause / unpause the player. This has no effect \n"
     "                         if the player is stopped.\n" 
     "      --playlist [args]  Print or set the current playlist. Pass\n"
-    "                         media files\ and / or .m3u / .txt - files.\n"
+    "                         media files and / or .m3u / .txt - files.\n"
     "      --repeat           Toggle repeat playlist.\n"
     "      --shuffle          Toggle shuffle.\n"
     "  -v, --volume [arg]     Set or get the volume of the climpd-player.\n"
@@ -91,7 +91,7 @@ static const char help[] = {
     "                         in the current track.\n"
     "                         Accepted time formats: [m:ss] - or just - [s]\n"
     "      --sort             Sort the playlist. /some/file01 will be before\n"
-    "                         /some/file02 and so on. Useful if you forgot to
+    "                         /some/file02 and so on. Useful if you forgot to\n"
     "                         sort the file in bash (use: sort -V).\n"
     "  -i, --stdin            Read playlist from stdin.\n"
     "      --stop             Stop the playback\n"
