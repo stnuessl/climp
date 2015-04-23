@@ -85,7 +85,6 @@ static const char help[] = {
     "                         playlist. Possible arguments are media files,\n"
     "                         .m3u / .txt files or numbers.\n"
     "      --files            Print all files in the current playlist\n"
-    "      --log              Print the log of the daemon\n"
     "      --mute             Mute or unmute the player\n"
     "      --seek [arg]       Get current position or jump to a position \n"
     "                         in the current track.\n"
@@ -288,15 +287,6 @@ cleanup1:
     media_list_destroy(&ml);
     
     return err;
-}
-
-static int handle_log(const char **argv, int argc)
-{
-    report_redundant_if_applicable(argv, argc);
-    
-    climpd_log_print(fd_out);
-    
-    return 0;
 }
 
 static int handle_mute(const char **argv, int argc)
@@ -670,7 +660,6 @@ static struct option options[] = {
     { "--next",         "-n",   &handle_next            },
     { "--play",         "-p",   &handle_play            },
     { "--files",        "",     &handle_files           },
-    { "--log",          "",     &handle_log             },
     { "--mute",         "-m",   &handle_mute            },
     { "--seek",         "",     &handle_seek            },
     { "--sort",         "",     &handle_sort            },

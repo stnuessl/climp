@@ -84,7 +84,7 @@ static int climpd_player_play_uri(const char *__restrict uri)
     
     err = climpd_player_set_state(GST_STATE_PLAYING);
     if(err < 0) {
-        climpd_log_e(tag, "unable to play '%s'\n", uri);
+        climpd_log_e(tag, "unable to play \"%s\"\n", uri);
         return err;
     }
     
@@ -505,15 +505,11 @@ int climpd_player_play(void)
         _running_track = playlist_next(&_playlist);
         if (!_running_track)
             return -ENOENT;
-        
-        uri = media_uri(_running_track);
-        err = climpd_player_play_uri(uri);
-        if (err < 0) {
-            climpd_log_e(tag, "failed to start playback - %s\n", strerr(-err));
+
+        err = climpd_player_play_uri(media_uri(_running_track));
+        if (err < 0)
             return err;
-        }
-        
-        climpd_log_i(tag, "started playback of '%s'\n", uri);
+
         break;
     }
     
