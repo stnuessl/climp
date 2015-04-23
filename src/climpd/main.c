@@ -578,6 +578,12 @@ static int handle_stdin(const char **argv, int argc)
     
     report_redundant_if_applicable(argv, argc);
     
+    if (isatty(fd_in)) {
+        err = -EPIPE;
+        report_error(cmd, "stdin is attached to a terminal", err);
+        return err;
+    }
+    
     err = media_list_init(&ml);
     if (err < 0) {
         report_error(cmd, "failed to initialize media-list", err);
@@ -721,9 +727,8 @@ static int handle_connection(int fd)
     }
     
     err = chdir(cwd);
-    if (err < 0) {
+    if (err < 0)
         climpd_log_w(tag, "chdir() to \"%s\" failed - %s\n", cwd, errstr);
-    }
     
     err = handle_argv((const char **) argv, argc);
     
