@@ -602,7 +602,7 @@ int climpd_player_seek(unsigned int val)
     
     if(!ok) {
         climpd_log_e(tag, "seeking to position %d failed\n", val);
-        return -ENOMEM;
+        return -EAGAIN;
     }
     
     return 0;
