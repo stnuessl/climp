@@ -46,12 +46,8 @@ static int media_player_set_state(GstState state)
     GstStateChangeReturn val;
     
     val = gst_element_set_state(_gst_pipeline, state);
-    if (val == GST_STATE_CHANGE_FAILURE)
-        return -1;
     
-    _gst_state = state;
-    
-    return 0;
+    return (val == GST_STATE_CHANGE_FAILURE) ? -1 : 0;
 }
 
 static void on_pad_added(GstElement *src, GstPad *new_pad, void *data) {
@@ -104,12 +100,7 @@ static void handle_bus_error(GstMessage *msg)
     
     climpd_log_e(tag, "received error from \"%s\": %s\n", name, err->message);
     
-    if (_running_track) {
-        climpd_log_e(tag, "encountered this error while \"%s\" was played\n", 
-                     media_uri(_running_track));
-    }
-    
-    if(debug_info) {
+    if (debug_info) {
         climpd_log_i(tag, "additional debugging information: %s\n", debug_info);
         g_free(debug_info);
     }
@@ -131,6 +122,7 @@ static gboolean bus_watcher(GstBus *bus, GstMessage *msg, gpointer data)
         break;
     case GST_MESSAGE_TAG:
     case GST_MESSAGE_STATE_CHANGED:
+        gst_message_parse_state_changed(msg, NULL, &_gst_state, NULL);
     case GST_MESSAGE_WARNING:
     case GST_MESSAGE_INFO:
     case GST_MESSAGE_BUFFERING:
@@ -352,4 +344,9 @@ void media_player_set_muted(bool muted)
 bool media_player_muted(void)
 {
     return _muted;
+}
+
+enum media_player_state media_player_state(void)
+{
+    return _gst_state;
 }

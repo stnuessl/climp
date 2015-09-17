@@ -33,90 +33,6 @@
 
 #define MEDIA_META_ELEMENT_SIZE  64
 
-static void parse_tags(const GstTagList *list, const gchar *tag, void *data)
-{
-    struct media_info *m_info = data;
-    const GValue *val;
-    const char *s;
-    int i, num;
-    
-    num = gst_tag_list_get_tag_size(list, tag);
-    
-    for (i = 0; i < num; ++i) {
-        val = gst_tag_list_get_value_index(list, tag, i);
-        
-        if(strcmp(GST_TAG_TITLE, tag) == 0) {
-            s = g_value_get_string(val);
-            strncpy(m_info->title, s, MEDIA_META_ELEMENT_SIZE);
-            
-            m_info->title[MEDIA_META_ELEMENT_SIZE - 1] = '\0';
-        } else if(strcmp(GST_TAG_ALBUM, tag) == 0) {
-            s = g_value_get_string(val);
-            strncpy(m_info->album, s, MEDIA_META_ELEMENT_SIZE);
-            
-            m_info->album[MEDIA_META_ELEMENT_SIZE - 1] = '\0';
-        } else if(strcmp(GST_TAG_ARTIST, tag) == 0) {
-            s = g_value_get_string(val);
-            strncpy(m_info->artist, s, MEDIA_META_ELEMENT_SIZE);
-            
-            m_info->artist[MEDIA_META_ELEMENT_SIZE - 1] = '\0';
-        } else if(strcmp(GST_TAG_TRACK_NUMBER, tag) == 0) {
-            m_info->track = g_value_get_uint(val);
-            
-        }
-    }
-}
-
-static GstDiscovererResult media_parse_info(struct media *__restrict m, 
-                                            GstDiscovererInfo *__restrict info,
-                                            char **err_msg)
-{
-    struct media_info *m_info;
-    const GstTagList *tags;
-    GstDiscovererResult result;
-    
-    if (m->parsed)
-        return GST_DISCOVERER_OK;
-    
-    result = gst_discoverer_info_get_result(info);
-    
-    switch(result) {
-    case GST_DISCOVERER_URI_INVALID:
-        if (err_msg)
-            *err_msg = strdup("invalid media uri"); 
-        break;
-    case GST_DISCOVERER_ERROR:
-        if (err_msg)
-            *err_msg = strdup("discoverer error");
-        break;
-    case GST_DISCOVERER_TIMEOUT:
-        if (err_msg)
-            *err_msg = strdup("received timeout");
-        break;
-    case GST_DISCOVERER_MISSING_PLUGINS:
-        if (err_msg)
-            *err_msg = strdup("missing plugins");
-        break;
-    case GST_DISCOVERER_OK:
-        m_info = media_info(m);
-        
-        m_info->seekable = gst_discoverer_info_get_seekable(info);
-        m_info->duration = gst_discoverer_info_get_duration(info) / 1e9;
-        
-        tags = gst_discoverer_info_get_tags(info);
-        
-        if (tags)
-            gst_tag_list_foreach(tags, &parse_tags, m_info);
-        
-        m->parsed = true;
-        break;
-    default:
-        break;
-    }
-    
-    return result;
-}
-
 struct media *media_new(const char *__restrict arg)
 {
     struct media *media;
@@ -184,9 +100,9 @@ const char *media_hierarchical(const struct media *__restrict media)
     return media->hier;
 }
 
-void media_set_parsed(struct media *__restrict media)
+void media_set_parsed(struct media *__restrict media, bool val)
 {
-    media->parsed = true;
+    media->parsed = val;
 }
 
 bool media_is_parsed(const struct media *__restrict media)
@@ -213,32 +129,3 @@ int media_hierarchical_compare(const struct media *__restrict media,
     return (arg) ? strcmp(media->hier, arg) : 1;
 }
 
-GstDiscovererResult media_parse(struct media *__restrict m, 
-                                GstDiscoverer *__restrict disc,
-                                char **err_msg)
-{
-    GstDiscovererResult result;
-    GstDiscovererInfo *info;
-    GError *error;
-    
-    if (m->parsed)
-        return GST_DISCOVERER_OK;
-
-    info = gst_discoverer_discover_uri(disc, m->uri, &error);
-    if(!info) {
-        if (error) {
-            if (err_msg)
-                *err_msg = strdup(error->message);
-            
-            g_error_free(error);
-        }
-        
-        return GST_DISCOVERER_ERROR;
-    }
-
-    result = media_parse_info(m, info, err_msg);
-    
-    gst_discoverer_info_unref(info);
-    
-    return result;
-}

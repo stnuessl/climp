@@ -22,15 +22,20 @@
 #define _MEDIA_DISCOVERER_H_
 
 #include <obj/media.h>
+#include <obj/media-list.h>
 
 int media_discoverer_init(void);
 
 void media_discoverer_destroy(void);
 
-void media_discoverer_discover(struct media *m);
-
 void media_discoverer_start(void);
 
 void media_discoverer_stop(void);
+
+int media_discoverer_discover_media_sync(struct media* m);
+
+void media_discoverer_discover_media_async(struct media *m);
+
+void media_discoverer_discover_media_list_async(struct media_list *ml);
 
 #endif /* _MEDIA_DISCOVERER_H_ */

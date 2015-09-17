@@ -20,6 +20,8 @@ include_directories(../shared/)
 
 add_executable(climpd 
     main.c
+    core/media-player/media-player.c
+    core/media-player/media-discoverer.c
     core/climpd-log.c
     core/climpd-player.c
     core/climpd-config.c

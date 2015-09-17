@@ -51,5 +51,6 @@ void media_player_set_muted(bool muted);
 
 bool media_player_muted(void);
 
+enum media_player_state media_player_state(void);
 
 #endif /* _MEDIA_PLAYER_H_ */

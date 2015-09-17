@@ -83,13 +83,13 @@ bool climpd_player_shuffle(void);
 
 bool climpd_player_toggle_shuffle(void);
 
-enum climpd_player_state climpd_player_state(void);
-
-bool climpd_player_is_playing(void);
-
-bool climpd_player_is_paused(void);
-
-bool climpd_player_is_stopped(void);
+// enum climpd_player_state climpd_player_state(void);
+// 
+// bool climpd_player_is_playing(void);
+// 
+// bool climpd_player_is_paused(void);
+// 
+// bool climpd_player_is_stopped(void);
 
 int climpd_player_add_media_list(struct media_list *__restrict ml);
 
