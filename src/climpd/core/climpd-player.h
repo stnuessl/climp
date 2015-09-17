@@ -33,12 +33,6 @@
 #include <obj/media-list.h>
 #include <obj/media.h>
 
-enum climpd_player_state {
-    CLIMPD_PLAYER_PLAYING = GST_STATE_PLAYING,
-    CLIMPD_PLAYER_PAUSED  = GST_STATE_PAUSED,
-    CLIMPD_PLAYER_STOPPED = GST_STATE_NULL,
-};
-
 void climpd_player_init(void);
 
 void climpd_player_destroy(void);

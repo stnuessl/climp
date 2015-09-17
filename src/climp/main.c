@@ -109,7 +109,7 @@ int main(int argc, char *argv[])
     const char *cwd = getenv("PWD");
     
     if(getuid() == 0) {
-        fprintf(stderr, "climp: run as root\n");
+        fprintf(stderr, "climp: cannot run as root\n");
         exit(EXIT_FAILURE);
     }
 
