@@ -31,10 +31,10 @@ add_executable(climpd
     core/socket.c
     core/util.c
     core/mainloop.c
-    obj/playlist.c
+    core/media-player/playlist.c
     obj/media-list.c
     obj/media.c
-    obj/kfy.c
+    core/media-player/kfy.c
     obj/uri.c
     ../shared/ipc.c
 )

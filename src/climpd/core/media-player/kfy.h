@@ -23,30 +23,20 @@
 
 #include <stdbool.h>
 
-#include <libvci/random.h>
+void kfy_init(unsigned int size);
 
-struct kfy {
-    struct random rand;
-    unsigned int *a;
-    unsigned int end;
-    unsigned int size;
-    unsigned int capacity;
-};
+void kfy_destroy(void);
 
-int kfy_init(struct kfy *__restrict k, unsigned int size);
+void kfy_reset(void);
 
-void kfy_destroy(struct kfy *__restrict k);
+unsigned int kfy_shuffle(void);
 
-void kfy_reset(struct kfy *__restrict k);
+int kfy_add(unsigned int cnt);
 
-unsigned int kfy_shuffle(struct kfy *__restrict k);
+void kfy_remove(unsigned int cnt);
 
-int kfy_add(struct kfy *__restrict k, unsigned int cnt);
+unsigned int kfy_size(void);
 
-void kfy_remove(struct kfy *__restrict k, unsigned int cnt);
-
-unsigned int kfy_size(const struct kfy *__restrict k);
-
-bool kfy_cycle_done(const struct kfy *__restrict k);
+bool kfy_cycle_done(void);
 
 #endif /* _KFY_H_ */

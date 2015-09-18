@@ -42,17 +42,16 @@
 #include <core/climpd-log.h>
 #include <core/media-player/media-player.h>
 #include <core/media-player/media-discoverer.h>
-#include <core/terminal-color-map.h>
+#include <core/media-player/playlist.h>
 #include <core/climpd-player.h>
+#include <core/terminal-color-map.h>
 #include <core/climpd-paths.h>
 #include <core/util.h>
 
-#include <obj/playlist.h>
 #include <obj/uri.h>
 
 static const char *tag = "climpd-player";
 
-static struct playlist _playlist;
 static struct media *_running_track;
 
 static void handle_end_of_stream(void)
@@ -62,7 +61,7 @@ static void handle_end_of_stream(void)
     if (_running_track)
         media_unref(_running_track);
     
-    _running_track = playlist_next(&_playlist);
+    _running_track = playlist_next();
     if(!_running_track) {
         climpd_log_i(tag, "finished playing current playlist\n");
         return;
@@ -123,53 +122,53 @@ static void handle_end_of_stream(void)
 //     }
 // }
 
-static void load_playlist_from_disk(void)
-{
-    const char *path = climpd_paths_last_playlist();
-    struct media_list ml;
-    int err;
-
-    err = media_list_init(&ml);
-    if (err < 0) {
-        climpd_log_w(tag, "failed to initialize last played playlist\n");
-        return;
-    }
-    
-    err = media_list_add_from_path(&ml, path);
-    if (err < 0 && err != -ENOENT) {
-        climpd_log_w(tag, "failed to load last playlist elements from \"%s\" - "
-                     "%s\n", path, strerr(-err));
-        goto cleanup;
-    }
-    
-    err = playlist_add_media_list(&_playlist, &ml);
-    if (err < 0) {
-        climpd_log_w(tag, "failed to add last playlist elements - %s\n", 
-                     strerr(-err));
-        goto cleanup;
-    }
-    
-    media_discoverer_discover_media_list_async(&ml);
-    
-cleanup:
-    media_list_destroy(&ml);
-}
-
-static void save_playlist_to_disk(void)
-{
-    const char *path = climpd_paths_last_playlist();
-    int fd;
-    
-    fd = open(path, O_WRONLY | O_CLOEXEC | O_CREAT | O_TRUNC, 0644);
-    if (fd < 0) {
-        climpd_log_e(tag, "failed to save playlist to \"%s\" - %s\n", path, 
-                     errstr);
-        return;
-    } 
-    
-    climpd_player_print_uris(fd);
-    close(fd);
-}
+// static void load_playlist_from_disk(void)
+// {
+//     const char *path = climpd_paths_last_playlist();
+//     struct media_list ml;
+//     int err;
+// 
+//     err = media_list_init(&ml);
+//     if (err < 0) {
+//         climpd_log_w(tag, "failed to initialize last played playlist\n");
+//         return;
+//     }
+//     
+//     err = media_list_add_from_path(&ml, path);
+//     if (err < 0 && err != -ENOENT) {
+//         climpd_log_w(tag, "failed to load last playlist elements from \"%s\" - "
+//                      "%s\n", path, strerr(-err));
+//         goto cleanup;
+//     }
+//     
+//     err = playlist_add_media_list(&_playlist, &ml);
+//     if (err < 0) {
+//         climpd_log_w(tag, "failed to add last playlist elements - %s\n", 
+//                      strerr(-err));
+//         goto cleanup;
+//     }
+//     
+//     media_discoverer_discover_media_list_async(&ml);
+//     
+// cleanup:
+//     media_list_destroy(&ml);
+// }
+// 
+// static void save_playlist_to_disk(void)
+// {
+//     const char *path = climpd_paths_last_playlist();
+//     int fd;
+//     
+//     fd = open(path, O_WRONLY | O_CLOEXEC | O_CREAT | O_TRUNC, 0644);
+//     if (fd < 0) {
+//         climpd_log_e(tag, "failed to save playlist to \"%s\" - %s\n", path, 
+//                      errstr);
+//         return;
+//     } 
+//     
+//     climpd_player_print_uris(fd);
+//     close(fd);
+// }
 
 void climpd_player_init(void)
 {
@@ -435,17 +434,17 @@ enum climpd_player_state climpd_player_state(void)
 
 bool climpd_player_is_playing(void)
 {
-    return _gst_state == GST_STATE_PLAYING;
+    return media_player_state() == GST_STATE_PLAYING;
 }
 
 bool climpd_player_is_paused(void)
 {
-    return _gst_state == GST_STATE_PAUSED;
+    return media_player_state() == GST_STATE_PAUSED;
 }
 
 bool climpd_player_is_stopped(void)
 {
-    return _gst_state == GST_STATE_NULL;
+    return media_player_state() == GST_STATE_NULL;
 }
 
 int climpd_player_add_media_list(struct media_list *__restrict ml)
