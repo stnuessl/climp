@@ -27,17 +27,17 @@ void climpd_log_init(void);
 
 void climpd_log_destroy(void);
 
-void climpd_log_d(const char *__restrict tag, const char *fmt, ...)
-                                            __attribute__((format(printf,2,3)));
+__attribute__((format(printf,2,3)))
+void climpd_log_d(const char *__restrict tag, const char *fmt, ...);
 
-void climpd_log_i(const char *__restrict tag, const char *fmt, ...)
-                                            __attribute__((format(printf,2,3)));
+__attribute__((format(printf,2,3)))
+void climpd_log_i(const char *__restrict tag, const char *fmt, ...);
 
-void climpd_log_w(const char *__restrict tag, const char *fmt, ...)
-                                            __attribute__((format(printf,2,3)));
+__attribute__((format(printf,2,3)))
+void climpd_log_w(const char *__restrict tag, const char *fmt, ...);
 
-void climpd_log_e(const char *__restrict tag, const char *fmt, ...)
-                                            __attribute__((format(printf,2,3)));
+__attribute__((format(printf,2,3)))
+void climpd_log_e(const char *__restrict tag, const char *fmt, ...);
 
 void climpd_log_v_d(const char *__restrict tag, const char *__restrict fmt, 
                     va_list vargs);
@@ -51,8 +51,8 @@ void climpd_log_v_w(const char *__restrict tag, const char *__restrict fmt,
 void climpd_log_v_e(const char *__restrict tag, const char *__restrict fmt, 
                     va_list vargs);
 
-void climpd_log_append(const char *fmt, ...)
-                                            __attribute__((format(printf,1,2)));
+__attribute__((format(printf,1,2)))
+void climpd_log_append(const char *fmt, ...);
 
 void climpd_log_print(int fd);
 

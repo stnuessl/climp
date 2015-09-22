@@ -28,8 +28,8 @@
 
 #include <libvci/filesystem.h>
 
-#include <obj/media.h>
-#include <obj/uri.h>
+#include <media/media.h>
+#include <media/uri.h>
 
 #define MEDIA_META_ELEMENT_SIZE  64
 
@@ -52,8 +52,8 @@ struct media *media_new(const char *__restrict arg)
     media->info.track = 0;
     media->info.duration = 0;
     media->info.seekable = false;
-        
-    media->hier = uri_hierarchical(media->uri);
+    
+    media->path = uri_hierarchical(media->uri);
     
     /* 
      * Webradio, etc. won't (can't ?) be parsed so we prevent this by
@@ -62,10 +62,10 @@ struct media *media_new(const char *__restrict arg)
     media->parsed = uri_is_http(media->uri);
     
     atomic_init(&media->ref_count, 1);
-
+    
     return media;
-
-cleanup1:
+    
+    cleanup1:
     free(media);
     
     return NULL;
@@ -95,9 +95,9 @@ const char *media_uri(const struct media *__restrict media)
     return media->uri;
 }
 
-const char *media_hierarchical(const struct media *__restrict media)
+const char *media_path(const struct media *__restrict media)
 {
-    return media->hier;
+    return media->path;
 }
 
 void media_set_parsed(struct media *__restrict media, bool val)
@@ -113,11 +113,11 @@ bool media_is_parsed(const struct media *__restrict media)
 int media_compare(const struct media *__restrict m1, 
                   const struct media *__restrict m2)
 {
-    return strverscmp(m1->hier, m2->hier);
+    return strverscmp(m1->path, m2->path);
 }
 
-int media_hierarchical_compare(const struct media *__restrict media, 
-                               const char *__restrict arg)
+int media_path_compare(const struct media *__restrict media, 
+                       const char *__restrict arg)
 {
     static __thread char rpath[PATH_MAX];
     
@@ -125,7 +125,6 @@ int media_hierarchical_compare(const struct media *__restrict media,
         arg = uri_hierarchical(arg);
     else if (!path_is_absolute(arg))
         arg = realpath(arg, rpath);
-        
-    return (arg) ? strcmp(media->hier, arg) : 1;
+    
+    return (arg) ? strcmp(media->path, arg) : 1;
 }
-

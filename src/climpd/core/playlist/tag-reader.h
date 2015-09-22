@@ -18,28 +18,28 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef _MEDIA_HISTORY_H_
-#define _MEDIA_HISTORY_H_
+#ifndef _TAG_READER_H_
+#define _TAG_READER_H_
 
-#include <libvci/link.h>
+#include <gst/gst.h>
+#include <gst/pbutils/pbutils.h>
 
-#include <obj/media.h>
+#include <libvci/map.h>
 
-struct media_history {
-    struct link list;
-    
-    unsigned int size;
-    unsigned int max_size;
+#include <media/media.h>
+
+struct tag_reader {
+    struct map media_map;
+    GstDiscoverer *d_async;
+    GstDiscoverer *d_sync;
 };
 
-void media_history_init(struct media_history *__restrict mh, 
-                        unsigned int max_size);
+int tag_reader_init(struct tag_reader* tr);
 
-void media_history_destroy(struct media_history *__restrict mh);
+void tag_reader_destroy(struct tag_reader *__restrict tr);
 
-void media_history_insert(struct media_history *__restrict mh, 
-                          struct media *m);
+int tag_reader_read_sync(struct tag_reader *__restrict tr, struct media *m);
 
-struct media *media_history_take(struct media_history *__restrict mh);
+void tag_reader_read_async(struct tag_reader *__restrict tr, struct media *m);
 
-#endif /* _MEDIA_HISTORY_H_ */
+#endif /* _TAG_READER_H_ */

@@ -25,7 +25,7 @@
 
 #include <libvci/filesystem.h>
 
-#include <obj/uri.h>
+#include <media/uri.h>
 
 char *uri_new(const char *__restrict arg)
 {

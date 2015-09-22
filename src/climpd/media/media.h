@@ -24,6 +24,9 @@
 #include <stdbool.h>
 #include <stdatomic.h>
 
+#include <gst/gst.h>
+#include <gst/pbutils/pbutils.h>
+
 #include <libvci/link.h>
 
 #define MEDIA_META_ELEMENT_SIZE  64
@@ -40,7 +43,7 @@ struct media_info {
 struct media {
     struct media_info info;
     char *uri;
-    const char *hier;
+    const char *path;
     
     bool parsed;
     
@@ -57,16 +60,16 @@ struct media_info *media_info(struct media *__restrict media);
 
 const char *media_uri(const struct media *__restrict media);
 
-const char *media_hierarchical(const struct media *__restrict media);
+const char *media_path(const struct media *__restrict media);
 
-void media_set_parsed(struct media *__restrict media, bool val);
+void media_set_parsed(struct media *__restrict media, bool parsed);
 
 bool media_is_parsed(const struct media *__restrict media);
 
 int media_compare(const struct media *__restrict m1, 
                   const struct media *__restrict m2);
 
-int media_hierarchical_compare(const struct media *__restrict media,
-                               const char *__restrict hier);
+int media_path_compare(const struct media *__restrict media,
+                       const char *__restrict hier);
 
 #endif /* _MEDIA_H_ */

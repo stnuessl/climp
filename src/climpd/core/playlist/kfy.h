@@ -18,17 +18,35 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef _CLIMPD_PATHS_H_
-#define _CLIMPD_PATHS_H_
+#ifndef _KFY_H_
+#define _KFY_H_
 
-void climpd_paths_init(void);
+#include <stdbool.h>
 
-void climpd_paths_destroy(void);
+#include <libvci/random.h>
 
-const char *climpd_paths_config(void);
+struct kfy {
+    struct random rand;
+    unsigned int *a;
+    unsigned int end;
+    unsigned int size;
+    unsigned int capacity;
+};
 
-const char *climpd_paths_media_list_loader(void);
+int kfy_init(struct kfy *__restrict k, unsigned int size);
 
-const char *climpd_paths_last_playlist(void);
+void kfy_destroy(struct kfy *__restrict k);
 
-#endif /* _CLIMPD_PATHS_H_ */
+void kfy_reset(struct kfy *__restrict k);
+
+unsigned int kfy_shuffle(struct kfy *__restrict k);
+
+int kfy_add(struct kfy *__restrict k, unsigned int cnt);
+
+void kfy_remove(struct kfy *__restrict k, unsigned int cnt);
+
+unsigned int kfy_size(const struct kfy *__restrict k);
+
+bool kfy_cycle_done(const struct kfy *__restrict k);
+
+#endif /* _KFY_H_ */

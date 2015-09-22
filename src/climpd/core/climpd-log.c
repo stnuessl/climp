@@ -49,12 +49,12 @@ void climpd_log_init(void)
         goto fail;
     
     log_set_level(&log, LOG_DEBUG);
-
+    
     return;
-fail:
+    fail:
     /* last hope is to get a error message to stderr ... */
     fprintf(stderr, "climpd: failed to initialize log file - %s - "
-            "aborting...\n", strerr(errno));
+    "aborting...\n", strerr(errno));
     exit(EXIT_FAILURE);
 }
 
