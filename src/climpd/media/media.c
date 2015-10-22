@@ -45,9 +45,9 @@ struct media *media_new(const char *__restrict arg)
     if(!media->uri)
         goto cleanup1;
     
-    strncpy(media->info.title,  media->uri, MEDIA_META_ELEMENT_SIZE);
-    strncpy(media->info.artist, "",         MEDIA_META_ELEMENT_SIZE);
-    strncpy(media->info.album,  "",         MEDIA_META_ELEMENT_SIZE);
+    strncpy(media->info.title,  basename(media->uri), MEDIA_META_ELEMENT_SIZE);
+    strncpy(media->info.artist, "", MEDIA_META_ELEMENT_SIZE);
+    strncpy(media->info.album,  "", MEDIA_META_ELEMENT_SIZE);
     
     media->info.track = 0;
     media->info.duration = 0;

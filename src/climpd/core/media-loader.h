@@ -18,25 +18,27 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef _TAG_READER_H_
-#define _TAG_READER_H_
+#ifndef _MEDIA_LOADER_H_
+#define _MEDIA_LOADER_H_
 
-#include <gst/gst.h>
-#include <gst/pbutils/pbutils.h>
+#include <libvci/vector.h>
+#include <core/playlist/playlist.h>
+#include <linux/limits.h>
 
-#include <libvci/map.h>
-
-#include <media/media.h>
-
-struct tag_reader {
-    struct map media_map;
-    GstDiscoverer *disc;
+struct media_loader {
+    struct vector dir_vec;
+    char buffer[PATH_MAX];
 };
 
-int tag_reader_init(struct tag_reader* tr);
+int media_loader_init(struct media_loader *__restrict ml);
 
-void tag_reader_destroy(struct tag_reader *__restrict tr);
+void media_loader_destroy(struct media_loader *__restrict ml);
 
-void tag_reader_read_async(struct tag_reader *__restrict tr, struct media *m);
+int media_loader_add_dir(struct media_loader *__restrict ml, 
+                         const char *__restrict dirpath);
 
-#endif /* _TAG_READER_H_ */
+int media_loader_load(struct media_loader *__restrict ml, 
+                      const char *__restrict arg,
+                      struct playlist *__restrict playlist);
+
+#endif /* _MEDIA_LOADER_H_ */

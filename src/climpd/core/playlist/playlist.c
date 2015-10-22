@@ -305,10 +305,7 @@ struct media *playlist_at(struct playlist *__restrict pl, int index)
         return NULL;
     
     m = *vector_at(&pl->vec_media, i);
-    
-    if (!media_is_parsed(m))
-        (void) tag_reader_read_sync(&pl->tag_reader, m);
-    
+        
     return media_ref(m);
 }
 

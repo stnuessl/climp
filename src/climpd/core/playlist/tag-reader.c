@@ -121,7 +121,6 @@ static void on_discovered(GstDiscoverer *disc,
     uri = gst_discoverer_info_get_uri(info);
     
     m = map_take(&reader->media_map, uri);
-    
     if (!m)
         return;
     
@@ -148,6 +147,22 @@ out:
     media_unref(m);
 }
 
+static void on_start(GstDiscoverer *disc, void *data)
+{
+    struct tag_reader *tr = data;
+    
+    (void) disc;
+    (void) tr;
+}
+
+static void on_finished(GstDiscoverer *disc, void *data)
+{
+    struct tag_reader *tr = data;
+    
+    (void) disc;
+    (void) tr;
+}
+
 int tag_reader_init(struct tag_reader *__restrict tr)
 {
     const struct map_config conf = {
@@ -168,8 +183,8 @@ int tag_reader_init(struct tag_reader *__restrict tr)
         return -err;
     }
     
-    tr->d_async = gst_discoverer_new(5 * GST_SECOND, &error);
-    if (!tr->d_async) {
+    tr->disc = gst_discoverer_new(5 * GST_SECOND, &error);
+    if (!tr->disc) {
         if (error) {
             err = -error->code;
             climpd_log_e(tag, "failed to initialize async discoverer - %s\n",
@@ -180,92 +195,29 @@ int tag_reader_init(struct tag_reader *__restrict tr)
             climpd_log_e(tag, "failed to initialize async discoverer\n");
         }
 
-        goto cleanup1;
+        map_destroy(&tr->media_map);
+        return err;
     }
     
-    g_signal_connect(tr->d_async, "discovered", G_CALLBACK(on_discovered), tr);
+    g_signal_connect(tr->disc, "discovered", G_CALLBACK(on_discovered), tr);
+    g_signal_connect(tr->disc, "starting", G_CALLBACK(on_start), tr);
+    g_signal_connect(tr->disc, "finished", G_CALLBACK(on_finished), tr);
     
-    gst_discoverer_start(tr->d_async);
-    
-    tr->d_sync = gst_discoverer_new(5 * GST_SECOND, &error);
-    if (!tr->d_sync) {
-        if (error) {
-            err = -error->code;
-            climpd_log_e(tag, "failed to initialize sync discoverer - %s\n",
-                         error->message);
-            g_error_free(error);
-        } else {
-            err = -ENOTSUP;
-            climpd_log_e(tag, "failed to initialize sync discoverer\n");
-        }
-        
-        goto cleanup2;
-    }
+    gst_discoverer_start(tr->disc);
 
     climpd_log_i(tag, "initialized\n");
     
     return 0;
-    
-cleanup2:
-    g_object_unref(tr->d_async);
-cleanup1:
-    map_destroy(&tr->media_map);
-    
-    return err;
 }
 
 void tag_reader_destroy(struct tag_reader *__restrict tr)
 {
-    gst_discoverer_stop(tr->d_async);
+    gst_discoverer_stop(tr->disc);
     
-    g_object_unref(tr->d_sync);
-    g_object_unref(tr->d_async);
+    g_object_unref(tr->disc);
     map_destroy(&tr->media_map);
     
     climpd_log_i(tag, "destroyed\n");
-}
-
-int tag_reader_read_sync(struct tag_reader *__restrict tr, struct media *m)
-{
-    GstDiscovererResult result;
-    GstDiscovererInfo *info;
-    GError *error;
-    const char *uri;
-    
-    if (m->parsed)
-        return 0;
-
-    uri = media_uri(m);
-
-    info = gst_discoverer_discover_uri(tr->d_sync, uri, &error);
-    if (!info) {
-        if (error) {
-            const char *msg = error->message;
-            climpd_log_e(tag, "failed to read tags for '%s' - %s\n", uri, msg);
-            g_error_free(error);
-        } else {
-            climpd_log_e(tag, "failed to read tags for '%s'\n", uri);
-        }
-
-        return -1;
-    }
-    
-    result = gst_discoverer_info_get_result(info);
-    if (result != GST_DISCOVERER_OK) {
-        const char *s = stringify_discoverer_result(result);
-        climpd_log_e(tag, "invalid discoverer result for '%s' - %s\n", uri, s);
-        
-        if (result == GST_DISCOVERER_MISSING_PLUGINS)
-            handle_missing_plugins(info);
-
-        gst_discoverer_info_unref(info);
-        return -1;
-    }
-    
-    parse_info(info, m);
-    
-    gst_discoverer_info_unref(info);
-    return 0;
 }
 
 void tag_reader_read_async(struct tag_reader *__restrict tr, struct media *m)
@@ -273,6 +225,9 @@ void tag_reader_read_async(struct tag_reader *__restrict tr, struct media *m)
     const char *uri = media_uri(m);
     bool ok;
     int err;
+    
+    if (media_is_parsed(m))
+        return;
     
     media_ref(m);
     
@@ -285,7 +240,7 @@ void tag_reader_read_async(struct tag_reader *__restrict tr, struct media *m)
         return;
     }
     
-    ok = gst_discoverer_discover_uri_async(tr->d_async, uri);
+    ok = gst_discoverer_discover_uri_async(tr->disc, uri);
     if (!ok) {
         climpd_log_w(tag, "failed to async read tags for '%s'\n", uri);
         map_take(&tr->media_map, uri);
