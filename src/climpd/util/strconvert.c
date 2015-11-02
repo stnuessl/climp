@@ -53,8 +53,10 @@ int str_to_float(const char *__restrict s, float *f)
     if (errno)
         return -errno;
     
-    if (end != '\0')
+    if (*end != '\0')
         return -EINVAL;
+    
+    *f = val;
     
     return 0;
 }
@@ -90,14 +92,20 @@ int str_to_sec(const char *__restrict s, int *__restrict sec)
 
 int str_to_bool(const char *__restrict s, bool *__restrict val)
 {
-    if (!strcasecmp(s, "true") || !strcasecmp(s, "yes") || !strcasecmp(s, "on") 
-        || !strcasecmp(s, "y") || !strcmp(s, "1")) {
+    if (strcasecmp(s, "true") == 0 || 
+        strcasecmp(s, "yes") == 0  || 
+        strcasecmp(s, "on") == 0   ||
+        strcasecmp(s, "y") == 0    ||
+        strcmp(s, "1") == 0) {
         *val = true;
         return 0;
     } 
     
-    if (!strcasecmp(s, "false") || !strcasecmp(s, "no") || !strcasecmp(s, "off")
-        || !strcasecmp(s, "n")  || !strcmp(s, "0")) {
+    if (strcasecmp(s, "false") == 0 ||
+        strcasecmp(s, "no") == 0    ||
+        strcasecmp(s, "off") == 0   ||
+        strcasecmp(s, "n") == 0     ||
+        strcmp(s, "0") == 0) {
         *val = false;
         return 0;
     }

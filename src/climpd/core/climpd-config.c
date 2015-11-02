@@ -28,42 +28,141 @@
 #include <core/climpd-log.h>
 #include <core/climpd-config.h>
 #include <util/bool.h>
+#include <util/strconvert.h>
 
 static const char *tag = "climpd-config";
 
+static void log_invalid_value(const char *__restrict key, 
+                              const char *__restrict val,
+                              int err)
+{
+    climpd_log_w(tag, "invalid '%s' value: '%s' - %s\n", key, val, strerr(err));
+}
+
 static void parse_meta_column_width(const char *key, const char *val, void *arg)
 {
-    (void) key;
+    struct climpd_config *conf = arg;
+    int col_width, err;
+    
+    err = str_to_int(val, &col_width);
+    if (err < 0) {
+        log_invalid_value(key, val, -err);
+        return;
+    }
+    
+    conf->cout_conf.meta_column_width = (unsigned int) col_width;
+    
+    climpd_log_i(tag, "'%s' -> '%u'\n", key, conf->cout_conf.meta_column_width);
 }
 
 static void parse_volume(const char *key, const char *val, void *arg)
 {
-    (void) key;
+    struct climpd_config *conf = arg;
+    int vol, err;
+    
+    err = str_to_int(val, &vol);
+    if (err < 0) {
+        log_invalid_value(key, val, -err);
+        return;
+    }
+    
+    vol = min(vol, 100);
+    vol = max(vol, 0);
+    
+    conf->ap_conf.volume = (unsigned int) vol;
+    
+    climpd_log_i(tag, "'%s' -> '%u'\n", key, conf->ap_conf.volume);
 }
 
 static void parse_pitch(const char *key, const char *val, void *arg)
 {
-    (void) key;
+    struct climpd_config *conf = arg;
+    float pitch;
+    int err;
+    
+    err = str_to_float(val, &pitch);
+    if (err < 0) {
+        log_invalid_value(key, val, -err);
+        return;
+    }
+    
+    pitch = min(pitch, 10.0f);
+    pitch = max(pitch, 0.1f);
+    
+    conf->ap_conf.pitch = pitch;
+    
+    climpd_log_i(tag, "'%s' -> '%f'\n", key, conf->ap_conf.pitch);
 }
 
 static void parse_speed(const char *key, const char *val, void *arg)
 {
-    (void) key;
+    struct climpd_config *conf = arg;
+    float speed;
+    int err;
+    
+    err = str_to_float(val, &speed);
+    if (err < 0) {
+        log_invalid_value(key, val, -err);
+        return;
+    }
+    
+    speed = min(speed, 40.0f);
+    speed = max(speed, 0.1f);
+    
+    conf->ap_conf.speed = speed;
+    
+    climpd_log_i(tag, "'%s' -> '%f'\n", key, conf->ap_conf.speed);
 }
 
 static void parse_repeat(const char *key, const char *val, void *arg)
 {
-    (void) key;
+    struct climpd_config *conf = arg;
+    bool repeat;
+    int err;
+    
+    err = str_to_bool(val, &repeat);
+    if (err < 0) {
+        log_invalid_value(key, val, -err);
+        return;
+    }
+    
+    conf->ap_conf.repeat = repeat;
+    
+    climpd_log_i(tag, "'%s' -> '%s'\n", key, yes_no(conf->ap_conf.repeat));
 }
 
 static void parse_shuffle(const char *key, const char *val, void *arg)
 {
-    (void) key;
+    struct climpd_config *conf = arg;
+    bool shuffle;
+    int err;
+    
+    err = str_to_bool(val, &shuffle);
+    if (err < 0) {
+        log_invalid_value(key, val, -err);
+        return;
+    }
+    
+    conf->ap_conf.shuffle = shuffle;
+    
+    climpd_log_i(tag, "'%s' -> '%s'\n", key, yes_no(conf->ap_conf.shuffle));
 }
 
 static void parse_keep_changes(const char *key, const char *val, void *arg)
 {
-    (void) key;
+    struct climpd_config *conf = arg;
+    bool keep;
+    int err;
+    
+    err = str_to_bool(val, &keep);
+    if (err < 0) {
+        log_invalid_value(key, val, -err);
+        return;
+    }
+    
+    conf->keep_changes = keep;
+    
+    climpd_log_i(tag, "'%s' -> '%s'\n", key, yes_no(conf->keep_changes));
 }
 
 static void write_config(int fd, void *arg)
@@ -71,12 +170,17 @@ static void write_config(int fd, void *arg)
     struct climpd_config *conf = arg;
     
     dprintf(fd,
+            "# climpd configuration\n#\n"
+            "# Valid Ranges for\n"
+            "# - Volume : [0, 100]\n"
+            "# - Pitch  : [0.1, 10.0]\n"
+            "# - Speed  : [0.1, 40.0]\n#\n\n"
             "# Column width for media meta information\n"
             "ConsoleOutput.Meta_Column_Width = %u\n\n"
             "# Player Settings\n"
-            "AudioPlayer.Volume = %u\n",
-            "AudioPlayer.Pitch = %f\n"
-            "AudioPlayer.Speed = %f\n"
+            "AudioPlayer.Volume = %u\n"
+            "AudioPlayer.Pitch = %.2f\n"
+            "AudioPlayer.Speed = %.2f\n"
             "AudioPlayer.Repeat = %s\n"
             "AudioPlayer.Shuffle = %s\n\n"
             "# Config options\n"
@@ -84,12 +188,11 @@ static void write_config(int fd, void *arg)
             conf->cout_conf.meta_column_width, conf->ap_conf.volume, 
             conf->ap_conf.pitch, conf->ap_conf.speed, 
             yes_no(conf->ap_conf.repeat), yes_no(conf->ap_conf.shuffle), 
-            yes_no(conf->keep_changes)
-           );
+            yes_no(conf->keep_changes));
 }
 
 
-int climpd_config_init(struct climpd_config *__restrict conf,
+int climpd_config_init(struct climpd_config *__restrict conf, 
                        const char *__restrict path)
 {
     struct config_handle handles[] = {
@@ -112,7 +215,7 @@ int climpd_config_init(struct climpd_config *__restrict conf,
     conf->ap_conf.shuffle = false;
     conf->keep_changes = false;
     
-    err = config_init(&conf->conf, path, &write_config);
+    err = config_init(&conf->conf, path, &write_config, conf);
     if (err < 0)
         goto out;
     

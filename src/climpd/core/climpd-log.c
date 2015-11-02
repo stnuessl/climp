@@ -60,7 +60,7 @@ void climpd_log_init(void)
 
 void climpd_log_destroy(void)
 {
-    log_delete(&log);
+    log_destroy(&log);
 }
 
 void climpd_log_d(const char *__restrict tag, const char *fmt, ...)

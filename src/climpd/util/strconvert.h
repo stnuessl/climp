@@ -21,6 +21,8 @@
 #ifndef _STRCONVERT_H_
 #define _STRCONVERT_H_
 
+#include <stdbool.h>
+
 int str_to_int(const char *__restrict s, int *__restrict i);
 
 int str_to_float(const char *__restrict s, float *f);
