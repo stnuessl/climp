@@ -178,6 +178,26 @@ int audio_player_play_next(struct audio_player *__restrict ap)
     return audio_player_play_track(ap, track);
 }
 
+void audio_player_set_pitch(struct audio_player *__restrict ap, float pitch)
+{
+    gst_engine_set_pitch(&ap->engine, pitch);
+}
+
+float audio_player_pitch(const struct audio_player *__restrict ap)
+{
+    return gst_engine_pitch(&ap->engine);
+}
+
+void audio_player_set_speed(struct audio_player *__restrict ap, float speed)
+{
+    gst_engine_set_speed(&ap->engine, speed);
+}
+
+float audio_player_speed(const struct audio_player *__restrict ap)
+{
+    return gst_engine_speed(&ap->engine);
+}
+
 void audio_player_set_volume(struct audio_player *__restrict ap, 
                              unsigned int vol)
 {

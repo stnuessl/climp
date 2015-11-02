@@ -43,6 +43,7 @@ struct gst_engine {
     GstElement *gst_pipeline;
     GstElement *gst_source;
     GstElement *gst_convert;
+    GstElement *gst_pitch;
     GstElement *gst_volume;
     GstElement *gst_sink;
     GstState gst_state;
@@ -71,6 +72,14 @@ int gst_engine_stream_position(const struct gst_engine *__restrict en);
 
 int gst_engine_set_stream_position(struct gst_engine *__restrict en, 
                                    unsigned int sec);
+
+void gst_engine_set_pitch(struct gst_engine *__restrict en, float pitch);
+
+float gst_engine_pitch(const struct gst_engine *__restrict en);
+
+void gst_engine_set_speed(struct gst_engine *__restrict en, float speed);
+
+float gst_engine_speed(const struct gst_engine *__restrict en);
 
 void gst_engine_set_volume(struct gst_engine *__restrict en, unsigned int vol);
 

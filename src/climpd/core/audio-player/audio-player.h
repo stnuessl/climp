@@ -45,6 +45,14 @@ int audio_player_play_track(struct audio_player *__restrict ap, int track);
 
 int audio_player_play_next(struct audio_player *__restrict ap);
 
+void audio_player_set_pitch(struct audio_player *__restrict ap, float pitch);
+
+float audio_player_pitch(const struct audio_player *__restrict ap);
+
+void audio_player_set_speed(struct audio_player *__restrict ap, float speed);
+
+float audio_player_speed(const struct audio_player *__restrict ap);
+
 void audio_player_set_volume(struct audio_player *__restrict ap, 
                              unsigned int vol);
 

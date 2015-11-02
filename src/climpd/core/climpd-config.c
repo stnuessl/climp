@@ -1,0 +1,196 @@
+/*
+ * Copyright (C) 2015  Steffen Nüssle
+ * climp - Command Line Interface Music Player
+ *
+ * This file is part of climp.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+#include <unistd.h>
+#include <fcntl.h>
+#include <errno.h>
+
+#include <libvci/macro.h>
+#include <libvci/error.h>
+
+#include <core/climpd-log.h>
+#include <core/climpd-config.h>
+#include <util/bool.h>
+
+static const char *tag = "climpd-config";
+
+static void parse_meta_column_width(const char *key, const char *val, void *arg)
+{
+    (void) key;
+}
+
+static void parse_volume(const char *key, const char *val, void *arg)
+{
+    (void) key;
+}
+
+static void parse_pitch(const char *key, const char *val, void *arg)
+{
+    (void) key;
+}
+
+static void parse_speed(const char *key, const char *val, void *arg)
+{
+    (void) key;
+}
+
+static void parse_repeat(const char *key, const char *val, void *arg)
+{
+    (void) key;
+}
+
+static void parse_shuffle(const char *key, const char *val, void *arg)
+{
+    (void) key;
+}
+
+static void parse_keep_changes(const char *key, const char *val, void *arg)
+{
+    (void) key;
+}
+
+static void write_config(int fd, void *arg)
+{
+    struct climpd_config *conf = arg;
+    
+    dprintf(fd,
+            "# Column width for media meta information\n"
+            "ConsoleOutput.Meta_Column_Width = %u\n\n"
+            "# Player Settings\n"
+            "AudioPlayer.Volume = %u\n",
+            "AudioPlayer.Pitch = %f\n"
+            "AudioPlayer.Speed = %f\n"
+            "AudioPlayer.Repeat = %s\n"
+            "AudioPlayer.Shuffle = %s\n\n"
+            "# Config options\n"
+            "Config.Keep_Changes = %s\n\n",
+            conf->cout_conf.meta_column_width, conf->ap_conf.volume, 
+            conf->ap_conf.pitch, conf->ap_conf.speed, 
+            yes_no(conf->ap_conf.repeat), yes_no(conf->ap_conf.shuffle), 
+            yes_no(conf->keep_changes)
+           );
+}
+
+
+int climpd_config_init(struct climpd_config *__restrict conf,
+                       const char *__restrict path)
+{
+    struct config_handle handles[] = {
+        { &parse_meta_column_width, "ConsoleOutput.Meta_Column_Width", conf },
+        { &parse_volume,            "AudioPlayer.Volume",              conf },
+        { &parse_pitch,             "AudioPlayer.Pitch",               conf },
+        { &parse_speed,             "AudioPlayer.Speed",               conf },
+        { &parse_repeat,            "AudioPlayer.Repeat",              conf },
+        { &parse_shuffle,           "AudioPlayer.Shuffle",             conf },
+        { &parse_keep_changes,      "Config.Keep_Changes",             conf },
+    };
+    int err;
+    
+    /* Initialize config with sane defaults */
+    conf->cout_conf.meta_column_width = 24;
+    conf->ap_conf.volume = 60;
+    conf->ap_conf.pitch = 1.0f;
+    conf->ap_conf.speed = 1.0f;
+    conf->ap_conf.repeat = true;
+    conf->ap_conf.shuffle = false;
+    conf->keep_changes = false;
+    
+    err = config_init(&conf->conf, path, &write_config);
+    if (err < 0)
+        goto out;
+    
+    for(unsigned int i = 0; i < ARRAY_SIZE(handles); ++i) {
+        err = config_insert_handle(&conf->conf, handles + i);
+        if(err < 0) {
+            climpd_log_e(tag, "adding config handle \"%s\" failed - %s\n",
+                         handles[i].key, strerr(-err));
+            goto cleanup1;
+        }
+    }
+    
+    err = climpd_config_load(conf);
+    if (err < 0)
+        goto cleanup1;
+    
+    climpd_log_i(tag, "initialized configuration '%s'\n", path);
+    
+    return 0;
+
+cleanup1:
+    config_destroy(&conf->conf);
+out:
+    climpd_log_e(tag, "failed to initialize configuration file '%s' - %s\n",
+                 path, strerr(-err));
+    return err;
+}
+
+void climpd_config_destroy(struct climpd_config *__restrict conf)
+{
+    config_destroy(&conf->conf);
+    
+    climpd_log_i(tag, "destroyed\n");
+}
+
+int climpd_config_load(struct climpd_config *__restrict conf)
+{
+    int err = config_parse(&conf->conf);
+    if (err < 0) {
+        climpd_log_e(tag, "failed to load configuration - %s\n", strerr(-err));
+        return err;
+    }
+    
+    climpd_log_i(tag, "loaded configuration");
+    return 0;
+}
+
+int climpd_config_save(struct climpd_config *__restrict conf)
+{
+    int fd = open(config_path(&conf->conf), O_WRONLY | O_TRUNC);
+    if (fd < 0) {
+        int err = -errno;
+        climpd_log_e(tag, "failed to open config for writing - %s\n", errstr);
+        return err;
+    }
+    
+    write_config(fd, conf);
+    
+    close(fd);
+    
+    climpd_log_i(tag, "saved current configuration\n");
+    
+    return 0;
+}
+
+struct console_output_config *
+climpd_config_console_output_config(struct climpd_config *__restrict conf)
+{
+    return &conf->cout_conf;
+}
+
+struct audio_player_config *
+climpd_config_audio_player_config(struct climpd_config *__restrict conf)
+{
+    return &conf->ap_conf;
+}
+
+bool climpd_config_keep_changes(const struct climpd_config *__restrict conf)
+{
+    return conf->keep_changes;
+}

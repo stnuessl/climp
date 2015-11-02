@@ -143,6 +143,7 @@ int gst_engine_init(struct gst_engine *__restrict en)
     static const char *elements[] = {
         "uridecodebin",         "source",
         "audioconvert",         "convert",
+        "pitch",                "pitch",
         "volume",               "volume",
         "autoaudiosink",        "sink",
     };
@@ -175,14 +176,21 @@ int gst_engine_init(struct gst_engine *__restrict en)
     
     en->gst_source = gst_bin_get_by_name(GST_BIN(en->gst_pipeline), "source");
     en->gst_convert = gst_bin_get_by_name(GST_BIN(en->gst_pipeline), "convert");
+    en->gst_pitch = gst_bin_get_by_name(GST_BIN(en->gst_pipeline), "pitch");
     en->gst_volume = gst_bin_get_by_name(GST_BIN(en->gst_pipeline), "volume");
     en->gst_sink = gst_bin_get_by_name(GST_BIN(en->gst_pipeline), "sink");
     
     g_signal_connect(en->gst_source, "pad-added", G_CALLBACK(&on_pad_added), en);
     
-    ok = gst_element_link(en->gst_convert, en->gst_volume);
+    ok = gst_element_link(en->gst_convert, en->gst_pitch);
     if (!ok) {
-        climpd_log_e(tag, "linking gst_convert and gst_volume failed\n");
+        climpd_log_e(tag, "linking gst_convert and gst_pitch failed\n");
+        goto fail;
+    }
+    
+    ok = gst_element_link(en->gst_pitch, en->gst_volume);
+    if (!ok) {
+        climpd_log_e(tag, "linking gst_pitch and gst_volume failed\n");
         goto fail;
     }
     
@@ -191,6 +199,7 @@ int gst_engine_init(struct gst_engine *__restrict en)
         climpd_log_e(tag, "linking gst_volume and gst_sink failed\n");
         goto fail;
     }
+    
     
     bus = gst_element_get_bus(en->gst_pipeline);
     gst_bus_add_watch(bus, &bus_watcher, en);
@@ -210,6 +219,9 @@ fail:
     
     if (en->gst_volume)
         g_object_unref(en->gst_volume);
+    
+    if (en->gst_pitch)
+        g_object_unref(en->gst_pitch);
     
     if (en->gst_convert)
         g_object_unref(en->gst_convert);
@@ -231,6 +243,7 @@ void gst_engine_destroy(struct gst_engine *__restrict en)
     
     g_object_unref(en->gst_sink);
     g_object_unref(en->gst_volume);
+    g_object_unref(en->gst_pitch);
     g_object_unref(en->gst_convert);
     g_object_unref(en->gst_source);
     g_object_unref(en->gst_pipeline);
@@ -327,6 +340,40 @@ int gst_engine_set_stream_position(struct gst_engine *__restrict en,
     }
     
     return 0;
+}
+
+void gst_engine_set_pitch(struct gst_engine *__restrict en, float pitch)
+{
+    pitch = max(pitch, 0.1f);
+    pitch = min(pitch, 10.0f);
+    
+    g_object_set(en->gst_pitch, "pitch", pitch, NULL);
+}
+
+float gst_engine_pitch(const struct gst_engine *__restrict en)
+{
+    float pitch;
+    
+    g_object_get(en->gst_pitch, "pitch", &pitch, NULL);
+    
+    return pitch;
+}
+
+void gst_engine_set_speed(struct gst_engine *__restrict en, float speed)
+{
+    speed = max(speed, 0.1f);
+    speed = min(speed, 40.0f);
+    
+    g_object_set(en->gst_pitch, "tempo", speed, NULL);
+}
+
+float gst_engine_speed(const struct gst_engine *__restrict en)
+{
+    float speed;
+    
+    g_object_get(en->gst_pitch, "tempo", &speed, NULL);
+    
+    return speed;
 }
 
 void gst_engine_set_volume(struct gst_engine *__restrict en, unsigned int vol)
