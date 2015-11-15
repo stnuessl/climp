@@ -8,11 +8,11 @@ add_definitions(-D_GNU_SOURCE)
 #add_definitions(-DNDEBUG)
 #add_definitions(-O2) 
 add_definitions(-g3)
+add_definitions(-std=c11)
 
 #set(CMAKE_BUILD_TYPE "release")
 #set(CMAKE_BUILD_TYPE "debug")
 
-set(CMAKE_C_FLAGS "-std=c11")
 set(CMAKE_INSTALL_PREFIX /usr/local)
 set(TARGET_INSTALL_DIR bin)
 set(CMAKE_LIBRARY_PATH /usr/local/lib)

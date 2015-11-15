@@ -166,12 +166,9 @@ int playlist_add(struct playlist *__restrict pl, const char *__restrict path)
     }
     
     err = playlist_add_media(pl, m);
-    if (err < 0) {
-        media_unref(m);
-        return err;
-    }
+    media_unref(m);
     
-    return 0;
+    return err;
 }
 
 int playlist_load(struct playlist *__restrict pl, const char *__restrict path)
@@ -193,7 +190,7 @@ int playlist_load(struct playlist *__restrict pl, const char *__restrict path)
     line = NULL;
     size = 0;
     
-    old_size = vector_size(&pl->vec_media);
+    old_size = playlist_size(pl);
     
     while(1) {
         n = getline(&line, &size, file);
@@ -227,9 +224,9 @@ int playlist_load(struct playlist *__restrict pl, const char *__restrict path)
     return 0;
     
 cleanup1:
-    while (vector_size(&pl->vec_media) > old_size)
-        media_unref(vector_take_back(&pl->vec_media));
-    
+    while (playlist_size(pl) != old_size)
+        playlist_remove(pl, -1);
+
     free(line);
     fclose(file);
     
