@@ -293,17 +293,19 @@ void playlist_set_index(struct playlist *__restrict pl, int index)
 
 struct media *playlist_at(struct playlist *__restrict pl, int index)
 {
-    struct media *m;
-    unsigned int i;
+    struct media *m = playlist_at_unsafe(pl, index);
     
-    i = ensure_positiv_index(pl, index);
+    return (m) ? media_ref(m) : NULL;
+}
+
+struct media *playlist_at_unsafe(struct playlist *__restrict pl, int index)
+{
+    unsigned int i = ensure_positiv_index(pl, index);
     
     if (i >= vector_size(&pl->vec_media))
         return NULL;
     
-    m = *vector_at(&pl->vec_media, i);
-        
-    return media_ref(m);
+    return *vector_at(&pl->vec_media, i);
 }
 
 void playlist_set_shuffle(struct playlist *__restrict pl, bool shuffle)
@@ -339,7 +341,7 @@ void playlist_toggle_repeat(struct playlist *__restrict pl)
 unsigned int playlist_next(struct playlist *__restrict pl)
 {
     if (vector_empty(&pl->vec_media))
-        return -1;
+        return (unsigned int) -1;
     
     if (pl->shuffle) {
         if (kfy_cycle_done(&pl->kfy) && !pl->repeat) {
@@ -349,7 +351,7 @@ unsigned int playlist_next(struct playlist *__restrict pl)
         
         pl->index = kfy_shuffle(&pl->kfy);
         
-        assert(pl->index < playlist_size(pl) && "INVALID INDEX");
+        assert(pl->index < playlist_size(pl) && "invalid playlist index");
         
         return (unsigned int) -1;
     }

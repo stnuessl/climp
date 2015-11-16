@@ -162,7 +162,7 @@ fail:
 
 int audio_player_play_next(struct audio_player *__restrict ap)
 {
-    int track;
+    unsigned int track;
     
     if (playlist_empty(&ap->playlist)) {
         climpd_log_e(tag, "failed to play next track - playlist is empty\n");
@@ -170,12 +170,12 @@ int audio_player_play_next(struct audio_player *__restrict ap)
     }
     
     track = playlist_next(&ap->playlist);
-    if (track < 0) {
+    if (track == (unsigned int) -1) {
         climpd_log_i(tag, "finished playlist\n");
         return 0;
     }
     
-    return audio_player_play_track(ap, track);
+    return audio_player_play_track(ap, (int) track);
 }
 
 void audio_player_set_pitch(struct audio_player *__restrict ap, float pitch)

@@ -35,27 +35,17 @@
 
 static struct log log;
 
-void climpd_log_init(void)
+int climpd_log_init(const char *path)
 {
     int err;
-    char path[sizeof(LOG_PATH_RAW) + 10];
-    
-    err = snprintf(path, sizeof(path), LOG_PATH_RAW, getuid());
-    if (err < 0)
-        goto fail;
-    
+
     err = log_init(&log, path, LOG_ALL);
     if (err < 0)
-        goto fail;
+        return err;
     
     log_set_level(&log, LOG_DEBUG);
     
-    return;
-    fail:
-    /* last hope is to get a error message to stderr ... */
-    fprintf(stderr, "climpd: failed to initialize log file - %s - "
-    "aborting...\n", strerr(errno));
-    exit(EXIT_FAILURE);
+    return 0;
 }
 
 void climpd_log_destroy(void)

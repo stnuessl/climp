@@ -31,7 +31,7 @@ int main(int argc, char *argv[])
     struct media *m1, *m2;
     
     gst_init(NULL, NULL);
-    climpd_log_init();
+    assert(climpd_log_init("/tmp/playlist.log") == 0 && "climpd_log_init");
 
     assert(playlist_init(&playlist) == 0 && "playlist_init");
     

@@ -38,12 +38,14 @@ struct program_option po[] = {
     PROGRAM_OPTION_INIT("--speed", "-s", 1),
     PROGRAM_OPTION_INIT("--pitch", "", 1),
     PROGRAM_OPTION_INIT("--play", "-p", -1),
+    PROGRAM_OPTION_INIT("--repeat", "-r", 0),
 };
 
 struct program_option *opt_vol       = po + 0;
 struct program_option *opt_speed     = po + 1;
 struct program_option *opt_pitch     = po + 2;
 struct program_option *opt_play      = po + 3;
+struct program_option *opt_repeat    = po + 4;
 
 void die(const char *__restrict msg)
 {
@@ -65,7 +67,9 @@ int main(int argc, char *argv[])
     int err;
     
     gst_init(NULL, NULL);
-    climpd_log_init();
+    err = climpd_log_init("/tmp/audio_player.log");
+    if (err < 0)
+        die("failed to initialize log file");
     
     err = options_parse(po, ARRAY_SIZE(po), argv + 1, argc - 1, &err_msg);
     if (err < 0) {
@@ -81,8 +85,8 @@ int main(int argc, char *argv[])
     
     audio_player_set_volume(&player, 60);
     
-    if (opt_vol->argc) {
-        unsigned int vol;
+    if (opt_vol->passed) {
+        int vol;
         
         err = str_to_int(opt_vol->argv[0], &vol);
         if (err < 0)
@@ -91,7 +95,7 @@ int main(int argc, char *argv[])
         audio_player_set_volume(&player, vol);
     }
     
-    if (opt_speed->argc) {
+    if (opt_speed->passed) {
         float speed;
         
         err = str_to_float(opt_speed->argv[0], &speed);
@@ -101,7 +105,7 @@ int main(int argc, char *argv[])
         audio_player_set_speed(&player, speed);
     }
     
-    if (opt_pitch->argc) {
+    if (opt_pitch->passed) {
         float pitch;
         
         err = str_to_float(opt_speed->argv[0], &pitch);
@@ -112,6 +116,9 @@ int main(int argc, char *argv[])
     }
     
     pl = audio_player_playlist(&player);
+    
+    if (opt_repeat->passed)
+        playlist_set_repeat(pl, true);
     
     for (int i = 0; i < opt_play->argc; ++i) {
         if (is_text_file(opt_play->argv[i])) {

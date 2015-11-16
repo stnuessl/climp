@@ -23,7 +23,7 @@
 
 #include <stdarg.h>
 
-void climpd_log_init(void);
+int climpd_log_init(const char *path);
 
 void climpd_log_destroy(void);
 

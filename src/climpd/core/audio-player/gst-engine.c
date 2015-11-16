@@ -63,8 +63,6 @@ static gboolean bus_watcher(GstBus *bus, GstMessage *msg, void *data)
             en->on_end_of_stream(en);
         break;
     case GST_MESSAGE_STATE_CHANGED:
-        gst_message_parse_state_changed(msg, NULL, &en->gst_state, NULL);
-        break;
     case GST_MESSAGE_TAG:
     case GST_MESSAGE_PROGRESS:
     case GST_MESSAGE_WARNING:
@@ -268,6 +266,8 @@ int gst_engine_play(struct gst_engine *__restrict en)
     if (err < 0)
         climpd_log_e(tag, "failed to start playback\n");
     
+    en->gst_state = GST_STATE_PLAYING;
+    
     return err;
 }
 
@@ -285,6 +285,8 @@ int gst_engine_pause(struct gst_engine *__restrict en)
     if(err < 0)
         climpd_log_e(tag, "failed to pause playback.\n");
     
+    en->gst_state = GST_STATE_PAUSED;
+    
     return err;
 }
 
@@ -298,6 +300,8 @@ int gst_engine_stop(struct gst_engine *__restrict en)
     err = gst_engine_set_state(en, GST_STATE_NULL);
     if(err < 0)
         climpd_log_e(tag, "failed to stop playback.\n");
+    
+    en->gst_state = GST_STATE_NULL;
     
     return err;
 }
@@ -385,7 +389,7 @@ void gst_engine_set_volume(struct gst_engine *__restrict en, unsigned int vol)
     
     en->volume = vol;
     
-    val = (101.0 - 50 * log10(101.0 - vol)) / 101;
+    val = (101.0 - 50.0 * log10(101.0 - vol)) / 101.0;
 
     g_object_set(en->gst_volume, "volume", val, NULL);
     

@@ -62,6 +62,8 @@ void playlist_set_index(struct playlist *__restrict pl, int index);
 
 struct media *playlist_at(struct playlist *__restrict pl, int index);
 
+struct media *playlist_at_unsafe(struct playlist *__restrict pl, int index);
+
 void playlist_set_shuffle(struct playlist *__restrict pl, bool shuffle);
 
 bool playlist_shuffle(const struct playlist *__restrict pl);

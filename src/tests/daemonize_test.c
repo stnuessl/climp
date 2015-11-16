@@ -64,8 +64,8 @@ int main(int argc, char *argv[])
     (void) argv;
     
     printf("Run '$ kill -s SIGERM <pid>' to terminate the process\n");
-    
-    climpd_log_init();
+
+    assert(climpd_log_init("/tmp/daemonize.log") == 0 && "climpd_log_init");
     
     assert(daemonize(handles, ARRAY_SIZE(handles)) == 0 && "daemonize");
     
