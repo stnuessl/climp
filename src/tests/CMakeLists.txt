@@ -59,3 +59,27 @@ target_link_libraries(playlist_test
     ${GSTREAMER_PBUTILS_LIBRARIES}
     vci
 )
+
+#######################################################
+
+add_executable(audio_player_test
+    audio_player_test.c
+    ../climpd/core/climpd-log.c
+    ../climpd/core/audio-player/audio-player.c
+    ../climpd/core/audio-player/gst-engine.c
+    ../climpd/core/playlist/playlist.c
+    ../climpd/core/playlist/kfy.c
+    ../climpd/core/playlist/tag-reader.c
+    ../climpd/media/media.c
+    ../climpd/media/uri.c
+    ../climpd/util/strconvert.c
+)
+
+target_link_libraries(audio_player_test
+    ${CMAKE_THREAD_LIBS_INIT}
+    ${GLIB_LIBRARIES}
+    ${GSTREAMER_LIBRARIES}
+    ${GSTREAMER_PBUTILS_LIBRARIES}
+    vci
+    m
+)

@@ -24,9 +24,6 @@
 #include <stdbool.h>
 #include <stdatomic.h>
 
-#include <gst/gst.h>
-#include <gst/pbutils/pbutils.h>
-
 #include <libvci/link.h>
 
 #define MEDIA_META_ELEMENT_SIZE  64

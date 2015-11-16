@@ -46,10 +46,8 @@ int main(int argc, char *argv[])
     
     for (unsigned int i = 0, size = playlist_size(&playlist); i < size; ++i) {
         struct media *m = playlist_at(&playlist, i);
-        struct media_info *info = media_info(m);
         
-        printf(" ( %2u ) %-20s %-20s %s\n", i + 1, info->title, info->album, 
-               info->artist);
+        printf(" ( %2u )  %s\n", i + 1, media_path(m));
         
         /* internal tag reader, playlist and the reference here */
         assert(m->ref_count == 3 && "invalid media reference count");
