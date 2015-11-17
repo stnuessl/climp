@@ -21,8 +21,6 @@
 #ifndef _IPC_H_
 #define _IPC_H_
 
-#define IPC_SOCKET_PATH "/tmp/.climp-unix"
-
 int ipc_send_setup(int sock, int fd_in, int fd_out, int fd_err,
                    const char *__restrict wd);
 

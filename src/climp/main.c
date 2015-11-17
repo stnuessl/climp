@@ -37,7 +37,7 @@ extern char **environ;
 
 static int _ipc_sock;
 
-static int connect_to_daemon(void)
+static int connect_to_daemon(const char *__restrict path)
 {
     struct sockaddr_un addr;
     int err;
@@ -51,7 +51,7 @@ static int connect_to_daemon(void)
     memset(&addr, 0, sizeof(addr));
     
     addr.sun_family = AF_UNIX;
-    strncpy(addr.sun_path, IPC_SOCKET_PATH, sizeof(addr.sun_path));
+    strncpy(addr.sun_path, path, sizeof(addr.sun_path));
     
     err = connect(_ipc_sock, (struct sockaddr *) &addr, sizeof(addr));
     if (err < 0) {
@@ -105,6 +105,7 @@ static int spawn_climpd(void)
 
 int main(int argc, char *argv[])
 {
+    char *sock_path = NULL;
     int fd0, fd1, fd2, attempts, status, err;
     const char *cwd = getenv("PWD");
     
@@ -112,15 +113,21 @@ int main(int argc, char *argv[])
         fprintf(stderr, "climp: cannot run as root\n");
         exit(EXIT_FAILURE);
     }
+    
+    err = asprintf(&sock_path, "/tmp/.climpd-%d.sock", getuid());
+    if (err < 0) {
+        fprintf(stderr, "failed to create socket path\n");
+        exit(EXIT_FAILURE);
+    }
 
-    err = connect_to_daemon();
+    err = connect_to_daemon(sock_path);
     if (err < 0) {
         if(err != -ENOENT && err != -ECONNREFUSED) {
             fprintf(stderr, "failed to connect to server - %s\n", strerr(-err));
             exit(EXIT_FAILURE);
         }
         
-        err = unlink(IPC_SOCKET_PATH);
+        err = unlink(sock_path);
         if(err < 0 && errno != ENOENT) {
             fprintf(stderr, "failed to cleanup old socket - %s\n", errstr);
             exit(EXIT_FAILURE);
@@ -137,7 +144,7 @@ int main(int argc, char *argv[])
         while (attempts--) {
             usleep(10 * 1000);
             
-            err = connect_to_daemon();
+            err = connect_to_daemon(sock_path);
             if(err < 0)
                 continue;
             
@@ -176,6 +183,7 @@ int main(int argc, char *argv[])
     }
     
     close(_ipc_sock);
+    free(sock_path);
     
     return EXIT_SUCCESS;
 }

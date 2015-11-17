@@ -259,7 +259,7 @@ int climpd_config_load(struct climpd_config *__restrict conf)
         return err;
     }
     
-    climpd_log_i(tag, "loaded configuration");
+    climpd_log_i(tag, "loaded configuration\n");
     return 0;
 }
 

@@ -20,9 +20,20 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include <errno.h>
 
 #include <util/strconvert.h>
+
+bool str_is_int(const char *__restrict s)
+{
+    while (*s != '\0') {
+        if (!isxdigit(*s++))
+            return false;
+    }
+    
+    return true;
+}
 
 int str_to_int(const char *__restrict s, int *__restrict i)
 {

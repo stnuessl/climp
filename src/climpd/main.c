@@ -25,9 +25,9 @@
 #include <errno.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <locale.h>
 #include <stdarg.h>
 #include <assert.h>
+#include <execinfo.h>
 
 #include <libvci/map.h>
 #include <libvci/hash.h>
@@ -40,23 +40,35 @@
 #include "../shared/ipc.h"
 
 #include <core/climpd-log.h>
-#include <core/terminal-color-map.h>
-#include <core/climpd-paths.h>
-#include <core/climpd-player.h>
+#include <core/audio-player/audio-player.h>
+#include <core/climpd-config.h>
+#include <core/daemonize.h>
 #include <core/media-loader.h>
 #include <core/climpd-config.h>
-#include <core/socket.h>
-#include <core/mainloop.h>
-#include <core/util.h>
+#include <core/argument-parser.h>
 
-#include <obj/media-list.h>
+#include <ipc/socket-server.h>
+
+#include <util/strconvert.h>
 
 static const char *tag = "main";
 
+/* client side standard fds */
 static int fd_in;
 static int fd_out;
 static int fd_err;
 
+static char *conf_path;
+static char *playlist_path;
+static char *loader_path;
+static char *socket_path;
+
+static struct audio_player audio_player;
+static struct media_loader media_loader;
+static struct climpd_config config;
+static struct socket_server socket_server;
+static struct argument_parser arg_parser;
+static GMainLoop *main_loop;
 static struct map options_map;
 
 static const char help[] = {
@@ -98,12 +110,6 @@ static const char help[] = {
     "                         corresponding URI\n"
 };
 
-struct option {
-    const char *l_opt;
-    const char *s_opt;
-    int (*handler)(const char **argv, int argc);
-};
-
 __attribute__((format(printf,1,2)))
 static void print(const char *__restrict fmt, ...)
 {
@@ -129,35 +135,40 @@ static void report_invalid_boolean(const char *__restrict invalid_val)
     eprint("climpd: unrecognized boolean value '%s'\n", invalid_val);
 }
 
-static void report_invalid_integer(const char *__restrict invalid_val)
+static void report_invalid_integer(const char *__restrict s, int err)
 {
-    eprint("climpd: unrecognized integer value '%s'\n", invalid_val);
+    eprint("climpd: unrecognized integer value '%s' - %s\n", s, strerr(err));
+}
+
+static void report_invalid_float(const char *__restrict s, int err)
+{
+    eprint("climpd: unrecognized float value '%s' - %s\n", s, strerr(err));
 }
 
 static void report_missing_arg(const char *__restrict cmd)
 {
-    dprintf(fd_err, "climpd: \"%s\" is missing at least one argument\n", cmd);
+    eprint("climpd: \"%s\" is missing at least one argument\n", cmd);
 }
 
 static void report_arg_error(const char *__restrict cmd, 
                              const char *__restrict arg, 
                              int err)
 {
-    dprintf(fd_err, "climpd: %s: \"%s\" - %s\n", cmd, arg, strerr(abs(err)));
+    eprint("climpd: %s: \"%s\" - %s\n", cmd, arg, strerr(abs(err)));
 }
 
 static void report_error(const char *__restrict cmd, 
                          const char *__restrict msg,
                          int err)
 {
-    dprintf(fd_err, "climpd: %s: %s - %s\n", cmd, msg, strerr(abs(err)));
+    eprint("climpd: %s: %s - %s\n", cmd, msg, strerr(abs(err)));
 }
 
 static void report_invalid_time_format(const char *__restrict cmd, 
                                        const char *__restrict arg)
 {
-    dprintf(fd_err, "climpd: %s: \"%s\" - invalid time format, "
-    "use m:ss, m.ss, m,ss or just s\n", cmd, arg);
+    eprint("climpd: %s: \"%s\" - invalid time format, "
+           "use m:ss, m.ss, m,ss or just s\n", cmd, arg);
 }
 
 static void report_redundant_if_applicable(const char **argv, int argc)
@@ -165,538 +176,927 @@ static void report_redundant_if_applicable(const char **argv, int argc)
     if (argc <= 0)
         return;
     
-    dprintf(fd_err, "climpd: ignoring redundant arguments - ");
+    eprint("climpd: ignoring redundant arguments - ");
     
     for (int i = 0; i < argc; ++i)
-        dprintf(fd_err, "%s ", argv[i]);
+        eprint("%s ", argv[i]);
     
-    dprintf(fd_err, "\n");
+    eprint("\n");
 }
 
-static int handle_add(const char **argv, int argc)
+static void report_invalid_arg(const char *arg)
+{    
+    eprint("ignoring invalid argument '%s'\n", arg);
+}
+
+// static int handle_add(const char **argv, int argc)
+// {
+//     static const char *cmd = "--add";
+//     struct media_list ml;
+//     int err;
+//     
+//     if (argc == 0) {
+//         report_missing_arg(cmd);
+//         return -EINVAL;
+//     }
+//     
+//     err = media_list_init(&ml);
+//     
+//     for (int i = 0; i < argc; ++i) {
+//         err = media_loader_load(argv[i], &ml);
+//         if (err < 0) {
+//             report_arg_error(cmd, argv[i], err);
+//             goto cleanup1;
+//         }
+//     }
+//     
+//     err = climpd_player_add_media_list(&ml);
+//     if (err < 0)
+//         report_error(cmd, "failed to add items to playlist", err);
+//     
+// cleanup1:
+//     media_list_destroy(&ml);
+//     
+//     return err;
+// }
+// 
+// static int handle_clear(const char **argv, int argc)
+// {
+//     report_redundant_if_applicable(argv, argc);
+//     
+//     climpd_player_clear_playlist();
+//     
+//     return 0;
+// }
+// 
+// static int handle_config(const char **argv, int argc)
+// {
+//     report_redundant_if_applicable(argv + 1, argc - 1);
+//     
+//     if (argc == 0) {
+//         climpd_config_print(fd_out);
+//         return 0;
+//     }
+//     
+//     /* TODO: reload config from 'argv[0]' */
+//     
+//     return 0;
+// }
+// 
+// int handle_current(const char **argv, int argc)
+// {
+//     report_redundant_if_applicable(argv, argc);
+//     
+//     climpd_player_print_current_track(fd_out);
+//     
+//     return 0;
+// }
+// 
+// static int handle_files(const char **argv, int argc)
+// {
+//     report_redundant_if_applicable(argv, argc);
+//     
+//     climpd_player_print_files(fd_out);
+//     
+//     return 0;
+// }
+// 
+// static int handle_help(const char **argv, int argc)
+// {
+//     report_redundant_if_applicable(argv, argc);
+//     
+//     print("%s\n", help);
+//     
+//     return 0;
+// }
+// 
+// static int handle_playlist(const char **argv, int argc)
+// {
+//     static const char *cmd = "--playlist";
+//     struct media_list ml;
+//     int err;
+//     
+//     if (argc == 0) {
+//         climpd_player_print_playlist(fd_out);
+//         return 0;
+//     }
+//     
+//     err = media_list_init(&ml);
+//     if (err < 0) {
+//         eprint("climpd: creating media list failed - %s\n", strerr(-err));
+//         return err;
+//     }
+//     
+//     for (int i = 0; i < argc; ++i) {
+//         err = media_loader_load(argv[i], &ml);
+//         if (err < 0) {
+//             report_arg_error(cmd, argv[i], err);
+//             goto cleanup1;
+//         }
+//     }
+//     
+//     err = climpd_player_set_media_list(&ml);
+//     if (err < 0)
+//         eprint("climpd: setting new media list failed - %s\n", strerr(-err));
+//     
+// cleanup1:
+//     media_list_destroy(&ml);
+//     
+//     return err;
+// }
+// 
+// static int handle_mute(const char **argv, int argc)
+// {
+//     bool muted;
+//     
+//     report_redundant_if_applicable(argv + 1, argc - 1);
+//     
+//     if (argc == 0) {
+//         climpd_player_toggle_muted();        
+//         return 0;
+//     }
+// 
+//     if (str_to_bool(argv[0], &muted)) {
+//         report_invalid_boolean(argv[0]);
+//         return -EINVAL;
+//     }
+//     
+//     climpd_player_set_muted(muted);
+//     
+//     return 0;
+// }
+// 
+// static int handle_next(const char **argv, int argc)
+// {
+//     static const char *cmd = "--next";
+//     int err;
+//     
+//     report_redundant_if_applicable(argv, argc);
+//     
+//     err = climpd_player_next();
+//     if (err < 0) {
+//         report_error(cmd, "failed to play next track", err);
+//         return err;
+//     }
+//     
+//     if (climpd_player_is_stopped())
+//         print("climpd: %s: finished playback\n", cmd);
+//     
+//     return 0;
+// }
+// 
+// static int handle_pause(const char **argv, int argc)
+// {
+//     int err;
+//     
+//     report_redundant_if_applicable(argv, argc);
+//     
+//     switch (climpd_player_state()) {
+//     case CLIMPD_PLAYER_PLAYING:
+//         climpd_player_pause();
+//         break;
+//     case CLIMPD_PLAYER_PAUSED:
+//         err = climpd_player_play();
+//         if (err < 0) {
+//             report_error("--pause", "unable to resume playing", err);
+//             return err;
+//         }
+//         break;
+//     case CLIMPD_PLAYER_STOPPED:
+//         print("climpd: --pause: player is stopped - done\n");
+//         break;
+//     default:
+//         break;
+//     }
+//     
+//     return 0;
+// }
+// 
+// static int handle_play(const char **argv, int argc)
+// {
+//     static const char *cmd = "--play";
+//     struct media_list ml;
+//     int index;
+//     bool valid_index;
+//     int err;
+//     
+//     if (argc == 0)
+//         return climpd_player_play();
+//     
+//     err = media_list_init(&ml);
+//     if (err < 0) {
+//         report_arg_error(cmd, argv[0], err);
+//         return err;
+//     }
+//     
+//     valid_index = false;
+//     
+//     for (int i = 0; i < argc; ++i) {
+//         err = str_to_int(argv[i], &index);
+//         if (err == 0) {
+//             valid_index = true;
+//             continue;
+//         }
+//         
+//         err = media_loader_load(argv[i], &ml);
+//         if (err == 0)
+//             continue;
+//         
+//         report_arg_error(cmd, argv[i], err);
+//         goto cleanup1;
+//     }
+//     
+//     /* 
+//      * Run this first so indices become valid especially usefull 
+//      * if loading playlist and jumping directly  to a track, e.g.:
+//      * 
+//      *     climp --clear --play my_playlist.m3u 10
+//      */
+//     if (!media_list_empty(&ml)) {
+//         err = climpd_player_set_media_list(&ml);
+//         if (err < 0) {
+//             report_error(cmd, "adding files to player failed", err);
+//             goto cleanup1;
+//         }
+//         
+//         if (!valid_index) {
+//             err = climpd_player_next();
+//             if (err < 0)
+//                 report_error(cmd, "failed to play track", err);
+//         }
+//     }
+//     
+//     if (valid_index) {
+//         err = climpd_player_play_track(index);
+//         if (err < 0) {
+//             eprint("climpd: %s: failed to play track \"%d\" - %s\n", cmd, index,
+//                    strerr(-err));
+//         }
+//     }
+//     
+// cleanup1:
+//     media_list_destroy(&ml);
+//     
+//     return err;
+// }
+// 
+// static int handle_prev(const char **argv, int argc)
+// {
+//     report_redundant_if_applicable(argv, argc);
+//     
+//     assert(0 && "NOT IMPLEMENTED");
+//     
+//     return 0;
+// }
+// 
+// static int handle_quit(const char **argv, int argc)
+// {
+//     report_redundant_if_applicable(argv, argc);
+//     
+//     mainloop_quit();
+//     
+//     return 0;
+// }
+// 
+// static int handle_remove(const char **argv, int argc)
+// {
+//     static const char *cmd = "--remove";
+//     struct media_list ml;
+//     int err;
+//     
+//     err = media_list_init(&ml);
+//     
+//     for (int i = 0; i < argc; ++i) {
+//         int index;
+//         
+//         err = str_to_int(argv[i], &index);
+//         if (err == 0) {
+//             climpd_player_delete_index(index);
+//             continue;
+//         }
+//         
+//         err = media_loader_load(argv[i], &ml);
+//         if (err < 0) {
+//             report_arg_error(cmd, argv[i], err);
+//             goto cleanup1;
+//         }
+//     }
+//     
+//     climpd_player_remove_media_list(&ml);
+//     
+// cleanup1:
+//     media_list_destroy(&ml);
+//     
+//     return 0;
+// }
+// 
+// static int handle_repeat(const char **argv, int argc)
+// {
+//     bool repeat;
+//     
+//     report_redundant_if_applicable(argv + 1, argc - 1);
+//     
+//     if (argc == 0) {
+//         bool val = climpd_player_toggle_repeat();
+//         
+//         dprintf(fd_out, "  Repeating is now %s\n", (val) ? "ON" : "OFF");
+//         return 0;
+//     }
+//     
+//     if (str_to_bool(argv[0], &repeat) < 0) {
+//         report_invalid_boolean(argv[0]);
+//         return -EINVAL;
+//     }
+//     
+//     climpd_player_set_repeat(repeat);
+//     
+//     return 0;
+// }
+// 
+// static int handle_seek(const char **argv, int argc)
+// {
+//     int sec, err;
+//     
+//     report_redundant_if_applicable(argv + 1, argc - 1);
+//     
+//     if (argc == 0) {
+//         int val = climpd_player_peek();
+//         
+//         int min = val / 60;
+//         int sec = val % 60;
+//         
+//         print("  %d:%02d\n", min, sec);
+//         return 0;
+//     }
+//     
+//     err = str_to_sec(argv[0], &sec);
+//     if (err < 0) {
+//         report_invalid_time_format("--seek", argv[0]);
+//         return err;
+//     }
+//     
+//     err = climpd_player_seek((unsigned int) sec);
+//     if(err < 0) {
+//         report_error("--seek", "seeking to position failed", err);
+//         return err;
+//     }
+//     
+//     return 0;
+// }
+// 
+// static int handle_shuffle(const char **argv, int argc)
+// {
+//     bool shuffle;
+//     
+//     report_redundant_if_applicable(argv + 1, argc - 1);
+//     
+//     if (argc == 0) {
+//         bool shuffle = climpd_player_toggle_shuffle();        
+//         
+//         dprintf(fd_out, "  Shuffling is now %s\n", (shuffle) ? "ON" : "OFF");
+//         return 0;
+//     } 
+// 
+//     if (str_to_bool(argv[0], &shuffle) < 0) {
+//         report_invalid_boolean(argv[0]);
+//         return -EINVAL;
+//     }
+//     
+//     climpd_player_set_shuffle(shuffle);
+//     
+//     return 0;
+// }
+// 
+// static int handle_sort(const char **argv, int argc)
+// {
+//     report_redundant_if_applicable(argv, argc);
+//     
+//     climpd_player_sort_playlist();
+//     
+//     return 0;
+// }
+// 
+// static int handle_stdin(const char **argv, int argc)
+// {
+//     static const char *cmd = "--stdin";
+//     struct media_list ml;
+//     int err;
+//     
+//     report_redundant_if_applicable(argv, argc);
+//     
+//     if (isatty(fd_in)) {
+//         err = -EPIPE;
+//         report_error(cmd, "stdin is attached to a terminal", err);
+//         return err;
+//     }
+//     
+//     err = media_list_init(&ml);
+//     if (err < 0) {
+//         report_error(cmd, "failed to initialize media-list", err);
+//         return err;
+//     }
+//     
+//     err = media_list_add_from_fd(&ml, fd_in);
+//     if (err < 0) {
+//         report_error(cmd, "failed to load files from stdin", err);
+//         goto cleanup1;
+//     }
+//     
+//     if (!media_list_empty(&ml)) {
+//         err = climpd_player_set_media_list(&ml);
+//         if (err < 0) {
+//             report_error(cmd, "failed to set player media-list", err);
+//             goto cleanup1;
+//         }
+//     } else {
+//         report_error(cmd, "no (valid) data to read from stdin", -ENODATA);
+//     }
+//     
+// cleanup1:
+//     media_list_destroy(&ml);
+//     
+//     return err;
+// }
+// 
+// static int handle_stop(const char **argv, int argc)
+// {
+//     report_redundant_if_applicable(argv, argc);
+//     
+//     climpd_player_stop();
+//     
+//     return 0;
+// }
+// 
+// int handle_uris(const char **argv, int argc)
+// {
+//     report_redundant_if_applicable(argv, argc);
+//     
+//     climpd_player_print_uris(fd_out);
+//     
+//     return 0;
+// }
+// 
+// 
+// static int handle_volume(const char **argv, int argc)
+// {
+//     int vol, err;
+//     
+//     report_redundant_if_applicable(argv + 1, argc - 1);
+//     
+//     if (argc == 0) {
+//         climpd_player_print_volume(fd_out);
+//         return 0;
+//     }
+//     
+//     err = str_to_int(argv[0], &vol);
+//     if (err < 0) {
+//         report_invalid_integer(argv[0]);
+//         return -EINVAL;
+//     }
+//     
+//     climpd_player_set_volume((unsigned int) abs(vol));
+//     
+//     return 0;
+// }
+// 
+// static struct option options[] = {
+//     { "--add",          "-a",   &handle_add             },
+//     { "--clear",        "",     &handle_clear           },
+//     { "--config",       "",     &handle_config          },
+//     { "--current",      "-c",   &handle_current         },
+//     { "--remove",       "",     &handle_remove          },
+//     { "--pause",        "",     &handle_pause           },
+//     { "--playlist",     "",     &handle_playlist        },
+//     { "--repeat",       "",     &handle_repeat          },
+//     { "--shuffle",      "",     &handle_shuffle         },
+//     { "--volume",       "-v",   &handle_volume          },
+//     { "--quit",         "-q",   &handle_quit            },
+//     { "--help",         "",     &handle_help            },
+//     { "--previous",     "",     &handle_prev            },
+//     { "--next",         "-n",   &handle_next            },
+//     { "--play",         "-p",   &handle_play            },
+//     { "--files",        "",     &handle_files           },
+//     { "--mute",         "-m",   &handle_mute            },
+//     { "--seek",         "",     &handle_seek            },
+//     { "--sort",         "",     &handle_sort            },
+//     { "--stdin",        "-i",   &handle_stdin           },
+//     { "--stop",         "",     &handle_stop            },
+//     { "--uris",         "",     &handle_uris            },
+// };
+
+static int handle_add(const char *cmd, const char **argv, int argc)
 {
-    static const char *cmd = "--add";
-    struct media_list ml;
-    int err;
+    (void) argv;
+    (void) argc;
+    
+    eprint("climpd: %s: not implemented\n", cmd);
+    
+    return 0;
+}
+
+static int handle_clear(const char *cmd, const char **argv, int argc)
+{
+    (void) argv;
+    (void) argc;
+    
+    eprint("climpd: %s: not implemented\n", cmd);
+    
+    return 0;
+}
+
+static int handle_config(const char *cmd, const char **argv, int argc)
+{
+    (void) argv;
+    (void) argc;
+    
+    eprint("climpd: %s: not implemented\n", cmd);
+    
+    return 0;
+}
+
+static int handle_current(const char *cmd, const char **argv, int argc)
+{
+    (void) argv;
+    (void) argc;
+    
+    eprint("climpd: %s: not implemented\n", cmd);
+    
+    return 0;
+}
+
+static int handle_files(const char *cmd, const char **argv, int argc)
+{
+    (void) argv;
+    (void) argc;
+    
+    eprint("climpd: %s: not implemented\n", cmd);
+    
+    return 0;
+}
+
+static int handle_help(const char *cmd, const char **argv, int argc)
+{
+    (void) argv;
+    (void) argc;
+    
+    eprint("climpd: %s: not implemented\n", cmd);
+    
+    return 0;
+}
+
+static int handle_mute(const char *cmd, const char **argv, int argc)
+{
+    (void) argv;
+    (void) argc;
+    
+    eprint("climpd: %s: not implemented\n", cmd);
+    
+    return 0;
+}
+
+static int handle_next(const char *cmd, const char **argv, int argc)
+{
+    (void) argv;
+    (void) argc;
+    
+    eprint("climpd: %s: not implemented\n", cmd);
+    
+    return 0;
+}
+
+static int handle_pause(const char *cmd, const char **argv, int argc)
+{
+    (void) cmd;
+    
+    report_redundant_if_applicable(argv, argc);
+    
+    /* TODO: maybe toggle pausing? */
+    audio_player_pause(&audio_player);
+    
+    return 0;
+}
+
+static int handle_play(const char *cmd, const char **argv, int argc)
+{
+    struct playlist *playlist;
+    int index, err;
+    unsigned int cnt;
     
     if (argc == 0) {
-        report_missing_arg(cmd);
-        return -EINVAL;
-    }
-    
-    err = media_list_init(&ml);
-    
-    for (int i = 0; i < argc; ++i) {
-        err = media_loader_load(argv[i], &ml);
-        if (err < 0) {
-            report_arg_error(cmd, argv[i], err);
-            goto cleanup1;
-        }
-    }
-    
-    err = climpd_player_add_media_list(&ml);
-    if (err < 0)
-        report_error(cmd, "failed to add items to playlist", err);
-    
-cleanup1:
-    media_list_destroy(&ml);
-    
-    return err;
-}
-
-static int handle_clear(const char **argv, int argc)
-{
-    report_redundant_if_applicable(argv, argc);
-    
-    climpd_player_clear_playlist();
-    
-    return 0;
-}
-
-static int handle_config(const char **argv, int argc)
-{
-    report_redundant_if_applicable(argv + 1, argc - 1);
-    
-    if (argc == 0) {
-        climpd_config_print(fd_out);
-        return 0;
-    }
-    
-    /* TODO: reload config from 'argv[0]' */
-    
-    return 0;
-}
-
-int handle_current(const char **argv, int argc)
-{
-    report_redundant_if_applicable(argv, argc);
-    
-    climpd_player_print_current_track(fd_out);
-    
-    return 0;
-}
-
-static int handle_files(const char **argv, int argc)
-{
-    report_redundant_if_applicable(argv, argc);
-    
-    climpd_player_print_files(fd_out);
-    
-    return 0;
-}
-
-static int handle_help(const char **argv, int argc)
-{
-    report_redundant_if_applicable(argv, argc);
-    
-    print("%s\n", help);
-    
-    return 0;
-}
-
-static int handle_playlist(const char **argv, int argc)
-{
-    static const char *cmd = "--playlist";
-    struct media_list ml;
-    int err;
-    
-    if (argc == 0) {
-        climpd_player_print_playlist(fd_out);
-        return 0;
-    }
-    
-    err = media_list_init(&ml);
-    if (err < 0) {
-        eprint("climpd: creating media list failed - %s\n", strerr(-err));
+        err = audio_player_play(&audio_player);
         return err;
     }
     
+    playlist = audio_player_playlist(&audio_player);    
+    cnt = 0;
+    
+    /* get number of valid indices */
+    for (int i = 0; i < argc; ++i)
+        cnt += str_is_int(argv[i]) == true;
+    
+    /* if there are more args then valid indices -> new media files */
+    if (cnt != argc)
+        playlist_clear(playlist);
+    
     for (int i = 0; i < argc; ++i) {
-        err = media_loader_load(argv[i], &ml);
-        if (err < 0) {
-            report_arg_error(cmd, argv[i], err);
-            goto cleanup1;
+        if (str_is_int(argv[i])) {
+            err = str_to_int(argv[i], &index);
+            if (err < 0) {
+                report_invalid_integer(argv[i], err);
+                goto fail;
+            }
+        } else {
+            err = media_loader_load(&media_loader, argv[i], playlist);
+            if (err < 0) {
+                report_arg_error(cmd, argv[i], err);
+                goto fail;
+            }
         }
     }
-    
-    err = climpd_player_set_media_list(&ml);
-    if (err < 0)
-        eprint("climpd: setting new media list failed - %s\n", strerr(-err));
-    
-cleanup1:
-    media_list_destroy(&ml);
-    
-    return err;
-}
 
-static int handle_mute(const char **argv, int argc)
-{
-    bool muted;
-    
-    report_redundant_if_applicable(argv + 1, argc - 1);
-    
-    if (argc == 0) {
-        climpd_player_toggle_muted();        
-        return 0;
-    }
-
-    if (str_to_bool(argv[0], &muted)) {
-        report_invalid_boolean(argv[0]);
-        return -EINVAL;
-    }
-    
-    climpd_player_set_muted(muted);
-    
-    return 0;
-}
-
-static int handle_next(const char **argv, int argc)
-{
-    static const char *cmd = "--next";
-    int err;
-    
-    report_redundant_if_applicable(argv, argc);
-    
-    err = climpd_player_next();
-    if (err < 0) {
-        report_error(cmd, "failed to play next track", err);
-        return err;
-    }
-    
-    if (climpd_player_is_stopped())
-        print("climpd: %s: finished playback\n", cmd);
-    
-    return 0;
-}
-
-static int handle_pause(const char **argv, int argc)
-{
-    int err;
-    
-    report_redundant_if_applicable(argv, argc);
-    
-    switch (climpd_player_state()) {
-    case CLIMPD_PLAYER_PLAYING:
-        climpd_player_pause();
-        break;
-    case CLIMPD_PLAYER_PAUSED:
-        err = climpd_player_play();
+    if (cnt != 0) {
+        err = audio_player_play_track(&audio_player, index);
         if (err < 0) {
-            report_error("--pause", "unable to resume playing", err);
+            report_error(cmd, "failed to play track", err);
             return err;
         }
-        break;
-    case CLIMPD_PLAYER_STOPPED:
-        print("climpd: --pause: player is stopped - done\n");
-        break;
-    default:
-        break;
-    }
-    
-    return 0;
-}
-
-static int handle_play(const char **argv, int argc)
-{
-    static const char *cmd = "--play";
-    struct media_list ml;
-    int index;
-    bool valid_index;
-    int err;
-    
-    if (argc == 0)
-        return climpd_player_play();
-    
-    err = media_list_init(&ml);
-    if (err < 0) {
-        report_arg_error(cmd, argv[0], err);
-        return err;
-    }
-    
-    valid_index = false;
-    
-    for (int i = 0; i < argc; ++i) {
-        err = str_to_int(argv[i], &index);
-        if (err == 0) {
-            valid_index = true;
-            continue;
-        }
-        
-        err = media_loader_load(argv[i], &ml);
-        if (err == 0)
-            continue;
-        
-        report_arg_error(cmd, argv[i], err);
-        goto cleanup1;
-    }
-    
-    /* 
-     * Run this first so indices become valid especially usefull 
-     * if loading playlist and jumping directly  to a track, e.g.:
-     * 
-     *     climp --clear --play my_playlist.m3u 10
-     */
-    if (!media_list_empty(&ml)) {
-        err = climpd_player_set_media_list(&ml);
-        if (err < 0) {
-            report_error(cmd, "adding files to player failed", err);
-            goto cleanup1;
-        }
-        
-        if (!valid_index) {
-            err = climpd_player_next();
-            if (err < 0)
-                report_error(cmd, "failed to play track", err);
-        }
-    }
-    
-    if (valid_index) {
-        err = climpd_player_play_track(index);
-        if (err < 0) {
-            eprint("climpd: %s: failed to play track \"%d\" - %s\n", cmd, index,
-                   strerr(-err));
-        }
-    }
-    
-cleanup1:
-    media_list_destroy(&ml);
-    
-    return err;
-}
-
-static int handle_prev(const char **argv, int argc)
-{
-    report_redundant_if_applicable(argv, argc);
-    
-    assert(0 && "NOT IMPLEMENTED");
-    
-    return 0;
-}
-
-static int handle_quit(const char **argv, int argc)
-{
-    report_redundant_if_applicable(argv, argc);
-    
-    mainloop_quit();
-    
-    return 0;
-}
-
-static int handle_remove(const char **argv, int argc)
-{
-    static const char *cmd = "--remove";
-    struct media_list ml;
-    int err;
-    
-    err = media_list_init(&ml);
-    
-    for (int i = 0; i < argc; ++i) {
-        int index;
-        
-        err = str_to_int(argv[i], &index);
-        if (err == 0) {
-            climpd_player_delete_index(index);
-            continue;
-        }
-        
-        err = media_loader_load(argv[i], &ml);
-        if (err < 0) {
-            report_arg_error(cmd, argv[i], err);
-            goto cleanup1;
-        }
-    }
-    
-    climpd_player_remove_media_list(&ml);
-    
-cleanup1:
-    media_list_destroy(&ml);
-    
-    return 0;
-}
-
-static int handle_repeat(const char **argv, int argc)
-{
-    bool repeat;
-    
-    report_redundant_if_applicable(argv + 1, argc - 1);
-    
-    if (argc == 0) {
-        bool val = climpd_player_toggle_repeat();
-        
-        dprintf(fd_out, "  Repeating is now %s\n", (val) ? "ON" : "OFF");
-        return 0;
-    }
-    
-    if (str_to_bool(argv[0], &repeat) < 0) {
-        report_invalid_boolean(argv[0]);
-        return -EINVAL;
-    }
-    
-    climpd_player_set_repeat(repeat);
-    
-    return 0;
-}
-
-static int handle_seek(const char **argv, int argc)
-{
-    int sec, err;
-    
-    report_redundant_if_applicable(argv + 1, argc - 1);
-    
-    if (argc == 0) {
-        int val = climpd_player_peek();
-        
-        int min = val / 60;
-        int sec = val % 60;
-        
-        print("  %d:%02d\n", min, sec);
-        return 0;
-    }
-    
-    err = str_to_sec(argv[0], &sec);
-    if (err < 0) {
-        report_invalid_time_format("--seek", argv[0]);
-        return err;
-    }
-    
-    err = climpd_player_seek((unsigned int) sec);
-    if(err < 0) {
-        report_error("--seek", "seeking to position failed", err);
-        return err;
-    }
-    
-    return 0;
-}
-
-static int handle_shuffle(const char **argv, int argc)
-{
-    bool shuffle;
-    
-    report_redundant_if_applicable(argv + 1, argc - 1);
-    
-    if (argc == 0) {
-        bool shuffle = climpd_player_toggle_shuffle();        
-        
-        dprintf(fd_out, "  Shuffling is now %s\n", (shuffle) ? "ON" : "OFF");
-        return 0;
-    } 
-
-    if (str_to_bool(argv[0], &shuffle) < 0) {
-        report_invalid_boolean(argv[0]);
-        return -EINVAL;
-    }
-    
-    climpd_player_set_shuffle(shuffle);
-    
-    return 0;
-}
-
-static int handle_sort(const char **argv, int argc)
-{
-    report_redundant_if_applicable(argv, argc);
-    
-    climpd_player_sort_playlist();
-    
-    return 0;
-}
-
-static int handle_stdin(const char **argv, int argc)
-{
-    static const char *cmd = "--stdin";
-    struct media_list ml;
-    int err;
-    
-    report_redundant_if_applicable(argv, argc);
-    
-    if (isatty(fd_in)) {
-        err = -EPIPE;
-        report_error(cmd, "stdin is attached to a terminal", err);
-        return err;
-    }
-    
-    err = media_list_init(&ml);
-    if (err < 0) {
-        report_error(cmd, "failed to initialize media-list", err);
-        return err;
-    }
-    
-    err = media_list_add_from_fd(&ml, fd_in);
-    if (err < 0) {
-        report_error(cmd, "failed to load files from stdin", err);
-        goto cleanup1;
-    }
-    
-    if (!media_list_empty(&ml)) {
-        err = climpd_player_set_media_list(&ml);
-        if (err < 0) {
-            report_error(cmd, "failed to set player media-list", err);
-            goto cleanup1;
-        }
     } else {
-        report_error(cmd, "no (valid) data to read from stdin", -ENODATA);
+        err = audio_player_play_next(&audio_player);
+        if (err < 0) {
+            report_error(cmd, "failed to start playback", err);
+            return err;
+        }
     }
     
-cleanup1:
-    media_list_destroy(&ml);
+    err = playlist_save(playlist, playlist_path);
+    if (err < 0)
+        climpd_log_w(tag, "failed to save new playlist\n");
     
+    return 0;
+
+fail:
+    playlist_clear(playlist);
     return err;
 }
 
-static int handle_stop(const char **argv, int argc)
+static int handle_playlist(const char *cmd, const char **argv, int argc)
 {
-    report_redundant_if_applicable(argv, argc);
+    struct playlist *playlist;
+    int err;
     
-    climpd_player_stop();
-    
-    return 0;
-}
-
-int handle_uris(const char **argv, int argc)
-{
-    report_redundant_if_applicable(argv, argc);
-    
-    climpd_player_print_uris(fd_out);
-    
-    return 0;
-}
-
-
-static int handle_volume(const char **argv, int argc)
-{
-    int vol, err;
-    
-    report_redundant_if_applicable(argv + 1, argc - 1);
+    playlist = audio_player_playlist(&audio_player);
     
     if (argc == 0) {
-        climpd_player_print_volume(fd_out);
+        unsigned int size;
+        struct console_output_config *cout_conf;
+        unsigned int meta_len;
+        
+        size = playlist_size(playlist);
+        
+        cout_conf = climpd_config_console_output_config(&config);
+        meta_len = cout_conf->meta_column_width;
+        
+        for (unsigned int i = 0; i < size; ++i) {
+            struct media *m;
+            struct media_info *info;
+            unsigned int min, sec;
+            
+            m = playlist_at_unsafe(playlist, (int) i);
+            info = media_info(m);
+            
+            min = info->duration / 60;
+            sec = info->duration % 60;
+            
+            print(" ( %3u )    %2u:%02u   %-*.*s %-*.*s %-*.*s\n",
+                  i, min, sec, 
+                  meta_len, meta_len, info->title,
+                  meta_len, meta_len, info->artist,
+                  meta_len, meta_len, info->album);
+        }
+        
         return 0;
     }
     
-    err = str_to_int(argv[0], &vol);
-    if (err < 0) {
-        report_invalid_integer(argv[0]);
-        return -EINVAL;
-    }
+    playlist_clear(playlist);
     
-    climpd_player_set_volume((unsigned int) abs(vol));
+    for (int i = 0; i < argc; ++i) {
+        err = media_loader_load(&media_loader, argv[i], playlist);
+        if (err < 0) {
+            report_error(cmd, "failed to load media", err);
+            return err;
+        }
+    }
     
     return 0;
 }
 
-static struct option options[] = {
+static int handle_pitch(const char *cmd, const char **argv, int argc)
+{
+    float pitch, new_pitch;
+    int err;
+    
+    (void) cmd;
+    
+    report_redundant_if_applicable(argv + 1, argc - 1);
+    
+    pitch = audio_player_pitch(&audio_player);
+    if (argc == 0) {
+        print("  pitch: %f\n", pitch);
+        return 0;
+    }
+    
+    err = str_to_float(argv[0], &new_pitch);
+    if (err < 0) {
+        report_invalid_float(argv[0], err);
+        return -EINVAL;
+    }
+    
+    audio_player_set_pitch(&audio_player, new_pitch);
+    
+    if (pitch != new_pitch && climpd_config_keep_changes(&config)) {
+        struct audio_player_config *ap_conf;
+        
+        ap_conf = climpd_config_audio_player_config(&config);
+        ap_conf->pitch = new_pitch;
+        
+        climpd_config_save(&config);
+    }
+        
+    return 0;
+}
+
+static int handle_previous(const char *cmd, const char **argv, int argc)
+{
+    (void) argv;
+    (void) argc;
+    
+    eprint("climpd: %s: not implemented\n", cmd);
+    
+    return 0;
+}
+
+static int handle_quit(const char *cmd, const char **argv, int argc)
+{
+    (void) cmd;
+    
+    report_redundant_if_applicable(argv, argc);
+    
+    g_main_loop_quit(main_loop);
+    
+    return 0;
+}
+
+static int handle_remove(const char *cmd, const char **argv, int argc)
+{
+    (void) argv;
+    (void) argc;
+    
+    eprint("climpd: %s: not implemented\n", cmd);
+    
+    return 0;
+}
+
+static int handle_repeat(const char *cmd, const char **argv, int argc)
+{
+    (void) argv;
+    (void) argc;
+    
+    eprint("climpd: %s: not implemented\n", cmd);
+    
+    return 0;
+}
+
+static int handle_seek(const char *cmd, const char **argv, int argc)
+{
+    (void) argv;
+    (void) argc;
+    
+    eprint("climpd: %s: not implemented\n", cmd);
+    
+    return 0;
+}
+
+static int handle_shuffle(const char *cmd, const char **argv, int argc)
+{
+    (void) argv;
+    (void) argc;
+    
+    eprint("climpd: %s: not implemented\n", cmd);
+    
+    return 0;
+}
+
+static int handle_sort(const char *cmd, const char **argv, int argc)
+{
+    (void) argv;
+    (void) argc;
+    
+    eprint("climpd: %s: not implemented\n", cmd);
+    
+    return 0;
+}
+
+static int handle_speed(const char *cmd, const char **argv, int argc)
+{
+    float speed, new_speed;
+    int err;
+    
+    (void) cmd;
+        
+    report_redundant_if_applicable(argv + 1, argc - 1);
+    
+    speed = audio_player_pitch(&audio_player);
+    if (argc == 0) {
+        print("  speed: %f\n", speed);
+        return 0;
+    }
+    
+    err = str_to_float(argv[0], &new_speed);
+    if (err < 0) {
+        report_invalid_float(argv[0], err);
+        return -EINVAL;
+    }
+    
+    audio_player_set_speed(&audio_player, new_speed);
+    
+    if (speed != new_speed && climpd_config_keep_changes(&config)) {
+        struct audio_player_config *ap_conf;
+            
+        ap_conf = climpd_config_audio_player_config(&config);
+        ap_conf->speed = new_speed;
+        
+        climpd_config_save(&config);
+    }
+    
+    return 0;
+}
+
+static int handle_stdin(const char *cmd, const char **argv, int argc)
+{
+    (void) argv;
+    (void) argc;
+    
+    eprint("climpd: %s: not implemented\n", cmd);
+    
+    return 0;
+}
+
+static int handle_stop(const char *cmd, const char **argv, int argc)
+{
+    (void) argv;
+    (void) argc;
+    
+    eprint("climpd: %s: not implemented\n", cmd);
+    
+    return 0;
+}
+
+static int handle_uris(const char *cmd, const char **argv, int argc)
+{
+    (void) argv;
+    (void) argc;
+    
+    eprint("climpd: %s: not implemented\n", cmd);
+    
+    return 0;
+}
+
+static int handle_volume(const char *cmd, const char **argv, int argc)
+{
+    (void) argv;
+    (void) argc;
+    
+    eprint("climpd: %s: not implemented\n", cmd);
+    
+    return 0;
+}
+
+static struct arg args[] = {
     { "--add",          "-a",   &handle_add             },
     { "--clear",        "",     &handle_clear           },
     { "--config",       "",     &handle_config          },
     { "--current",      "-c",   &handle_current         },
-    { "--remove",       "",     &handle_remove          },
-    { "--pause",        "",     &handle_pause           },
-    { "--playlist",     "",     &handle_playlist        },
-    { "--repeat",       "",     &handle_repeat          },
-    { "--shuffle",      "",     &handle_shuffle         },
-    { "--volume",       "-v",   &handle_volume          },
-    { "--quit",         "-q",   &handle_quit            },
-    { "--help",         "",     &handle_help            },
-    { "--previous",     "",     &handle_prev            },
-    { "--next",         "-n",   &handle_next            },
-    { "--play",         "-p",   &handle_play            },
     { "--files",        "",     &handle_files           },
+    { "--help",         "",     &handle_help            },
     { "--mute",         "-m",   &handle_mute            },
+    { "--next",         "-n",   &handle_next            },
+    { "--pause",        "",     &handle_pause           },
+    { "--play",         "-p",   &handle_play            },
+    { "--playlist",     "",     &handle_playlist        },
+    { "--pitch",        "",     &handle_pitch           },
+    { "--previous",     "",     &handle_previous        },
+    { "--quit",         "-q",   &handle_quit            },
+    { "--remove",       "",     &handle_remove          },
+    { "--repeat",       "",     &handle_repeat          },
     { "--seek",         "",     &handle_seek            },
+    { "--shuffle",      "",     &handle_shuffle         },
     { "--sort",         "",     &handle_sort            },
-    { "--stdin",        "-i",   &handle_stdin           },
+    { "--speed",        "",     &handle_speed           },
+    { "--stdin",        "",     &handle_stdin           },
     { "--stop",         "",     &handle_stop            },
     { "--uris",         "",     &handle_uris            },
+    { "--volume",       "-v",   &handle_volume          },
 };
-
-
-static int handle_argv(const char **argv, int argc)
-{
-    int err;
-    
-    for (int i = 0 ; i < argc; ++i) {
-        struct option *opt = map_retrieve(&options_map, argv[i]);
-        
-        if (!opt) {
-            dprintf(fd_err, "climpd: invalid option \"%s\"\n", argv[i]);
-            continue;
-        }
-        
-        int j = i + 1;
-        
-        while (j < argc && !map_contains(&options_map, argv[j]))
-            j++;
-        
-        j--;
-        
-        err = opt->handler(argv + i + 1, j - i);
-        if (err < 0)
-            climpd_log_w(tag, "\"%s\" failed - %s\n", argv[i], strerr(-err));
-        
-        i = j;
-    }
-    
-    return 0;
-}
 
 static int handle_connection(int fd)
 {
@@ -715,11 +1115,12 @@ static int handle_connection(int fd)
         goto cleanup1;
     }
     
+    /* necessary to handle relative paths */
     err = chdir(cwd);
     if (err < 0)
         climpd_log_w(tag, "chdir() to \"%s\" failed - %s\n", cwd, errstr);
     
-    err = handle_argv((const char **) argv, argc);
+    err = argument_parser_run(&arg_parser, (const char **) argv, argc);
     
     chdir("/");
     
@@ -743,110 +1144,234 @@ cleanup1:
     return err;
 }
 
-static void options_init(void)
+void on_sighub(int signo, siginfo_t *info, void *context)
 {
-    const struct map_config m_conf = {
-        .size           = ARRAY_SIZE(options) << 2,
-        .lower_bound    = MAP_DEFAULT_LOWER_BOUND,
-        .upper_bound    = MAP_DEFAULT_UPPER_BOUND,
-        .static_size    = false,
-        .key_compare    = &compare_string,
-        .key_hash       = &hash_string,
-        .data_delete    = NULL,
-    };
-    int err;
-    
-    err = map_init(&options_map, &m_conf);
-    if (err < 0) {
-        climpd_log_e(tag, "failed to initialize option map - %s\n", 
-                     strerr(-err));
-        goto fail;
-    }
-    
-    for (unsigned int i = 0; i < ARRAY_SIZE(options); ++i) {
-        if (*options[i].l_opt != '\0') {
-            err = map_insert(&options_map, options[i].l_opt, options + i);
-            if (err < 0) {
-                climpd_log_e(tag, "failed to initialize option \"%s\" - %s\n", 
-                             options[i].l_opt, strerr(-err));
-                goto fail;
-            }
-        }
-        
-        if (*options[i].s_opt != '\0') {
-            err = map_insert(&options_map, options[i].s_opt, options + i);
-            if (err < 0) {
-                climpd_log_e(tag, "failed to initialize option \"%s\" - %s\n", 
-                             options[i].s_opt, strerr(-err));
-                goto fail;
-            }
-        }
-    }
-    
-    return;
-
-fail:
-    die_failed_init("options");
+    (void) signo;
+    (void) info;
+    (void) context;
 }
 
-void options_destroy(void)
+void on_sigterm(int signo, siginfo_t *info, void *context)
 {
-    map_destroy(&options_map);
+    (void) signo;
+    (void) info;
+    (void) context;
+    
+    g_main_loop_quit(main_loop);
+}
+
+__attribute__((noreturn))
+void on_sigerr(int signo, siginfo_t *info, void *context)
+{
+    static void *buffer[32];
+    int size;
+    
+    (void) info;
+    (void) context;
+    
+    climpd_log_e(tag, "received signal \"%s\"\nbacktrace:\n", strsignal(signo));
+    
+    size = backtrace(buffer, ARRAY_SIZE(buffer));
+    if(size > 0)
+        backtrace_symbols_fd(buffer, size, climpd_log_fd());
+    
+    exit(EXIT_FAILURE);
+}
+
+struct signal_handle sighandles[] = {
+    { SIGQUIT,          SIG_IGN     },
+    { SIGINT,           SIG_IGN     },
+    { SIGTSTP,          SIG_IGN     },
+    { SIGTTIN,          SIG_IGN,    },
+    { SIGTTOU,          SIG_IGN,    },
+    { SIGPIPE,          SIG_IGN,    },
+    { SIGHUP,           &on_sighub  },
+    { SIGTERM,          &on_sigterm },
+    { SIGILL,           &on_sigerr  },
+    { SIGBUS,           &on_sigerr  },
+    { SIGSEGV,          &on_sigerr  },
+    { SIGFPE,           &on_sigerr  },
+    { SIGSYS,           &on_sigerr  },
+    
+};
+
+__attribute__((constructor)) void __init(void)
+{
+    char *path = NULL;
+    int err;
+    
+    gst_init(NULL, NULL);
+    
+    err = asprintf(&path, "/tmp/climpd-%d.log", getuid());
+    if (err < 0) {
+        fprintf(stderr, "**FATAL: failed to allocate memory\n");
+        exit(EXIT_FAILURE);
+    }
+    
+    err = climpd_log_init(path);
+    
+    free(path);
+    
+    if (err < 0) {
+        fprintf(stderr, "**FATAL: failed to initialize log file - %s\n",
+                strerr(-err));
+        exit(EXIT_FAILURE);
+    }
+}
+
+__attribute__((destructor)) void __destroy(void)
+{
+    climpd_log_destroy();
+    gst_deinit();
+}
+
+__attribute__((noreturn)) void die_error(void)
+{
+    climpd_log_e(tag, "exiting due to previous error(s)\n");
+    exit(EXIT_FAILURE);;
 }
 
 int main(int argc, char *argv[])
 {
+    struct audio_player_config *player_config;
+    struct playlist *playlist;
+    const char *home;
     bool no_daemon = false;
+    int err;
+    
+    if(getuid() == 0)
+        exit(EXIT_FAILURE);
     
     for (int i = 1; i < argc; ++i) {
         if (strcmp("--no-daemon", argv[i]) == 0 || strcmp("-n", argv[i]) == 0)
             no_daemon = true;
     }
-    
-    if(getuid() == 0)
-        exit(EXIT_FAILURE);
 
-    setlocale(LC_ALL, "");
-    
-    gst_init(NULL, NULL);
-    
-    /* the log has to be the first thing to be initialized */
-    climpd_log_init();
-    
     climpd_log_i(tag, "starting initialization...\n");
+    
+    if (!no_daemon) {
+        err = daemonize(sighandles, ARRAY_SIZE(sighandles));
+        if (err < 0) {
+            climpd_log_e(tag, "failed to daemonize process\n");
+            die_error();
+        }
+    }
+    
+    home = getenv("HOME");
+    if (!home) {
+        climpd_log_e(tag, "failed to locate users home directory\n");
+        die_error();
+    }
 
-    terminal_color_map_init();
-    climpd_paths_init();
-    mainloop_init(no_daemon);
-    socket_init(&handle_connection);
+    err = asprintf(&conf_path, "%s/.config/climp/climpd.conf", home);
+    if (err < 0) {
+        climpd_log_e(tag, "failed to locate the configuration file\n");
+        die_error();
+    }
     
-    /* needs climpd_paths */
-    climpd_config_init();
+    err = climpd_config_init(&config, conf_path);
+    if (err < 0) {
+        climpd_log_e(tag, "failed to initialize configuration file - %s\n",
+                     strerr(-err));
+        die_error();
+    }
+
+    player_config = climpd_config_audio_player_config(&config);
     
-    /* needs climpd_config and climpd_paths */
-    climpd_player_init();
+    err = audio_player_init(&audio_player);
+    if (err < 0) {
+        climpd_log_e(tag, "failed to initialize audio player - %s\n", 
+                     strerr(-err));
+        die_error();
+    }
     
-    /* needs climpd_paths */
-    media_loader_init();
-    options_init();
+    err = asprintf(&playlist_path, "%s/.config/climp/playlists/__playlist.m3u", 
+                   home);
+    if (err < 0) {
+        climpd_log_e(tag, "failed to locate path to last playlist\n");
+        die_error();
+    }
+    
+    audio_player_set_volume(&audio_player, player_config->volume);
+    audio_player_set_pitch(&audio_player, player_config->pitch);
+    audio_player_set_speed(&audio_player, player_config->speed);
+    
+    playlist = audio_player_playlist(&audio_player);
+    
+    if (path_exists(playlist_path)) {
+        err = playlist_load(playlist, playlist_path);
+        if (err < 0)
+            climpd_log_w(tag, "failed to load last playlist - continuing\n");
+    }
+    
+    playlist_set_repeat(playlist, player_config->repeat);
+    playlist_set_shuffle(playlist, player_config->shuffle);
+    
+    err = asprintf(&loader_path, "%s/.config/climp/playlists/", home);
+    if (err < 0) {
+        climpd_log_e(tag, "failed to locate playlist folder\n");
+        die_error();
+    }
+    
+    err = media_loader_init(&media_loader);
+    if (err < 0) {
+        climpd_log_e(tag, "failed to initialize media loader - %s\n",
+                     strerr(-err));
+        die_error();
+    }
+    
+    err = media_loader_add_dir(&media_loader, loader_path);
+    if (err < 0) {
+        climpd_log_e(tag, "failed to add search directory to media loader\n");
+        die_error();
+    }
+    
+    err = asprintf(&socket_path, "/tmp/.climpd-%d.sock", getuid());
+    if (err < 0) {
+        climpd_log_e(tag, "failed to create path to server socket\n");
+        die_error();
+    }
+    
+    err = argument_parser_init(&arg_parser, args, ARRAY_SIZE(args));
+    if (err < 0) {
+        climpd_log_e(tag, "failed to initialize the argument handler - %s\n",
+                     strerr(-err));
+        die_error();
+    }
+    
+    argument_parser_set_default_handler(&arg_parser, &report_invalid_arg);
+    
+    err = socket_server_init(&socket_server, socket_path, &handle_connection);
+    if (err < 0) {
+        climpd_log_e(tag, "failed to initialize server socket - %s\n", 
+                     strerr(-err));
+        die_error();
+    }
+    
+    main_loop = g_main_loop_new(NULL, false);
+    if (!main_loop) {
+        climpd_log_e(tag, "failed to initialize main loop\n");
+        die_error();
+    }
 
     climpd_log_i(tag, "initialization successful\n");
     
-    mainloop_run();
+    g_main_loop_run(main_loop);
     
-    options_destroy();
-    media_loader_destroy();
-    climpd_player_destroy();
-    climpd_config_destroy();
-    socket_destroy();
-    mainloop_destroy();
-    climpd_paths_destroy();
-    terminal_color_map_destroy();
+    err = playlist_save(playlist, playlist_path);
+    if (err < 0)
+        climpd_log_w(tag, "failed to save playlist - continuing shutdown\n");
     
-    climpd_log_i(tag, "destroyed\n");
-    climpd_log_destroy();
+    free(loader_path);
+    free(playlist_path);
+    free(conf_path);
     
-    gst_deinit();
+    g_main_loop_unref(main_loop);
+    socket_server_destroy(&socket_server);
+    argument_parser_destroy(&arg_parser);
+    media_loader_destroy(&media_loader);
+    audio_player_destroy(&audio_player);
+    climpd_config_destroy(&config);
     
     return EXIT_SUCCESS;
 }

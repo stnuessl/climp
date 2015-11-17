@@ -20,22 +20,21 @@ include_directories(../shared/)
 
 add_executable(climpd 
     main.c
-    core/media-player/media-player.c
-    core/media-player/media-discoverer.c
-    core/climpd-log.c
-    core/climpd-player.c
+    core/audio-player/audio-player.c
+    core/audio-player/gst-engine.c
+    core/playlist/kfy.c
+    core/playlist/playlist.c
+    core/playlist/tag-reader.c
+    core/argument-parser.c
     core/climpd-config.c
-    core/climpd-paths.c
+    core/climpd-log.c
+    core/daemonize.c
     core/media-loader.c
-    core/terminal-color-map.c
-    core/socket.c
-    core/util.c
-    core/mainloop.c
-    core/media-player/playlist.c
-    obj/media-list.c
-    obj/media.c
-    core/media-player/kfy.c
-    obj/uri.c
+    ipc/socket-server.c
+    media/media.c
+    media/uri.c
+    util/bool.c
+    util/strconvert.c
     ../shared/ipc.c
 )
     

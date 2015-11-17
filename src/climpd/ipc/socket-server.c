@@ -18,6 +18,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <sys/socket.h>
@@ -82,7 +83,7 @@ out:
     close(fd);
     
     climpd_log_i(tag, "served connection on socket %d in %lu ms\n", fd, 
-                 clock_elapsed_ms(&_timer));
+                 clock_elapsed_ms(&ss->timer));
     
     return true;
 }
@@ -117,7 +118,7 @@ int socket_server_init(struct socket_server *__restrict ss,
     
     fd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (fd < 0) {
-        climpd_log_e(tag, "failed to create socket '%s' - %s\n". path, errstr);
+        climpd_log_e(tag, "failed to create socket '%s' - %s\n", path, errstr);
         goto cleanup2;
     }
     
@@ -169,7 +170,7 @@ void socket_server_destroy(struct socket_server *__restrict ss)
     unlink(ss->path);
     free(ss->path);
     
-    clock_destroy(&timer);
+    clock_destroy(&ss->timer);
     
     climpd_log_i(tag, "destroyed\n");
 }

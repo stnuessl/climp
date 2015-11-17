@@ -21,7 +21,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include <stdbool.h>
+#include <sys/types.h>
+#include <pwd.h>
 
 #include <libvci/options.h>
 #include <libvci/macro.h>
@@ -58,6 +61,18 @@ bool is_text_file(const char *path)
     return strstr(path, ".m3u") || strstr(path, ".txt");
 }
 
+int drop_privileges(void)
+{
+    struct passwd *passwd = getpwnam("nobody");
+    if (!passwd)
+        return -ENOTSUP;
+    
+    if (setuid(passwd->pw_uid) < 0)
+        return -errno;
+    
+    return 0;
+}
+
 int main(int argc, char *argv[])
 {
     struct audio_player player;
@@ -65,6 +80,12 @@ int main(int argc, char *argv[])
     GMainLoop *loop;
     char *err_msg = NULL;
     int err;
+    
+    if (getuid() == 0) {
+        err = drop_privileges();
+        if (err < 0)
+            die("failed to drop privileges - can't run as root");
+    }
     
     gst_init(NULL, NULL);
     err = climpd_log_init("/tmp/audio_player.log");

@@ -23,6 +23,8 @@
 
 #include <stdbool.h>
 
+bool str_is_int(const char *__restrict s);
+
 int str_to_int(const char *__restrict s, int *__restrict i);
 
 int str_to_float(const char *__restrict s, float *f);
