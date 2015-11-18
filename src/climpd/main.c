@@ -69,7 +69,6 @@ static struct climpd_config config;
 static struct socket_server socket_server;
 static struct argument_parser arg_parser;
 static GMainLoop *main_loop;
-static struct map options_map;
 
 static const char help[] = {
     "Usage:\n"
@@ -696,10 +695,12 @@ static int handle_add(const char *cmd, const char **argv, int argc)
 
 static int handle_clear(const char *cmd, const char **argv, int argc)
 {
-    (void) argv;
-    (void) argc;
+    struct playlist *playlist;
+    (void) cmd;
+    report_redundant_if_applicable(argv, argc);
     
-    eprint("climpd: %s: not implemented\n", cmd);
+    playlist = audio_player_playlist(&audio_player);
+    playlist_clear(playlist);
     
     return 0;
 }
@@ -716,30 +717,74 @@ static int handle_config(const char *cmd, const char **argv, int argc)
 
 static int handle_current(const char *cmd, const char **argv, int argc)
 {
-    (void) argv;
-    (void) argc;
+    struct playlist *playlist;
+    struct media *m;
+    struct media_info *info;
+    unsigned int p_min, p_sec, index, meta_len;
+    int position;
     
-    eprint("climpd: %s: not implemented\n", cmd);
+    (void) cmd;
+    report_redundant_if_applicable(argv, argc);
+
+    playlist = audio_player_playlist(&audio_player);
+    index = playlist_index(playlist);
+    if (index == (unsigned int) -1) {
+        print("climpd: no current track\n");
+        return 0;
+    }
+    
+    p_min = 0;
+    p_sec = 0;
+    
+    position = audio_player_stream_position(&audio_player);
+    if (position != -1) {
+        p_min = position / 60;
+        p_sec = position % 60;
+    }
+    
+    m = playlist_at_unsafe(playlist, index);
+    info = media_info(m);
+
+    meta_len = climpd_config_console_output_config(&config)->meta_column_width;
+    
+    eprint(" ( %3u )  %2u:%02u / %2u:%02u   %-*.*s %-*.*s %-*.*s\n",
+           index, p_min, p_sec, info->duration / 60, info->duration % 60, 
+           meta_len, meta_len, info->title,
+           meta_len, meta_len, info->artist,
+           meta_len, meta_len, info->album);
     
     return 0;
 }
 
 static int handle_files(const char *cmd, const char **argv, int argc)
 {
-    (void) argv;
-    (void) argc;
+    struct playlist *playlist;
+    unsigned int size;
+
+    (void) cmd;
     
-    eprint("climpd: %s: not implemented\n", cmd);
+    report_redundant_if_applicable(argv, argc);
+
+    playlist = audio_player_playlist(&audio_player);
+    
+    size = playlist_size(playlist);
+    
+    for (unsigned int i = 0; i < size; ++i) {
+        struct media *m = playlist_at_unsafe(playlist, (int) i);
+        
+        eprint("%s\n", media_path(m));
+    }
     
     return 0;
 }
 
 static int handle_help(const char *cmd, const char **argv, int argc)
 {
+    (void) cmd;
     (void) argv;
     (void) argc;
     
-    eprint("climpd: %s: not implemented\n", cmd);
+    print("%s\n", help);
     
     return 0;
 }
@@ -766,21 +811,30 @@ static int handle_next(const char *cmd, const char **argv, int argc)
 
 static int handle_pause(const char *cmd, const char **argv, int argc)
 {
-    (void) cmd;
+    int err;
     
     report_redundant_if_applicable(argv, argc);
     
-    /* TODO: maybe toggle pausing? */
-    audio_player_pause(&audio_player);
+    if (audio_player_is_playing(&audio_player)) {
+        err = audio_player_pause(&audio_player);
+        if (err < 0)
+            report_error(cmd, "failed to pause playback", err);
+    } else if (audio_player_is_paused(&audio_player)) {
+        err = audio_player_play(&audio_player);
+        if (err < 0)
+            report_error(cmd, "failed to unpause playback", err);
+    } else {
+        err = -EINVAL;
+        report_error(cmd, "unable to pause while stopped", err);
+    }
     
-    return 0;
+    return err;
 }
 
 static int handle_play(const char *cmd, const char **argv, int argc)
 {
     struct playlist *playlist;
-    int index, err;
-    unsigned int cnt;
+    int cnt, index, err;
     
     if (argc == 0) {
         err = audio_player_play(&audio_player);
@@ -1043,20 +1097,34 @@ static int handle_stdin(const char *cmd, const char **argv, int argc)
 
 static int handle_stop(const char *cmd, const char **argv, int argc)
 {
+    int err;
+    
     (void) argv;
     (void) argc;
     
-    eprint("climpd: %s: not implemented\n", cmd);
+    err = audio_player_stop(&audio_player);
+    if (err < 0)
+        report_error(cmd, "failed to stop playback", err);
     
-    return 0;
+    return err;
 }
 
 static int handle_uris(const char *cmd, const char **argv, int argc)
 {
-    (void) argv;
-    (void) argc;
+    struct playlist *playlist;
+    unsigned int size;
     
-    eprint("climpd: %s: not implemented\n", cmd);
+    (void) cmd;
+    report_redundant_if_applicable(argv, argc);
+    
+    playlist = audio_player_playlist(&audio_player);
+    size = playlist_size(playlist);
+    
+    for (unsigned int i = 0; i < size; ++i) {
+        struct media *m = playlist_at_unsafe(playlist, (int) i);
+        
+        eprint("%s\n", media_uri(m));
+    }
     
     return 0;
 }

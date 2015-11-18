@@ -96,9 +96,15 @@ static int gst_engine_set_state(struct gst_engine *__restrict en,
 {
     GstStateChangeReturn val;
     
-    val = gst_element_set_state(en->gst_pipeline, state);
+    if (en->gst_state != state) {
+        val = gst_element_set_state(en->gst_pipeline, state);
+        if (val == GST_STATE_CHANGE_FAILURE)
+            return -1;
+        
+        en->gst_state = state;
+    }
     
-    return (val == GST_STATE_CHANGE_FAILURE) ? -1 : 0;
+    return 0;
 }
 
 static void on_pad_added(GstElement *src, GstPad *new_pad, void *data) {
@@ -259,14 +265,9 @@ int gst_engine_play(struct gst_engine *__restrict en)
 {
     int err;
     
-    if (en->gst_state == GST_STATE_PLAYING)
-        return 0;
-
     err = gst_engine_set_state(en, GST_STATE_PLAYING);
     if (err < 0)
         climpd_log_e(tag, "failed to start playback\n");
-    
-    en->gst_state = GST_STATE_PLAYING;
     
     return err;
 }
@@ -275,17 +276,12 @@ int gst_engine_pause(struct gst_engine *__restrict en)
 {
     int err;
     
-    if(en->gst_state == GST_STATE_PAUSED)
-        return 0;
-    
     if (en->gst_state == GST_STATE_NULL)
         return -1;
     
     err = gst_engine_set_state(en, GST_STATE_PAUSED);
     if(err < 0)
         climpd_log_e(tag, "failed to pause playback.\n");
-    
-    en->gst_state = GST_STATE_PAUSED;
     
     return err;
 }
@@ -294,14 +290,9 @@ int gst_engine_stop(struct gst_engine *__restrict en)
 {
     int err;
     
-    if(en->gst_state == GST_STATE_NULL)
-        return 0;
-    
     err = gst_engine_set_state(en, GST_STATE_NULL);
     if(err < 0)
         climpd_log_e(tag, "failed to stop playback.\n");
-    
-    en->gst_state = GST_STATE_NULL;
     
     return err;
 }
@@ -309,15 +300,16 @@ int gst_engine_stop(struct gst_engine *__restrict en)
 int gst_engine_stream_position(const struct gst_engine *__restrict en)
 {
     bool ok;
-    gint64 val;
+    gint64 nsec;
     
-    ok = gst_element_query_position(en->gst_pipeline, GST_FORMAT_TIME, &val);
+    ok = gst_element_query_position(en->gst_pipeline, GST_FORMAT_TIME, &nsec);
     if (!ok) {
         climpd_log_e(tag, "failed to query the position of the stream\n");
         return -1;
     }
     
-    return (int) (val / (int) 1e9);
+    /* convert to seconds */
+    return (int) (nsec / 1e9);
 }
 
 int gst_engine_set_stream_position(struct gst_engine *__restrict en, 
@@ -332,7 +324,7 @@ int gst_engine_set_stream_position(struct gst_engine *__restrict en,
     flags  = GST_SEEK_FLAG_FLUSH;
     
     /* convert to nanoseconds */
-    time = (long) sec * (unsigned int) 1e9;
+    time = (long) sec * 1e9;
     
     ok = gst_element_seek_simple(en->gst_pipeline, format, flags, time);
     if(!ok) {
