@@ -49,12 +49,18 @@ int playlist_add(struct playlist *__restrict pl, const char *__restrict path);
 
 int playlist_load(struct playlist *__restrict pl, const char *__restrict path);
 
+int playlist_load_fd(struct playlist *__restrict pl, int fd);
+
 int playlist_save(struct playlist *__restrict pl, const char *__restrict path);
 
 unsigned int playlist_index_of(struct playlist *__restrict pl, 
                                const char *__restrict path);
 
 void playlist_remove(struct playlist *__restrict pl, int index);
+
+void playlist_remove_array(struct playlist *__restrict pl, 
+                           int *__restrict indices,
+                           unsigned int size);
 
 unsigned int playlist_index(const struct playlist *__restrict pl);
 
@@ -68,13 +74,9 @@ void playlist_set_shuffle(struct playlist *__restrict pl, bool shuffle);
 
 bool playlist_shuffle(const struct playlist *__restrict pl);
 
-void playlist_toggle_shuffle(struct playlist *__restrict pl);
-
 void playlist_set_repeat(struct playlist *__restrict pl, bool repeat);
 
 bool playlist_repeat(const struct playlist *__restrict pl);
-
-void playlist_toggle_repeat(struct playlist *__restrict pl);
 
 unsigned int playlist_next(struct playlist *__restrict pl);
 

@@ -191,19 +191,19 @@ static void write_config(int fd, void *arg)
             yes_no(conf->keep_changes));
 }
 
+static struct config_handle handles[] = {
+    { &parse_meta_column_width, "ConsoleOutput.Meta_Column_Width", NULL },
+    { &parse_volume,            "AudioPlayer.Volume",              NULL },
+    { &parse_pitch,             "AudioPlayer.Pitch",               NULL },
+    { &parse_speed,             "AudioPlayer.Speed",               NULL },
+    { &parse_repeat,            "AudioPlayer.Repeat",              NULL },
+    { &parse_shuffle,           "AudioPlayer.Shuffle",             NULL },
+    { &parse_keep_changes,      "Config.Keep_Changes",             NULL },
+};
 
 int climpd_config_init(struct climpd_config *__restrict conf, 
                        const char *__restrict path)
 {
-    struct config_handle handles[] = {
-        { &parse_meta_column_width, "ConsoleOutput.Meta_Column_Width", conf },
-        { &parse_volume,            "AudioPlayer.Volume",              conf },
-        { &parse_pitch,             "AudioPlayer.Pitch",               conf },
-        { &parse_speed,             "AudioPlayer.Speed",               conf },
-        { &parse_repeat,            "AudioPlayer.Repeat",              conf },
-        { &parse_shuffle,           "AudioPlayer.Shuffle",             conf },
-        { &parse_keep_changes,      "Config.Keep_Changes",             conf },
-    };
     int err;
     
     /* Initialize config with sane defaults */
@@ -220,6 +220,9 @@ int climpd_config_init(struct climpd_config *__restrict conf,
         goto out;
     
     for(unsigned int i = 0; i < ARRAY_SIZE(handles); ++i) {
+        /* TODO: config handle args are a mess... */
+        handles[i].arg = conf;
+        
         err = config_insert_handle(&conf->conf, handles + i);
         if(err < 0) {
             climpd_log_e(tag, "adding config handle \"%s\" failed - %s\n",

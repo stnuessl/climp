@@ -39,14 +39,71 @@
 
 static const char *tag = "playlist";
 
+static int descending_integer_comparator(const void *a, const void *b)
+{
+    const int *x, *y;
+    
+    x = a;
+    y = b;
+    
+    return (*y > *x) - (*y < *x);
+}
 
 static unsigned int ensure_positiv_index(const struct playlist *__restrict pl, 
-                                         int index)
+                                         int i)
 {
-    if (index < 0)
-        return vector_size(&pl->vec_media) + index;
-    else
-        return index;
+    return (i < 0) ? vector_size(&pl->vec_media) + i : (unsigned int) i;
+}
+
+static int playlist_load_file(struct playlist *__restrict pl, 
+                              FILE *__restrict file)
+{
+    char *line;
+    size_t size;
+    ssize_t n;
+    unsigned int old_size;
+    int err;
+    line = NULL;
+    size = 0;
+    
+    old_size = playlist_size(pl);
+    
+    while(1) {
+        n = getline(&line, &size, file);
+        if (n < 0)
+            break;
+        
+        if (n == 0)
+            continue;
+        
+        if (line[0] == '#' || line[0] == '\n')
+            continue;
+        
+        line[n - 1] = '\0';
+        
+        if (!path_is_absolute(line) && !uri_ok(line)) {
+            err = -ENOTSUP;
+            climpd_log_e(tag, "\"%s\" - no absolute path or valid uri\n", line);
+            goto cleanup1;
+        }
+        
+        err = playlist_add(pl, line);
+        if (err < 0)
+            goto cleanup1;
+    }
+    
+    free(line);
+    
+    return 0;
+
+cleanup1:
+    while (playlist_size(pl) != old_size)
+        playlist_remove(pl, -1);
+    
+    free(line);
+    fclose(file);
+    
+    return err;
 }
 
 int playlist_init(struct playlist *__restrict pl)
@@ -174,10 +231,6 @@ int playlist_add(struct playlist *__restrict pl, const char *__restrict path)
 int playlist_load(struct playlist *__restrict pl, const char *__restrict path)
 {
     FILE *file;
-    char *line;
-    size_t size;
-    ssize_t n;
-    unsigned int old_size;
     int err;
     
     file = fopen(path, "r");
@@ -187,50 +240,51 @@ int playlist_load(struct playlist *__restrict pl, const char *__restrict path)
         return err;
     }
     
-    line = NULL;
-    size = 0;
+    err = playlist_load_file(pl, file);
     
-    old_size = playlist_size(pl);
-    
-    while(1) {
-        n = getline(&line, &size, file);
-        if (n < 0)
-            break;
-        
-        if (n == 0)
-            continue;
-        
-        if (line[0] == '#' || line[0] == '\n')
-            continue;
-        
-        line[n - 1] = '\0';
-        
-        if (!path_is_absolute(line) && !uri_ok(line)) {
-            err = -ENOTSUP;
-            climpd_log_e(tag, "\"%s\" - no absolute path or valid uri\n", line);
-            goto cleanup1;
-        }
-        
-        err = playlist_add(pl, line);
-        if (err < 0)
-            goto cleanup1;
-    }
-    
-    free(line);
     fclose(file);
+    
+    if (err < 0)
+        return err;
     
     climpd_log_i(tag, "loaded '%s'\n", path);
-    
-    return 0;
-    
-cleanup1:
-    while (playlist_size(pl) != old_size)
-        playlist_remove(pl, -1);
 
-    free(line);
+    return 0;
+}
+
+int playlist_load_fd(struct playlist *__restrict pl, int fd)
+{
+    FILE *file;
+    int fd_dup, err;
+    
+    /* 'avoid that 'fclose' closes the passed file descriptor */
+    
+    fd_dup = dup(fd);
+    if (fd_dup < 0) {
+        err = -errno;
+        climpd_log_e(tag, "failed to duplicate file descriptor - %s\n", errstr);
+        return err;
+    }
+    
+    file = fdopen(fd_dup, "r");
+    if (!file) {
+        err = -errno;
+        climpd_log_e(tag, "failed to open file descriptor '%d' - %s\n",
+                     fd, errstr);
+        close(fd_dup);
+        return err;
+    }
+    
+    err = playlist_load_file(pl, file);
+    
     fclose(file);
     
-    return err;
+    if (err < 0)
+        return err;
+    
+    climpd_log_i(tag, "loaded playlist from file descriptor '%d'\n", fd);
+    
+    return 0;
 }
 
 int playlist_save(struct playlist *__restrict pl, const char *__restrict path)
@@ -281,6 +335,26 @@ void playlist_remove(struct playlist *__restrict pl, int index)
     }
 }
 
+void playlist_remove_array(struct playlist *__restrict pl, 
+                           int *__restrict indices,
+                           unsigned int size)
+{
+    if (size == 0 || vector_empty(&pl->vec_media))
+        return;
+    
+    for (unsigned int i = 0; i < size; ++i)
+        indices[i] = ensure_positiv_index(pl, indices[i]);
+    
+    qsort(indices, size, sizeof(*indices), &descending_integer_comparator);
+    
+    playlist_remove(pl, indices[0]);
+    
+    for (unsigned int i = 1; i < size; ++i) {
+        if (indices[i - 1] != indices[i])
+            playlist_remove(pl, indices[i]);
+    }
+}
+
 unsigned int playlist_index(const struct playlist *__restrict pl)
 {
     return pl->index;
@@ -318,11 +392,6 @@ bool playlist_shuffle(const struct playlist *__restrict pl)
     return pl->shuffle;
 }
 
-void playlist_toggle_shuffle(struct playlist *__restrict pl)
-{
-    pl->shuffle = !pl->shuffle;
-}
-
 void playlist_set_repeat(struct playlist *__restrict pl, bool repeat)
 {
     pl->repeat = repeat;
@@ -331,11 +400,6 @@ void playlist_set_repeat(struct playlist *__restrict pl, bool repeat)
 bool playlist_repeat(const struct playlist *__restrict pl)
 {
     return pl->repeat;
-}
-
-void playlist_toggle_repeat(struct playlist *__restrict pl)
-{
-    pl->repeat = !pl->repeat;
 }
 
 unsigned int playlist_next(struct playlist *__restrict pl)
@@ -353,7 +417,7 @@ unsigned int playlist_next(struct playlist *__restrict pl)
         
         assert(pl->index < playlist_size(pl) && "invalid playlist index");
         
-        return (unsigned int) -1;
+        return pl->index;
     }
     
     ++pl->index;

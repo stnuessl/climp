@@ -50,6 +50,7 @@
 #include <ipc/socket-server.h>
 
 #include <util/strconvert.h>
+#include <util/bool.h>
 
 static const char *tag = "main";
 
@@ -129,19 +130,26 @@ static void eprint(const char *__restrict fmt, ...)
     va_end(vargs);
 }
 
-static void report_invalid_boolean(const char *__restrict invalid_val)
+static void report_invalid_boolean(const char *__restrict cmd,
+                                   const char *__restrict invalid_val)
 {
-    eprint("climpd: unrecognized boolean value '%s'\n", invalid_val);
+    eprint("climpd: %s: unrecognized boolean value '%s'\n", cmd, invalid_val);
 }
 
-static void report_invalid_integer(const char *__restrict s, int err)
+static void report_invalid_integer(const char *__restrict cmd, 
+                                   const char *__restrict s, 
+                                   int err)
 {
-    eprint("climpd: unrecognized integer value '%s' - %s\n", s, strerr(err));
+    eprint("climpd: %s: unrecognized integer value '%s' - %s\n", cmd, 
+           s, strerr(err));
 }
 
-static void report_invalid_float(const char *__restrict s, int err)
+static void report_invalid_float(const char *__restrict cmd, 
+                                 const char *__restrict s, 
+                                 int err)
 {
-    eprint("climpd: unrecognized float value '%s' - %s\n", s, strerr(err));
+    eprint("climpd: %s: unrecognized float value '%s' - %s\n", cmd, 
+           s, strerr(err));
 }
 
 static void report_missing_arg(const char *__restrict cmd)
@@ -149,18 +157,25 @@ static void report_missing_arg(const char *__restrict cmd)
     eprint("climpd: \"%s\" is missing at least one argument\n", cmd);
 }
 
+static void report_load_error(const char *__restrict cmd,
+                              const char *__restrict arg,
+                              int err)
+{
+    eprint("climpd: %s: failed to load '%s' - %s\n", cmd, arg, strerr(err));
+}
+
 static void report_arg_error(const char *__restrict cmd, 
                              const char *__restrict arg, 
                              int err)
 {
-    eprint("climpd: %s: \"%s\" - %s\n", cmd, arg, strerr(abs(err)));
+    eprint("climpd: %s: \"%s\" - %s\n", cmd, arg, strerr(err));
 }
 
 static void report_error(const char *__restrict cmd, 
                          const char *__restrict msg,
                          int err)
 {
-    eprint("climpd: %s: %s - %s\n", cmd, msg, strerr(abs(err)));
+    eprint("climpd: %s: %s - %s\n", cmd, msg, strerr(err));
 }
 
 static void report_invalid_time_format(const char *__restrict cmd, 
@@ -685,10 +700,21 @@ static void report_invalid_arg(const char *arg)
 
 static int handle_add(const char *cmd, const char **argv, int argc)
 {
-    (void) argv;
-    (void) argc;
+    struct playlist *playlist;
+    int err;
     
-    eprint("climpd: %s: not implemented\n", cmd);
+    if (argc == 0) {
+        report_missing_arg(cmd);
+        return -EINVAL;
+    }
+    
+    playlist = audio_player_playlist(&audio_player);
+    
+    for (int i = 0; i < argc; ++i) {
+        err = media_loader_load(&media_loader, argv[i], playlist);
+        if (err < 0)
+            report_load_error(cmd, argv[i], err);
+    }
     
     return 0;
 }
@@ -707,10 +733,44 @@ static int handle_clear(const char *cmd, const char **argv, int argc)
 
 static int handle_config(const char *cmd, const char **argv, int argc)
 {
-    (void) argv;
-    (void) argc;
+    struct playlist *playlist;
+    struct audio_player_config *ap_conf;
+    struct console_output_config *cout_conf;
+    int err;
+    bool keep;
     
-    eprint("climpd: %s: not implemented\n", cmd);
+    report_redundant_if_applicable(argv, argc);
+    
+    err = climpd_config_load(&config);
+    if (err < 0) {
+        report_error(cmd, "failed to load configuration file", err);
+        return err;
+    }
+    
+    playlist = audio_player_playlist(&audio_player);
+    cout_conf = climpd_config_console_output_config(&config);
+    ap_conf = climpd_config_audio_player_config(&config);
+    keep = climpd_config_keep_changes(&config);
+    
+    audio_player_set_volume(&audio_player, ap_conf->volume);
+    audio_player_set_pitch(&audio_player, ap_conf->pitch);
+    audio_player_set_speed(&audio_player, ap_conf->speed);
+    
+    playlist_set_repeat(playlist, ap_conf->repeat);
+    playlist_set_shuffle(playlist, ap_conf->shuffle);
+    
+    eprint(" climpd-config      \n"
+           " -------------------\n"
+           " Column Width : %u  \n"
+           " Volume       : %u  \n"
+           " Pitch        : %.2f\n"
+           " Speed        : %.2f\n"
+           " Repeat       : %s  \n"
+           " Shuffle      : %s  \n"
+           " Save Changes : %s  \n\n",
+           cout_conf->meta_column_width, ap_conf->volume, ap_conf->pitch,
+           ap_conf->speed, yes_no(ap_conf->repeat), yes_no(ap_conf->shuffle), 
+           yes_no(keep));
     
     return 0;
 }
@@ -791,10 +851,23 @@ static int handle_help(const char *cmd, const char **argv, int argc)
 
 static int handle_mute(const char *cmd, const char **argv, int argc)
 {
-    (void) argv;
-    (void) argc;
+    bool value;
+    int err;
     
-    eprint("climpd: %s: not implemented\n", cmd);
+    report_redundant_if_applicable(argv + 1, argc - 1);
+    
+    if (argc == 0) {
+        audio_player_toggle_mute(&audio_player);
+        return 0;
+    }
+    
+    err = str_to_bool(argv[0], &value);
+    if (err < 0) {
+        report_invalid_boolean(cmd, argv[0]);
+        return err;
+    }
+
+    audio_player_set_mute(&audio_player, value);
     
     return 0;
 }
@@ -838,6 +911,9 @@ static int handle_play(const char *cmd, const char **argv, int argc)
     
     if (argc == 0) {
         err = audio_player_play(&audio_player);
+        if (err < 0)
+            report_error(cmd, "faild to start playback", err);
+        
         return err;
     }
     
@@ -856,13 +932,13 @@ static int handle_play(const char *cmd, const char **argv, int argc)
         if (str_is_int(argv[i])) {
             err = str_to_int(argv[i], &index);
             if (err < 0) {
-                report_invalid_integer(argv[i], err);
+                report_invalid_integer(cmd, argv[i], err);
                 goto fail;
             }
         } else {
             err = media_loader_load(&media_loader, argv[i], playlist);
             if (err < 0) {
-                report_arg_error(cmd, argv[i], err);
+                report_load_error(cmd, argv[i], err);
                 goto fail;
             }
         }
@@ -935,10 +1011,8 @@ static int handle_playlist(const char *cmd, const char **argv, int argc)
     
     for (int i = 0; i < argc; ++i) {
         err = media_loader_load(&media_loader, argv[i], playlist);
-        if (err < 0) {
-            report_error(cmd, "failed to load media", err);
-            return err;
-        }
+        if (err < 0)
+            report_load_error(cmd, argv[i], err);
     }
     
     return 0;
@@ -961,7 +1035,7 @@ static int handle_pitch(const char *cmd, const char **argv, int argc)
     
     err = str_to_float(argv[0], &new_pitch);
     if (err < 0) {
-        report_invalid_float(argv[0], err);
+        report_invalid_float(cmd, argv[0], err);
         return -EINVAL;
     }
     
@@ -1002,50 +1076,95 @@ static int handle_quit(const char *cmd, const char **argv, int argc)
 
 static int handle_remove(const char *cmd, const char **argv, int argc)
 {
-    (void) argv;
-    (void) argc;
+    struct playlist *playlist;
+    int int_argv[argc], err;
     
-    eprint("climpd: %s: not implemented\n", cmd);
+    for (int i = 0; i < argc; ++i) {
+        err = str_to_int(argv[i], int_argv + i);
+        if (err < 0) {
+            report_arg_error(cmd, argv[i], err);
+            return err;
+        }
+    }
+    
+    playlist = audio_player_playlist(&audio_player);
+    playlist_remove_array(playlist, int_argv, (unsigned int) argc);
     
     return 0;
 }
 
 static int handle_repeat(const char *cmd, const char **argv, int argc)
 {
-    (void) argv;
-    (void) argc;
+    struct playlist *playlist = audio_player_playlist(&audio_player);
+    bool value;
+    int err;
     
-    eprint("climpd: %s: not implemented\n", cmd);
+    report_redundant_if_applicable(argv + 1, argc - 1);
+    
+    err = str_to_bool(argv[0], &value);
+    if (err < 0) {
+        report_invalid_boolean(cmd, argv[0]);
+        return err;
+    }
+    
+    playlist_set_repeat(playlist, value);
     
     return 0;
 }
 
 static int handle_seek(const char *cmd, const char **argv, int argc)
 {
-    (void) argv;
-    (void) argc;
+    int sec, err;
     
-    eprint("climpd: %s: not implemented\n", cmd);
+    report_redundant_if_applicable(argv + 1, argc - 1);
     
-    return 0;
+    if (argc == 0) {
+        report_missing_arg(cmd);
+        return -EINVAL;
+    }
+    
+    err = str_to_sec(argv[0], &sec);
+    if (err < 0) {
+        report_invalid_time_format(cmd, argv[0]);
+        return err;
+    }
+    
+    err = audio_player_set_stream_position(&audio_player, (unsigned int) sec);
+    if (err < 0)
+        report_error(cmd, "unable to change the streams position", err);
+    
+    return err;
 }
 
 static int handle_shuffle(const char *cmd, const char **argv, int argc)
 {
-    (void) argv;
-    (void) argc;
+    struct playlist *playlist = audio_player_playlist(&audio_player);
+    bool value;
+    int err;
     
-    eprint("climpd: %s: not implemented\n", cmd);
+    report_redundant_if_applicable(argv + 1, argc - 1);
+    
+    err = str_to_bool(argv[0], &value);
+    if (err < 0) {
+        report_invalid_boolean(cmd, argv[0]);
+        return err;
+    }
+    
+    playlist_set_shuffle(playlist, value);
     
     return 0;
 }
 
 static int handle_sort(const char *cmd, const char **argv, int argc)
 {
-    (void) argv;
-    (void) argc;
+    struct playlist *playlist;
     
-    eprint("climpd: %s: not implemented\n", cmd);
+    (void) cmd;
+    
+    report_redundant_if_applicable(argv, argc);
+
+    playlist = audio_player_playlist(&audio_player);
+    playlist_sort(playlist);
     
     return 0;
 }
@@ -1059,7 +1178,7 @@ static int handle_speed(const char *cmd, const char **argv, int argc)
         
     report_redundant_if_applicable(argv + 1, argc - 1);
     
-    speed = audio_player_pitch(&audio_player);
+    speed = audio_player_speed(&audio_player);
     if (argc == 0) {
         print("  speed: %f\n", speed);
         return 0;
@@ -1067,7 +1186,7 @@ static int handle_speed(const char *cmd, const char **argv, int argc)
     
     err = str_to_float(argv[0], &new_speed);
     if (err < 0) {
-        report_invalid_float(argv[0], err);
+        report_invalid_float(cmd, argv[0], err);
         return -EINVAL;
     }
     
@@ -1087,11 +1206,25 @@ static int handle_speed(const char *cmd, const char **argv, int argc)
 
 static int handle_stdin(const char *cmd, const char **argv, int argc)
 {
-    (void) argv;
-    (void) argc;
+    struct playlist *playlist;
+    int err;
     
-    eprint("climpd: %s: not implemented\n", cmd);
+    report_redundant_if_applicable(argv, argc);
     
+    if (isatty(fd_in)) {
+        err = -EPIPE;
+        report_error(cmd, "stdin is attached to a terminal", err);
+        return err;
+    }
+    
+    playlist = audio_player_playlist(&audio_player);
+    
+    err = playlist_load_fd(playlist, fd_in);
+    if (err < 0) {
+        report_error(cmd, "error loading playlist: view log for details", err);
+        return err;
+    }
+
     return 0;
 }
 
@@ -1131,11 +1264,25 @@ static int handle_uris(const char *cmd, const char **argv, int argc)
 
 static int handle_volume(const char *cmd, const char **argv, int argc)
 {
-    (void) argv;
-    (void) argc;
+    unsigned int value;
+    int err;
     
-    eprint("climpd: %s: not implemented\n", cmd);
+    report_redundant_if_applicable(argv + 1, argc - 1);
     
+    if (argc == 0) {
+        value = audio_player_volume(&audio_player);
+        print("  %u\n", value);
+        return 0;
+    }
+    
+    err = str_to_int(argv[0], (int *) &value);
+    if (err < 0) {
+        report_invalid_integer(cmd, argv[0], err);
+        return err;
+    }
+    
+    audio_player_set_volume(&audio_player, value);
+        
     return 0;
 }
 
@@ -1212,12 +1359,12 @@ cleanup1:
     return err;
 }
 
-void on_sighub(int signo, siginfo_t *info, void *context)
-{
-    (void) signo;
-    (void) info;
-    (void) context;
-}
+// void on_sighub(int signo, siginfo_t *info, void *context)
+// {
+//     (void) signo;
+//     (void) info;
+//     (void) context;
+// }
 
 void on_sigterm(int signo, siginfo_t *info, void *context)
 {
@@ -1253,7 +1400,7 @@ struct signal_handle sighandles[] = {
     { SIGTTIN,          SIG_IGN,    },
     { SIGTTOU,          SIG_IGN,    },
     { SIGPIPE,          SIG_IGN,    },
-    { SIGHUP,           &on_sighub  },
+    { SIGHUP,           SIG_IGN,    },
     { SIGTERM,          &on_sigterm },
     { SIGILL,           &on_sigerr  },
     { SIGBUS,           &on_sigerr  },
