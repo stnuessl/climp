@@ -874,10 +874,24 @@ static int handle_mute(const char *cmd, const char **argv, int argc)
 
 static int handle_next(const char *cmd, const char **argv, int argc)
 {
-    (void) argv;
-    (void) argc;
+    int err;
     
-    eprint("climpd: %s: not implemented\n", cmd);
+    report_redundant_if_applicable(argv, argc);
+    
+    err = audio_player_play_next(&audio_player);
+    if (err < 0) {
+        struct playlist *playlist = audio_player_playlist(&audio_player);
+        
+        if (playlist_empty(playlist))
+            report_error(cmd, "playlist is empty", err);
+        else
+            report_error(cmd, "failed to play next track", err);
+        
+        return err;
+    }
+    
+    if (audio_player_is_stopped(&audio_player))
+        print("climpd: finished playlist\n");
     
     return 0;
 }
@@ -888,6 +902,7 @@ static int handle_pause(const char *cmd, const char **argv, int argc)
     
     report_redundant_if_applicable(argv, argc);
     
+    /* TODO cleanup */
     if (audio_player_is_playing(&audio_player)) {
         err = audio_player_pause(&audio_player);
         if (err < 0)
