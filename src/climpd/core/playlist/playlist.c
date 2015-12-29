@@ -23,6 +23,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <ctype.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <errno.h>
@@ -58,7 +59,7 @@ static unsigned int ensure_positiv_index(const struct playlist *__restrict pl,
 static int playlist_load_file(struct playlist *__restrict pl, 
                               FILE *__restrict file)
 {
-    char *line;
+    char *line, *begin, *end;
     size_t size;
     ssize_t n;
     unsigned int old_size;
@@ -76,18 +77,32 @@ static int playlist_load_file(struct playlist *__restrict pl,
         if (n == 0)
             continue;
         
-        if (line[0] == '#' || line[0] == '\n')
+        /* skip all leading whitespaces */
+        begin = line;
+        
+        while (*begin != '\0' && isspace(*begin))
+            ++begin;
+        
+        if (*begin == '#' || *begin == ';')
             continue;
+
+        /* trim all trailing whitespaces */
+        end = line + n - 1;
         
-        line[n - 1] = '\0';
+        while (end > begin && isspace(*end))
+            *end-- = '\0';
         
-        if (!path_is_absolute(line) && !uri_ok(line)) {
+        /* skip empty lines */
+        if (begin >= end)
+            continue;
+
+        if (!path_is_absolute(begin) && !uri_ok(begin)) {
             err = -ENOTSUP;
-            climpd_log_e(tag, "\"%s\" - no absolute path or valid uri\n", line);
+            climpd_log_e(tag, "\"%s\" - no absolute path or uri\n", begin);
             goto cleanup1;
         }
         
-        err = playlist_add(pl, line);
+        err = playlist_add(pl, begin);
         if (err < 0)
             goto cleanup1;
     }

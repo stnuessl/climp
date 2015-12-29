@@ -92,9 +92,10 @@ int argument_parser_run(struct argument_parser *__restrict ap,
                         int argc)
 {
     int err;
-    
+
     for (int i = 0 ; i < argc; ++i) {
         struct arg *arg = map_retrieve(&ap->map, argv[i]);
+        int j;
         
         if (!arg) {
             climpd_log_w(tag, "skipping invalid argument '%s'\n", argv[i]);
@@ -105,18 +106,23 @@ int argument_parser_run(struct argument_parser *__restrict ap,
             continue;
         }
         
-        int j = i + 1;
+        j = i + 1;
         
         while (j < argc && !map_contains(&ap->map, argv[j]))
-            j++;
+            ++j;
         
-        j--;
+        climpd_log_i(tag, "running '%s ", argv[i]);
         
-        err = arg->handler(argv[i], argv + i + 1, j - i);
+        for (int k = i + 1; k < j; ++k)
+            climpd_log_append("%s ", argv[k]);
+        
+        climpd_log_append("\b'\n");
+        
+        err = arg->handler(argv[i], argv + i + 1, j - (i + 1));
         if (err < 0)
             climpd_log_w(tag, "\"%s\" failed - %s\n", argv[i], strerr(-err));
         
-        i = j;
+        i = j - 1;
     }
     
     return 0;

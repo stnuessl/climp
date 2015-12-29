@@ -265,18 +265,18 @@ static int handle_config(const char *cmd, const char **argv, int argc)
     playlist_set_repeat(playlist, ap_conf->repeat);
     playlist_set_shuffle(playlist, ap_conf->shuffle);
     
-    eprint(" climpd-config      \n"
-           " -------------------\n"
-           " Column Width : %u  \n"
-           " Volume       : %u  \n"
-           " Pitch        : %.2f\n"
-           " Speed        : %.2f\n"
-           " Repeat       : %s  \n"
-           " Shuffle      : %s  \n"
-           " Save Changes : %s  \n\n",
-           cout_conf->meta_column_width, ap_conf->volume, ap_conf->pitch,
-           ap_conf->speed, yes_no(ap_conf->repeat), yes_no(ap_conf->shuffle), 
-           yes_no(keep));
+    print(" climpd-config      \n"
+          " -------------------\n"
+          " Column Width : %u  \n"
+          " Volume       : %u  \n"
+          " Pitch        : %.2f\n"
+          " Speed        : %.2f\n"
+          " Repeat       : %s  \n"
+          " Shuffle      : %s  \n"
+          " Save Changes : %s  \n\n",
+          cout_conf->meta_column_width, ap_conf->volume, ap_conf->pitch,
+          ap_conf->speed, yes_no(ap_conf->repeat), yes_no(ap_conf->shuffle), 
+          yes_no(keep));
     
     return 0;
 }
@@ -313,11 +313,11 @@ static int handle_current(const char *cmd, const char **argv, int argc)
 
     meta_len = climpd_config_console_output_config(&config)->meta_column_width;
     
-    eprint(" ( %3u )  %2u:%02u / %2u:%02u   %-*.*s %-*.*s %-*.*s\n",
-           index, p_min, p_sec, info->duration / 60, info->duration % 60, 
-           meta_len, meta_len, info->title,
-           meta_len, meta_len, info->artist,
-           meta_len, meta_len, info->album);
+    print(" ( %3u )  %2u:%02u / %2u:%02u   %-*.*s %-*.*s %-*.*s\n",
+          index, p_min, p_sec, info->duration / 60, info->duration % 60, 
+          meta_len, meta_len, info->title,
+          meta_len, meta_len, info->artist,
+          meta_len, meta_len, info->album);
     
     return 0;
 }
@@ -338,7 +338,7 @@ static int handle_files(const char *cmd, const char **argv, int argc)
     for (unsigned int i = 0; i < size; ++i) {
         struct media *m = playlist_at_unsafe(playlist, (int) i);
         
-        eprint("%s\n", media_path(m));
+        print("%s\n", media_path(m));
     }
     
     return 0;
@@ -779,7 +779,7 @@ static int handle_uris(const char *cmd, const char **argv, int argc)
     for (unsigned int i = 0; i < size; ++i) {
         struct media *m = playlist_at_unsafe(playlist, (int) i);
         
-        eprint("%s\n", media_uri(m));
+        print("%s\n", media_uri(m));
     }
     
     return 0;
@@ -921,20 +921,19 @@ void on_sigerr(int signo, siginfo_t *info, void *context)
 }
 
 struct signal_handle sighandles[] = {
-    { SIGQUIT,          SIG_IGN     },
-    { SIGINT,           SIG_IGN     },
-    { SIGTSTP,          SIG_IGN     },
-    { SIGTTIN,          SIG_IGN,    },
-    { SIGTTOU,          SIG_IGN,    },
-    { SIGPIPE,          SIG_IGN,    },
-    { SIGHUP,           SIG_IGN,    },
-    { SIGTERM,          &on_sigterm },
-    { SIGILL,           &on_sigerr  },
-    { SIGBUS,           &on_sigerr  },
-    { SIGSEGV,          &on_sigerr  },
-    { SIGFPE,           &on_sigerr  },
-    { SIGSYS,           &on_sigerr  },
-    
+    { SIGQUIT,          (void (*)(int, siginfo_t *, void *)) SIG_IGN    },
+    { SIGINT,           (void (*)(int, siginfo_t *, void *)) SIG_IGN    },
+    { SIGTSTP,          (void (*)(int, siginfo_t *, void *)) SIG_IGN    },
+    { SIGTTIN,          (void (*)(int, siginfo_t *, void *)) SIG_IGN    },
+    { SIGTTOU,          (void (*)(int, siginfo_t *, void *)) SIG_IGN    },
+    { SIGPIPE,          (void (*)(int, siginfo_t *, void *)) SIG_IGN    },
+    { SIGHUP,           (void (*)(int, siginfo_t *, void *)) SIG_IGN    },
+    { SIGTERM,          &on_sigterm                                     },
+    { SIGILL,           &on_sigerr                                      },
+    { SIGBUS,           &on_sigerr                                      },
+    { SIGSEGV,          &on_sigerr                                      },
+    { SIGFPE,           &on_sigerr                                      },
+    { SIGSYS,           &on_sigerr                                      },
 };
 
 __attribute__((constructor)) void __init(void)
