@@ -127,7 +127,7 @@ void climpd_log_append(const char *fmt, ...)
     
     va_start(vargs, fmt);
     
-    log_append(&log, fmt, vargs);
+    log_vappend(&log, fmt, vargs);
     
     va_end(vargs);
 }
