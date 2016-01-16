@@ -24,6 +24,12 @@
 #include <core/audio-player/gst-engine.h>
 #include <core/playlist/playlist.h>
 
+enum audio_player_state {
+    AUDIO_PLAYER_PLAYING = GST_ENGINE_PLAYING,
+    AUDIO_PLAYER_PAUSED = GST_ENGINE_PAUSED,
+    AUDIO_PLAYER_STOPPED = GST_ENGINE_STOPPED,
+};
+
 struct audio_player {
     struct gst_engine engine;
     struct playlist playlist;
@@ -63,6 +69,9 @@ void audio_player_set_mute(struct audio_player *__restrict ap, bool mute);
 bool audio_player_is_muted(const struct audio_player *__restrict ap);
 
 void audio_player_toggle_mute(struct audio_player *__restrict ap);
+
+enum audio_player_state 
+audio_player_state(const struct audio_player *__restrict ap);
 
 bool audio_player_is_playing(const struct audio_player *__restrict ap);
 

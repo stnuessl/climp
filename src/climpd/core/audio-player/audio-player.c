@@ -226,6 +226,12 @@ void audio_player_toggle_mute(struct audio_player *__restrict ap)
     gst_engine_set_mute(&ap->engine, !mute);
 }
 
+enum audio_player_state 
+audio_player_state(const struct audio_player *__restrict ap)
+{
+    return gst_engine_state(&ap->engine);
+}
+
 bool audio_player_is_playing(const struct audio_player *__restrict ap)
 {
     return gst_engine_state(&ap->engine) == GST_ENGINE_PLAYING;

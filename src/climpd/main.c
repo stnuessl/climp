@@ -90,7 +90,7 @@ static const char help[] = {
     "  -v, --volume [arg]     Set or get the volume of the climpd-player.\n"
     "  -q, --quit             Quit the climpd application.\n"
     "      --help             Print this help message\n"
-    "      --previous         not implemented yet\n"
+    "      --previous         not implemented\n"
     "      --next             Play the next track in the playlist.\n"
     "  -p, --play [args]      Start playback, or set a playlist and start\n"
     "                         playback immediatley, or jump to a track in the\n"
@@ -408,20 +408,27 @@ static int handle_pause(const char *cmd, const char **argv, int argc)
     
     report_redundant_if_applicable(argv, argc);
     
-    /* TODO cleanup */
-    if (audio_player_is_playing(&audio_player)) {
+    switch (audio_player_state(&audio_player)) {
+    case AUDIO_PLAYER_PLAYING:
         err = audio_player_pause(&audio_player);
         if (err < 0)
             report_error(cmd, "failed to pause playback", err);
-    } else if (audio_player_is_paused(&audio_player)) {
+        
+        break;
+    case AUDIO_PLAYER_PAUSED:
         err = audio_player_play(&audio_player);
         if (err < 0)
             report_error(cmd, "failed to unpause playback", err);
-    } else {
+        
+        break;
+    case AUDIO_PLAYER_STOPPED:
+    default:
         err = -EINVAL;
         report_error(cmd, "unable to pause while stopped", err);
+        
+        break;
     }
-    
+
     return err;
 }
 
