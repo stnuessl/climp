@@ -23,6 +23,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
+#include <time.h>
 #include <stdbool.h>
 #include <sys/wait.h>
 #include <sys/socket.h>
@@ -36,6 +37,22 @@
 extern char **environ;
 
 static int _ipc_sock;
+
+static void sleep_ns(unsigned long ns)
+{
+    struct timespec ts, rem;
+    int err;
+    
+    rem.tv_sec = ns / (1000 * 1000 * 1000);
+    rem.tv_nsec = ns % (1000 * 1000 * 1000);
+    
+    do {
+        ts.tv_sec = rem.tv_sec;
+        ts.tv_nsec = rem.tv_nsec;
+        
+        err = nanosleep(&ts, &rem);
+    } while (err < 0 && errno == EINTR);
+}
 
 static int connect_to_daemon(const char *__restrict path)
 {
@@ -114,6 +131,11 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
     
+    if (argc == 1) {
+        argv = (char *[]) { argv[0], "--help" };
+        argc = 2;
+    }
+    
     err = asprintf(&sock_path, "/tmp/.climpd-%d.sock", getuid());
     if (err < 0) {
         fprintf(stderr, "failed to create socket path\n");
@@ -142,8 +164,8 @@ int main(int argc, char *argv[])
         attempts = 1000;
         
         while (attempts--) {
-            usleep(10 * 1000);
-            
+            sleep_ns(10 * 1000 * 1000);
+
             err = connect_to_daemon(sock_path);
             if(err < 0)
                 continue;
