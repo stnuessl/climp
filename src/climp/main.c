@@ -40,17 +40,14 @@ static int _ipc_sock;
 
 static void sleep_ns(unsigned long ns)
 {
-    struct timespec ts, rem;
+    struct timespec ts;
     int err;
     
-    rem.tv_sec = ns / (1000 * 1000 * 1000);
-    rem.tv_nsec = ns % (1000 * 1000 * 1000);
+    ts.tv_sec = ns / (1000 * 1000 * 1000);
+    ts.tv_nsec = ns % (1000 * 1000 * 1000);
     
     do {
-        ts.tv_sec = rem.tv_sec;
-        ts.tv_nsec = rem.tv_nsec;
-        
-        err = nanosleep(&ts, &rem);
+        err = nanosleep(&ts, &ts);
     } while (err < 0 && errno == EINTR);
 }
 
