@@ -153,6 +153,8 @@ int audio_player_play_track(struct audio_player *__restrict ap, int track)
     
     ap->active_track = m;
     
+    climpd_log_i(tag, "now playing '%s'\n", media_path(ap->active_track));
+    
     return 0;
 
 fail:
