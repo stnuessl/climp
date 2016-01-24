@@ -24,6 +24,7 @@
 #include <stdio.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <stdbool.h>
 
 #define BUFFER_SIZE (1 << 12)
 
@@ -31,17 +32,22 @@ int main(int argc, char *argv[])
 {
     static __thread char buffer[BUFFER_SIZE];
     char *path;
+    bool env;
     ssize_t n;
     int fd, err;
     
     (void) argc;
     (void) argv;
     
-    err = asprintf(&path, "/tmp/climpd-%u.log", getuid());
-    if (err < 0) {
-        const char *msg = strerror(errno);
-        fprintf(stderr, "unable to retrieve path of log file - %s\n", msg);
-        exit(EXIT_FAILURE);
+    path = getenv("CLIMPD_LOGFILE");
+    env = !!path;
+    if (!path) {
+        err = asprintf(&path, "/tmp/climpd-%u.log", getuid());
+        if (err < 0) {
+            const char *msg = strerror(errno);
+            fprintf(stderr, "unable to retrieve path of log file - %s\n", msg);
+            exit(EXIT_FAILURE);
+        }
     }
     
     fd = open(path, O_RDONLY);
@@ -70,7 +76,9 @@ int main(int argc, char *argv[])
     }
     
     close(fd);
-    free(path);
+    
+    if (!env)
+        free(path);
     
     return EXIT_SUCCESS;
 }

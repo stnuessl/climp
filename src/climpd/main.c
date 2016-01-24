@@ -945,20 +945,26 @@ struct signal_handle sighandles[] = {
 
 __attribute__((constructor)) void __init(void)
 {
-    char *path = NULL;
+    char *path;
+    bool env;
     int err;
     
     gst_init(NULL, NULL);
     
-    err = asprintf(&path, "/tmp/climpd-%d.log", getuid());
-    if (err < 0) {
-        fprintf(stderr, "**FATAL: failed to allocate memory\n");
-        exit(EXIT_FAILURE);
+    path = getenv("CLIMPD_LOGFILE");
+    env = !!path;
+    if (!path) {
+        err = asprintf(&path, "/tmp/climpd-%d.log", getuid());
+        if (err < 0) {
+            fprintf(stderr, "**FATAL: failed to allocate memory\n");
+            exit(EXIT_FAILURE);
+        }
     }
     
     err = climpd_log_init(path);
-    
-    free(path);
+
+    if (!env)
+        free(path);
     
     if (err < 0) {
         fprintf(stderr, "**FATAL: failed to initialize log file - %s\n",
