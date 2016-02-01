@@ -27,6 +27,9 @@
 
 bool str_is_int(const char *__restrict s)
 {
+    if (*s == '+' || *s == '-')
+        ++s;
+    
     while (*s != '\0') {
         if (!isxdigit(*s++))
             return false;
