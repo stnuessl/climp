@@ -345,12 +345,15 @@ void playlist_remove(struct playlist *__restrict pl, int index)
     
     if (i < playlist_size(pl)) {
         struct media *m = vector_take_at(&pl->vec_media, i);
-        
         media_unref(m);
+        
+        kfy_remove(&pl->kfy, 1);
     }
+    
+    assert(kfy_size(&pl->kfy) == vector_size(&pl->vec_media) && "INVALID SIZE");
 }
 
-void playlist_remove_array(struct playlist *__restrict pl, 
+void playlist_remove_array(struct playlist *__restrict pl,
                            int *__restrict indices,
                            unsigned int size)
 {

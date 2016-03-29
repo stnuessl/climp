@@ -5,9 +5,9 @@ project(climp C)
 
 add_definitions(-Wall -Wextra -Wpedantic)
 add_definitions(-D_GNU_SOURCE)
-#add_definitions(-DNDEBUG)
-#add_definitions(-O2) 
-add_definitions(-g3)
+add_definitions(-DNDEBUG)
+add_definitions(-O2) 
+# add_definitions(-g3)
 add_definitions(-std=c11)
 
 #set(CMAKE_BUILD_TYPE "release")
